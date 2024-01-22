@@ -1,21 +1,23 @@
 mod d3d_device;
 mod display;
+mod image_bytes;
 mod logger;
 mod texture;
+mod tone_map;
+mod write_image;
 
-use std::fs;
 use std::sync::mpsc::channel;
 
 use half::f16;
-use log::{error, info};
-use windows::core::{ComInterface, IInspectable, Result, HSTRING};
+use image_bytes::convert_image_to_bytes;
+use log::error;
+use tone_map::{gamma_compression, simple_reinhard_tonemapper};
+use windows::core::{ComInterface, IInspectable, Result};
 use windows::Foundation::TypedEventHandler;
 use windows::Graphics::Capture::{
     Direct3D11CaptureFramePool, GraphicsCaptureItem, GraphicsCaptureSession,
 };
 use windows::Graphics::DirectX::DirectXPixelFormat;
-use windows::Graphics::Imaging::{BitmapAlphaMode, BitmapEncoder, BitmapPixelFormat};
-use windows::Storage::{CreationCollisionOption, FileAccessMode, StorageFolder};
 use windows::Win32::Graphics::Direct3D11::{
     ID3D11Resource, ID3D11Texture2D, D3D11_CPU_ACCESS_READ, D3D11_MAPPED_SUBRESOURCE,
     D3D11_MAP_READ, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
@@ -25,6 +27,7 @@ use windows::Win32::System::WinRT::Graphics::Capture::IGraphicsCaptureItemIntero
 use crate::d3d_device::{create_d3d_device, create_dxgi_device};
 use crate::display::get_display;
 use crate::texture::get_texture_from_surface;
+use crate::write_image::write_image;
 
 fn main() -> Result<()> {
     logger::init_fern().unwrap();
@@ -101,7 +104,7 @@ fn main() -> Result<()> {
         copy_texture
     };
 
-    let image: Vec<Vec<[f16; 4]>> = unsafe {
+    let (mut image, input_max) = unsafe {
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         texture.GetDesc(&mut desc as *mut _);
 
@@ -128,37 +131,51 @@ fn main() -> Result<()> {
 
         let mut image: Vec<Vec<[f16; CHANNELS]>> =
             vec![vec![[f16::ZERO; CHANNELS]; desc.Width as usize]; desc.Height as usize];
-
+        let mut input_max = f16::ZERO;
         for row in 0..desc.Height {
-            /*             let data_begin = (row * (desc.Width * BYTES_PER_PIXEL as u32)) as usize;
-                       let data_end = ((row + 1) * (desc.Width * BYTES_PER_PIXEL as u32)) as usize;
-            */
             let slice_begin = (row * mapped.RowPitch) as usize;
             let slice_end = slice_begin + (desc.Width * BYTES_PER_PIXEL as u32) as usize;
 
             let slice = &slice[slice_begin..slice_end];
+
             for pixel_index in 0..(slice.len() / BYTES_PER_PIXEL) {
                 let mut pixel = [f16::ZERO; CHANNELS];
+
                 for channel_index in 0..CHANNELS {
                     let channel_start =
                         (pixel_index * BYTES_PER_PIXEL) + (channel_index * BYTES_PER_CHANNEL);
                     let mut channel = [0u8; BYTES_PER_CHANNEL];
+
                     for byte_index in 0..BYTES_PER_CHANNEL {
                         channel[byte_index] = slice[channel_start + byte_index];
                     }
 
-                    pixel[channel_index] = f16::from_le_bytes(channel);
+                    let pixel_value = f16::from_le_bytes(channel);
+                    pixel[channel_index] = pixel_value;
+                    if pixel_value > input_max && channel_index != 3 {
+                        input_max = pixel_value
+                    }
                 }
+
                 image[row as usize][pixel_index] = pixel;
             }
         }
 
         d3d_context.Unmap(Some(&resource), 0);
 
-        image
+        (image, input_max)
     };
 
-    dbg!(image);
+    // good sdr -> sdr values 1.05, 0.5
+    gamma_compression(&mut image, 1.05, 0.5);
+    let image = convert_image_to_bytes(
+        image,
+        capture_size.Width as usize,
+        capture_size.Height as usize,
+        f16::ONE,
+    );
+
+    write_image(image, capture_size.Width as u32, capture_size.Height as u32)?;
 
     Ok(())
 }
