@@ -1,0 +1,1 @@
+Code adapted from [robminkh/screenshot-rs](https://github.com/robmikh/screenshot-rs).
