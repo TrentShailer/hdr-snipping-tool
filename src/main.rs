@@ -1,17 +1,16 @@
 mod d3d_device;
 mod display;
-mod image_bytes;
+mod image;
 mod logger;
 mod texture;
-mod tone_map;
 mod write_image;
 
 use std::sync::mpsc::channel;
+use std::time::SystemTime;
 
 use half::f16;
-use image_bytes::convert_image_to_bytes;
 use log::error;
-use tone_map::{gamma_compression, simple_reinhard_tonemapper};
+use rayon::prelude::*;
 use windows::core::{ComInterface, IInspectable, Result};
 use windows::Foundation::TypedEventHandler;
 use windows::Graphics::Capture::{
@@ -26,10 +25,12 @@ use windows::Win32::System::WinRT::Graphics::Capture::IGraphicsCaptureItemIntero
 
 use crate::d3d_device::{create_d3d_device, create_dxgi_device};
 use crate::display::get_display;
+use crate::image::Image;
 use crate::texture::get_texture_from_surface;
 use crate::write_image::write_image;
 
 fn main() -> Result<()> {
+    let start = SystemTime::now();
     logger::init_fern().unwrap();
 
     if !GraphicsCaptureSession::IsSupported()? {
@@ -104,7 +105,7 @@ fn main() -> Result<()> {
         copy_texture
     };
 
-    let (mut image, input_max) = unsafe {
+    let mut image = unsafe {
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         texture.GetDesc(&mut desc as *mut _);
 
@@ -129,9 +130,40 @@ fn main() -> Result<()> {
         const BYTES_PER_CHANNEL: usize = 2;
         const CHANNELS: usize = 4;
 
-        let mut image: Vec<Vec<[f16; CHANNELS]>> =
-            vec![vec![[f16::ZERO; CHANNELS]; desc.Width as usize]; desc.Height as usize];
-        let mut input_max = f16::ZERO;
+        let mut image: Image = Image::new(desc.Width as usize, desc.Height as usize);
+
+        /* let mut image = (0..desc.Height)
+        .into_par_iter()
+        .map(|row_index| {
+            let mut row = vec![[f16::ZERO; CHANNELS]; desc.Width as usize];
+            let slice_begin = (row_index * mapped.RowPitch) as usize;
+            let slice_end = slice_begin + (desc.Width * BYTES_PER_PIXEL as u32) as usize;
+
+            let slice = &slice[slice_begin..slice_end];
+
+            for pixel_index in 0..(slice.len() / BYTES_PER_PIXEL) {
+                let mut pixel = [f16::ZERO; CHANNELS];
+
+                for channel_index in 0..CHANNELS {
+                    let channel_start =
+                        (pixel_index * BYTES_PER_PIXEL) + (channel_index * BYTES_PER_CHANNEL);
+                    let mut channel = [0u8; BYTES_PER_CHANNEL];
+
+                    for byte_index in 0..BYTES_PER_CHANNEL {
+                        channel[byte_index] = slice[channel_start + byte_index];
+                    }
+
+                    let pixel_value = f16::from_le_bytes(channel);
+                    pixel[channel_index] = pixel_value;
+                }
+
+                row[pixel_index] = pixel;
+            }
+            row
+        })
+        .collect(); */
+
+        let f16_start = SystemTime::now();
         for row in 0..desc.Height {
             let slice_begin = (row * mapped.RowPitch) as usize;
             let slice_end = slice_begin + (desc.Width * BYTES_PER_PIXEL as u32) as usize;
@@ -152,30 +184,43 @@ fn main() -> Result<()> {
 
                     let pixel_value = f16::from_le_bytes(channel);
                     pixel[channel_index] = pixel_value;
-                    if pixel_value > input_max && channel_index != 3 {
-                        input_max = pixel_value
+                    if pixel_value > image.max_value {
+                        image.max_value = pixel_value;
                     }
                 }
 
-                image[row as usize][pixel_index] = pixel;
+                image.rows[row as usize][pixel_index] = pixel;
             }
         }
+        let f16_end = SystemTime::now();
+        let duration = f16_end.duration_since(f16_start).unwrap();
+        println!("f16 took {}s", duration.as_secs_f64());
 
         d3d_context.Unmap(Some(&resource), 0);
 
-        (image, input_max)
+        image
     };
 
     // good sdr -> sdr values 1.05, 0.5
-    gamma_compression(&mut image, 1.05, 0.5);
-    let image = convert_image_to_bytes(
-        image,
-        capture_size.Width as usize,
-        capture_size.Height as usize,
-        f16::ONE,
-    );
+    let gamma_start = SystemTime::now();
+    image.compress_gamma(1.05, 0.5);
+    let gamma_end = SystemTime::now();
+    let duration = gamma_end.duration_since(gamma_start).unwrap();
+    println!("Gamma took {}s", duration.as_secs_f64());
 
-    write_image(image, capture_size.Width as u32, capture_size.Height as u32)?;
+    let width = image.width;
+    let height = image.height;
+
+    let u8_start = SystemTime::now();
+    let image = image.to_bytes();
+    let u8_end = SystemTime::now();
+    let duration = u8_end.duration_since(u8_start).unwrap();
+    println!("u8 took {}s", duration.as_secs_f64());
+
+    write_image(image, width as u32, height as u32)?;
+    let end = SystemTime::now();
+    let duration = end.duration_since(start).unwrap();
+    println!("Completed in {}s", duration.as_secs_f64());
 
     Ok(())
 }
