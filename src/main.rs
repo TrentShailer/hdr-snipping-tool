@@ -3,8 +3,10 @@ mod display;
 mod logger;
 mod texture;
 
+use std::fs;
 use std::sync::mpsc::channel;
 
+use half::f16;
 use log::{error, info};
 use windows::core::{ComInterface, IInspectable, Result, HSTRING};
 use windows::Foundation::TypedEventHandler;
@@ -31,10 +33,7 @@ fn main() -> Result<()> {
         error!("Graphics capture is not supported.");
         return Ok(());
     }
-    info!("Graphics capture is supported.");
 
-    // Loop, get keybind down
-    // from mouse get the display
     let display = get_display()?;
 
     // turn display into capture item
@@ -48,9 +47,10 @@ fn main() -> Result<()> {
     let dxgi_device = create_dxgi_device(&d3d_device)?;
 
     // create frame pool
+    // should set pixel format to match the display's pixel format
     let frame_pool = Direct3D11CaptureFramePool::CreateFreeThreaded(
         &dxgi_device,
-        DirectXPixelFormat::B8G8R8A8UIntNormalized,
+        DirectXPixelFormat::R16G16B16A16Float,
         1,
         capture_size,
     )?;
@@ -101,8 +101,7 @@ fn main() -> Result<()> {
         copy_texture
     };
 
-    // convert texture to bitmap
-    let bits = unsafe {
+    let image: Vec<Vec<[f16; 4]>> = unsafe {
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         texture.GetDesc(&mut desc as *mut _);
 
@@ -116,7 +115,6 @@ fn main() -> Result<()> {
             Some(&mut mapped),
         )?;
 
-        // Get a slice of bytes
         let slice: &[u8] = {
             std::slice::from_raw_parts(
                 mapped.pData as *const _,
@@ -124,49 +122,43 @@ fn main() -> Result<()> {
             )
         };
 
-        let bytes_per_pixel = 4;
-        let mut bits = vec![0u8; (desc.Width * desc.Height * bytes_per_pixel) as usize];
+        const BYTES_PER_PIXEL: usize = 8;
+        const BYTES_PER_CHANNEL: usize = 2;
+        const CHANNELS: usize = 4;
+
+        let mut image: Vec<Vec<[f16; CHANNELS]>> =
+            vec![vec![[f16::ZERO; CHANNELS]; desc.Width as usize]; desc.Height as usize];
+
         for row in 0..desc.Height {
-            let data_begin = (row * (desc.Width * bytes_per_pixel)) as usize;
-            let data_end = ((row + 1) * (desc.Width * bytes_per_pixel)) as usize;
+            /*             let data_begin = (row * (desc.Width * BYTES_PER_PIXEL as u32)) as usize;
+                       let data_end = ((row + 1) * (desc.Width * BYTES_PER_PIXEL as u32)) as usize;
+            */
             let slice_begin = (row * mapped.RowPitch) as usize;
-            let slice_end = slice_begin + (desc.Width * bytes_per_pixel) as usize;
-            bits[data_begin..data_end].copy_from_slice(&slice[slice_begin..slice_end]);
+            let slice_end = slice_begin + (desc.Width * BYTES_PER_PIXEL as u32) as usize;
+
+            let slice = &slice[slice_begin..slice_end];
+            for pixel_index in 0..(slice.len() / BYTES_PER_PIXEL) {
+                let mut pixel = [f16::ZERO; CHANNELS];
+                for channel_index in 0..CHANNELS {
+                    let channel_start =
+                        (pixel_index * BYTES_PER_PIXEL) + (channel_index * BYTES_PER_CHANNEL);
+                    let mut channel = [0u8; BYTES_PER_CHANNEL];
+                    for byte_index in 0..BYTES_PER_CHANNEL {
+                        channel[byte_index] = slice[channel_start + byte_index];
+                    }
+
+                    pixel[channel_index] = f16::from_le_bytes(channel);
+                }
+                image[row as usize][pixel_index] = pixel;
+            }
         }
 
         d3d_context.Unmap(Some(&resource), 0);
 
-        bits
+        image
     };
 
-    // write bitmap to file
-    let path = std::env::current_dir()
-        .unwrap()
-        .to_string_lossy()
-        .to_string();
-    let folder = StorageFolder::GetFolderFromPathAsync(&HSTRING::from(&path))?.get()?;
-    let file = folder
-        .CreateFileAsync(
-            &HSTRING::from("screenshot.png"),
-            CreationCollisionOption::ReplaceExisting,
-        )?
-        .get()?;
-
-    {
-        let stream = file.OpenAsync(FileAccessMode::ReadWrite)?.get()?;
-        let encoder = BitmapEncoder::CreateAsync(BitmapEncoder::PngEncoderId()?, &stream)?.get()?;
-        encoder.SetPixelData(
-            BitmapPixelFormat::Bgra8,
-            BitmapAlphaMode::Premultiplied,
-            capture_size.Width as u32,
-            capture_size.Height as u32,
-            1.0,
-            1.0,
-            &bits,
-        )?;
-
-        encoder.FlushAsync()?.get()?;
-    }
+    dbg!(image);
 
     Ok(())
 }

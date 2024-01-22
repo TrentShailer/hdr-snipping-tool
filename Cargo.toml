@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 chrono = "0.4.31"
 fern = "0.6.2"
+half = "2.3.1"
 log = "0.4.20"
 owo-colors = "4.0.0"
 windows = { version = "0.52.0", features = [
