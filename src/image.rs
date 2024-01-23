@@ -1,13 +1,14 @@
 use std::{cmp::Ordering, time::SystemTime};
 
 use half::f16;
+use num_traits::{cast::ToPrimitive, Float};
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator,
     IntoParallelRefMutIterator, ParallelIterator,
 };
 
 pub struct Image {
-    pub values: Vec<f32>,
+    pub values: Vec<f16>,
     pub width: usize,
     pub height: usize,
 }
@@ -21,9 +22,9 @@ impl Image {
                 let start = byte_index * 2;
                 let end = start + 2;
                 channel[..2].copy_from_slice(&slice[start..end]);
-                f16::from_le_bytes(channel).to_f32()
+                f16::from_le_bytes(channel)
             })
-            .collect::<Vec<f32>>();
+            .collect::<Vec<f16>>();
 
         Self {
             values: values,
@@ -38,7 +39,7 @@ impl Image {
     /// Maps from the domain \[0,a^(-1/γ)] to the domain \[0,1].<br>
     /// γ regulated contrast, lower = lower, but also increases exposure of underexposed parts if lower.<br>
     /// if a < 1 it can decrease the exposure of over exposed parts of the image.
-    pub fn compress_gamma(&mut self, a: f32, gamma: f32) {
+    pub fn compress_gamma(&mut self, a: f16, gamma: f16) {
         self.values
             .par_iter_mut()
             .enumerate()
@@ -50,11 +51,11 @@ impl Image {
             });
     }
 
-    fn compress_gamma_value(value: &mut f32, a: f32, gamma: f32) {
+    fn compress_gamma_value(value: &mut f16, a: f16, gamma: f16) {
         *value = a * value.powf(gamma);
     }
 
-    fn get_max_value(&self) -> (usize, &f32) {
+    fn get_max_value(&self) -> (usize, &f16) {
         self.values
             .par_iter()
             .enumerate()
@@ -94,9 +95,9 @@ impl Image {
             .enumerate()
             .map(|(index, value)| {
                 if (index + 1) % 4 == 0 {
-                    (value * 255.0) as u8
+                    (value * F16_255).trunc().to_u8().unwrap()
                 } else {
-                    Self::scale_0_1(value, &max_value) as u8
+                    Self::scale_0_1(value, &max_value).trunc().to_u8().unwrap()
                 }
             })
             .collect::<Vec<u8>>();
@@ -108,7 +109,9 @@ impl Image {
         bytes
     }
 
-    fn scale_0_1(input: f32, max_value: &f32) -> f32 {
-        input / max_value * 255.0
+    fn scale_0_1(input: f16, max_value: &f16) -> f16 {
+        input / max_value * F16_255
     }
 }
+
+const F16_255: f16 = f16::from_f32_const(255.0);
