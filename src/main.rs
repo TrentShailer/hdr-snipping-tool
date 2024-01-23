@@ -8,9 +8,7 @@ mod write_image;
 use std::sync::mpsc::channel;
 use std::time::SystemTime;
 
-use half::f16;
 use log::error;
-use rayon::prelude::*;
 use windows::core::{ComInterface, IInspectable, Result};
 use windows::Foundation::TypedEventHandler;
 use windows::Graphics::Capture::{
@@ -30,7 +28,6 @@ use crate::texture::get_texture_from_surface;
 use crate::write_image::write_image;
 
 fn main() -> Result<()> {
-    let start = SystemTime::now();
     logger::init_fern().unwrap();
 
     if !GraphicsCaptureSession::IsSupported()? {
@@ -152,12 +149,9 @@ fn main() -> Result<()> {
     let width = image.width;
     let height = image.height;
 
-    let image = image.to_bytes();
+    let image = image.into_bytes();
 
     write_image(image, width as u32, height as u32)?;
-    let end = SystemTime::now();
-    let duration = end.duration_since(start).unwrap();
-    println!("Completed in {}s", duration.as_secs_f64());
 
     Ok(())
 }

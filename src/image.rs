@@ -1,7 +1,4 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::SystemTime,
-};
+use std::time::SystemTime;
 
 use half::f16;
 use rayon::iter::{
@@ -19,7 +16,7 @@ impl Image {
         let rows = (0..height)
             .into_par_iter()
             .map(|row| {
-                let slice_begin = (row * row_pitch) as usize;
+                let slice_begin = row * row_pitch;
                 let slice_end = slice_begin + (width * 8);
 
                 let slice = &slice[slice_begin..slice_end];
@@ -29,16 +26,15 @@ impl Image {
                     .map(|pixel_index| {
                         let mut pixel = [f16::ZERO; 4];
 
-                        for channel_index in 0..4 {
+                        for (channel_index, pixel) in pixel.iter_mut().enumerate() {
                             let channel_start = (pixel_index * 8) + (channel_index * 2);
                             let mut channel = [0u8; 2];
 
-                            for byte_index in 0..2 {
-                                channel[byte_index] = slice[channel_start + byte_index];
-                            }
+                            channel[..2]
+                                .copy_from_slice(&slice[channel_start..(2 + channel_start)]);
 
                             let pixel_value = f16::from_le_bytes(channel);
-                            pixel[channel_index] = pixel_value;
+                            *pixel = pixel_value;
                         }
 
                         pixel
@@ -54,33 +50,24 @@ impl Image {
         }
     }
 
-    pub fn new(width: usize, height: usize) -> Self {
-        let rows = vec![vec![[f16::ZERO; 4]; width]; height];
-        Self {
-            rows,
-            width,
-            height,
-        }
-    }
-
     /// a > 0; 0 < γ < 1;<br>
     /// Maps from the domain \[0,a^(-1/γ)] to the domain \[0,1].<br>
     /// γ regulated contrast, lower = lower, but also increases exposure of underexposed parts if lower.<br>
     /// if a < 1 it can decrease the exposure of over exposed parts of the image.
-    pub fn compress_gamma(&mut self, a: f32, γ: f32) {
+    pub fn compress_gamma(&mut self, a: f32, gamma: f32) {
         // let mut max_value = f16::ZERO;
         self.rows.par_iter_mut().for_each(|row| {
             row.par_iter_mut().for_each(|pixel| {
-                for channel in 0..3 {
-                    Self::compress_gamma_value(&mut pixel[channel], a, γ);
+                for channel in pixel.iter_mut().take(3) {
+                    Self::compress_gamma_value(channel, a, gamma);
                 }
             })
         });
     }
 
-    fn compress_gamma_value(channel: &mut f16, a: f32, γ: f32) {
+    fn compress_gamma_value(channel: &mut f16, a: f32, gamma: f32) {
         let f32_value = f16::to_f32(channel.to_owned());
-        let new_value = a * f32_value.powf(γ);
+        let new_value = a * f32_value.powf(gamma);
         *channel = f16::from_f32(new_value);
     }
 
@@ -93,7 +80,7 @@ impl Image {
             .unwrap()
     }
 
-    pub fn to_bytes(self) -> Vec<u8> {
+    pub fn into_bytes(self) -> Vec<u8> {
         let max_start = SystemTime::now();
         let max_value = self.get_max_value().to_f32();
         let max_end = SystemTime::now();

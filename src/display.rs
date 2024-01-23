@@ -6,7 +6,7 @@ use windows::Win32::Graphics::Gdi::{
 
 pub fn get_display() -> Result<DisplayInfo> {
     let displays = enumerate_displays()?;
-    Ok(displays.get(0).unwrap().to_owned())
+    Ok(displays.first().unwrap().to_owned())
 }
 
 fn enumerate_displays() -> Result<Vec<DisplayInfo>> {

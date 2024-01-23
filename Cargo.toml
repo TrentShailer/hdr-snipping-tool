@@ -35,3 +35,6 @@ windows = { version = "0.52.0", features = [
     "Graphics_DirectX_Direct3D11",
     "Graphics_Imaging",
 ] }
+
+[profile.release]
+lto = true
