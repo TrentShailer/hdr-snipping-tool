@@ -78,6 +78,7 @@ fn main() -> Result<()> {
     // wait for frame
     let frame = receiver.recv().unwrap();
 
+    let texture_start = SystemTime::now();
     // Copy frame into new texture
     let texture = unsafe {
         let source_texture: ID3D11Texture2D = get_texture_from_surface(&frame.Surface()?)?;
@@ -101,8 +102,13 @@ fn main() -> Result<()> {
 
         copy_texture
     };
+    let texture_end = SystemTime::now();
+    let duration = texture_end.duration_since(texture_start).unwrap();
+    println!("texture in {}s", duration.as_secs_f64());
 
     let mut image = unsafe {
+        let slice_start = SystemTime::now();
+
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         texture.GetDesc(&mut desc as *mut _);
 
@@ -122,6 +128,10 @@ fn main() -> Result<()> {
                 (desc.Height * mapped.RowPitch) as usize,
             )
         };
+
+        let slice_end = SystemTime::now();
+        let duration = slice_end.duration_since(slice_start).unwrap();
+        println!("slice in {}s", duration.as_secs_f64());
 
         let f16_start = SystemTime::now();
         let image: Image = Image::from(
