@@ -9,6 +9,7 @@ use std::sync::mpsc::channel;
 use std::time::SystemTime;
 
 use log::error;
+
 use windows::core::{ComInterface, IInspectable, Result};
 use windows::Foundation::TypedEventHandler;
 use windows::Graphics::Capture::{
@@ -30,58 +31,62 @@ use crate::write_image::write_image;
 fn main() -> Result<()> {
     logger::init_fern().unwrap();
 
-    if !GraphicsCaptureSession::IsSupported()? {
+    if !GraphicsCaptureSession::IsSupported().unwrap() {
         error!("Graphics capture is not supported.");
         return Ok(());
     }
 
-    let display = get_display()?;
+    let display = get_display().unwrap();
 
     // turn display into capture item
-    let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()?;
-    let capture_item: GraphicsCaptureItem = unsafe { interop.CreateForMonitor(display.handle) }?;
-    let capture_size = capture_item.Size()?;
+    let interop =
+        windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>().unwrap();
+    let capture_item: GraphicsCaptureItem =
+        unsafe { interop.CreateForMonitor(display.handle) }.unwrap();
+    let capture_size = capture_item.Size().unwrap();
 
     // create d3d device for capture item
-    let d3d_device = create_d3d_device()?;
-    let d3d_context = unsafe { d3d_device.GetImmediateContext()? };
-    let dxgi_device = create_dxgi_device(&d3d_device)?;
+    let d3d_device = create_d3d_device().unwrap();
+    let d3d_context = unsafe { d3d_device.GetImmediateContext().unwrap() };
+    let dxgi_device = create_dxgi_device(&d3d_device).unwrap();
 
     // create frame pool
-    // should set pixel format to match the display's pixel format
     let frame_pool = Direct3D11CaptureFramePool::CreateFreeThreaded(
         &dxgi_device,
         DirectXPixelFormat::R16G16B16A16Float,
         1,
         capture_size,
-    )?;
-    let session = frame_pool.CreateCaptureSession(&capture_item)?;
+    )
+    .unwrap();
+    let session = frame_pool.CreateCaptureSession(&capture_item).unwrap();
 
     // setup sender and reciever for frames
     let (sender, receiver) = channel();
 
     // handle frames arriving
-    frame_pool.FrameArrived(
-        &TypedEventHandler::<Direct3D11CaptureFramePool, IInspectable>::new({
-            move |frame_pool, _| {
-                let frame_pool = frame_pool.as_ref().unwrap();
-                let frame = frame_pool.TryGetNextFrame()?;
-                sender.send(frame).unwrap();
-                Ok(())
-            }
-        }),
-    )?;
+    frame_pool
+        .FrameArrived(
+            &TypedEventHandler::<Direct3D11CaptureFramePool, IInspectable>::new({
+                move |frame_pool, _| {
+                    let frame_pool = frame_pool.as_ref().unwrap();
+                    let frame = frame_pool.TryGetNextFrame().unwrap();
+                    sender.send(frame).unwrap();
+                    Ok(())
+                }
+            }),
+        )
+        .unwrap();
 
     // Start capture
-    session.StartCapture()?;
+    session.StartCapture().unwrap();
 
     // wait for frame
     let frame = receiver.recv().unwrap();
-
     let texture_start = SystemTime::now();
     // Copy frame into new texture
     let texture = unsafe {
-        let source_texture: ID3D11Texture2D = get_texture_from_surface(&frame.Surface()?)?;
+        let source_texture: ID3D11Texture2D =
+            get_texture_from_surface(&frame.Surface().unwrap()).unwrap();
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         source_texture.GetDesc(&mut desc);
         desc.BindFlags = 0;
@@ -91,14 +96,19 @@ fn main() -> Result<()> {
 
         let copy_texture = {
             let mut texture = None;
-            d3d_device.CreateTexture2D(&desc, None, Some(&mut texture))?;
+            d3d_device
+                .CreateTexture2D(&desc, None, Some(&mut texture))
+                .unwrap();
             texture.unwrap()
         };
 
-        d3d_context.CopyResource(Some(&copy_texture.cast()?), Some(&source_texture.cast()?));
+        d3d_context.CopyResource(
+            Some(&copy_texture.cast().unwrap()),
+            Some(&source_texture.cast().unwrap()),
+        );
 
-        session.Close()?;
-        frame_pool.Close()?;
+        session.Close().unwrap();
+        frame_pool.Close().unwrap();
 
         copy_texture
     };
@@ -112,15 +122,17 @@ fn main() -> Result<()> {
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         texture.GetDesc(&mut desc as *mut _);
 
-        let resource: ID3D11Resource = texture.cast()?;
+        let resource: ID3D11Resource = texture.cast().unwrap();
         let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
-        d3d_context.Map(
-            Some(&resource.clone()),
-            0,
-            D3D11_MAP_READ,
-            0,
-            Some(&mut mapped),
-        )?;
+        d3d_context
+            .Map(
+                Some(&resource.clone()),
+                0,
+                D3D11_MAP_READ,
+                0,
+                Some(&mut mapped),
+            )
+            .unwrap();
 
         let slice: &[u8] = {
             std::slice::from_raw_parts(
@@ -133,25 +145,22 @@ fn main() -> Result<()> {
         let duration = slice_end.duration_since(slice_start).unwrap();
         println!("slice in {}s", duration.as_secs_f64());
 
-        let f16_start = SystemTime::now();
-        let image: Image = Image::from(
-            slice,
-            mapped.RowPitch as usize,
-            desc.Width as usize,
-            desc.Height as usize,
-        );
-        let f16_end = SystemTime::now();
-        let duration = f16_end.duration_since(f16_start).unwrap();
-        println!("f16 took {}s", duration.as_secs_f64());
+        let f32_start = SystemTime::now();
+        let image: Image = Image::from_u8(slice, desc.Width as usize, desc.Height as usize);
+        let f32_end = SystemTime::now();
+        let duration = f32_end.duration_since(f32_start).unwrap();
+        println!("f32 took {}s", duration.as_secs_f64());
 
+        // TODO could move this to separate thread
         d3d_context.Unmap(Some(&resource), 0);
 
         image
     };
 
-    // good sdr -> sdr values 1.00, 0.475
+    // good sdr -> sdr values 1.00, 0.470
+
     let gamma_start = SystemTime::now();
-    image.compress_gamma(1.00, 0.475);
+    image.compress_gamma(1.00, 0.47);
     let gamma_end = SystemTime::now();
     let duration = gamma_end.duration_since(gamma_start).unwrap();
     println!("Gamma took {}s", duration.as_secs_f64());
@@ -161,7 +170,11 @@ fn main() -> Result<()> {
 
     let image = image.into_bytes();
 
-    write_image(image, width as u32, height as u32)?;
+    let write_start = SystemTime::now();
+    write_image(image, width as u32, height as u32).unwrap();
+    let write_end = SystemTime::now();
+    let duration = write_end.duration_since(write_start).unwrap();
+    println!("Write took {}s", duration.as_secs_f64());
 
     Ok(())
 }
