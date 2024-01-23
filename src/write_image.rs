@@ -22,7 +22,7 @@ pub fn write_image(image: Vec<u8>, width: u32, height: u32) -> Result<()> {
         let encoder = BitmapEncoder::CreateAsync(BitmapEncoder::PngEncoderId()?, &stream)?.get()?;
         encoder.SetPixelData(
             BitmapPixelFormat::Rgba8,
-            BitmapAlphaMode::Premultiplied,
+            BitmapAlphaMode::Ignore,
             width,
             height,
             1.0,

@@ -126,72 +126,13 @@ fn main() -> Result<()> {
             )
         };
 
-        const BYTES_PER_PIXEL: usize = 8;
-        const BYTES_PER_CHANNEL: usize = 2;
-        const CHANNELS: usize = 4;
-
-        let mut image: Image = Image::new(desc.Width as usize, desc.Height as usize);
-
-        /* let mut image = (0..desc.Height)
-        .into_par_iter()
-        .map(|row_index| {
-            let mut row = vec![[f16::ZERO; CHANNELS]; desc.Width as usize];
-            let slice_begin = (row_index * mapped.RowPitch) as usize;
-            let slice_end = slice_begin + (desc.Width * BYTES_PER_PIXEL as u32) as usize;
-
-            let slice = &slice[slice_begin..slice_end];
-
-            for pixel_index in 0..(slice.len() / BYTES_PER_PIXEL) {
-                let mut pixel = [f16::ZERO; CHANNELS];
-
-                for channel_index in 0..CHANNELS {
-                    let channel_start =
-                        (pixel_index * BYTES_PER_PIXEL) + (channel_index * BYTES_PER_CHANNEL);
-                    let mut channel = [0u8; BYTES_PER_CHANNEL];
-
-                    for byte_index in 0..BYTES_PER_CHANNEL {
-                        channel[byte_index] = slice[channel_start + byte_index];
-                    }
-
-                    let pixel_value = f16::from_le_bytes(channel);
-                    pixel[channel_index] = pixel_value;
-                }
-
-                row[pixel_index] = pixel;
-            }
-            row
-        })
-        .collect(); */
-
         let f16_start = SystemTime::now();
-        for row in 0..desc.Height {
-            let slice_begin = (row * mapped.RowPitch) as usize;
-            let slice_end = slice_begin + (desc.Width * BYTES_PER_PIXEL as u32) as usize;
-
-            let slice = &slice[slice_begin..slice_end];
-
-            for pixel_index in 0..(slice.len() / BYTES_PER_PIXEL) {
-                let mut pixel = [f16::ZERO; CHANNELS];
-
-                for channel_index in 0..CHANNELS {
-                    let channel_start =
-                        (pixel_index * BYTES_PER_PIXEL) + (channel_index * BYTES_PER_CHANNEL);
-                    let mut channel = [0u8; BYTES_PER_CHANNEL];
-
-                    for byte_index in 0..BYTES_PER_CHANNEL {
-                        channel[byte_index] = slice[channel_start + byte_index];
-                    }
-
-                    let pixel_value = f16::from_le_bytes(channel);
-                    pixel[channel_index] = pixel_value;
-                    if pixel_value > image.max_value {
-                        image.max_value = pixel_value;
-                    }
-                }
-
-                image.rows[row as usize][pixel_index] = pixel;
-            }
-        }
+        let image: Image = Image::from(
+            slice,
+            mapped.RowPitch as usize,
+            desc.Width as usize,
+            desc.Height as usize,
+        );
         let f16_end = SystemTime::now();
         let duration = f16_end.duration_since(f16_start).unwrap();
         println!("f16 took {}s", duration.as_secs_f64());
@@ -201,9 +142,9 @@ fn main() -> Result<()> {
         image
     };
 
-    // good sdr -> sdr values 1.05, 0.5
+    // good sdr -> sdr values 1.00, 0.475
     let gamma_start = SystemTime::now();
-    image.compress_gamma(1.05, 0.5);
+    image.compress_gamma(1.00, 0.475);
     let gamma_end = SystemTime::now();
     let duration = gamma_end.duration_since(gamma_start).unwrap();
     println!("Gamma took {}s", duration.as_secs_f64());
@@ -211,11 +152,7 @@ fn main() -> Result<()> {
     let width = image.width;
     let height = image.height;
 
-    let u8_start = SystemTime::now();
     let image = image.to_bytes();
-    let u8_end = SystemTime::now();
-    let duration = u8_end.duration_since(u8_start).unwrap();
-    println!("u8 took {}s", duration.as_secs_f64());
 
     write_image(image, width as u32, height as u32)?;
     let end = SystemTime::now();
