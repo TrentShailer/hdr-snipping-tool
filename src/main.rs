@@ -171,7 +171,7 @@ fn main() -> Result<()> {
     let image = image.into_bytes();
 
     let write_start = SystemTime::now();
-    write_image(image, width as u32, height as u32).unwrap();
+    write_image(&image, width as u32, height as u32).unwrap();
     let write_end = SystemTime::now();
     let duration = write_end.duration_since(write_start).unwrap();
     println!("Write took {}s", duration.as_secs_f64());

@@ -6,7 +6,7 @@ use rayon::iter::{
 };
 
 pub struct Image {
-    pub values: Vec<f32>,
+    pub values: Box<[f32]>,
     pub width: usize,
     pub height: usize,
 }
@@ -19,7 +19,7 @@ impl Image {
                 let start = byte_index * 2;
                 Self::f32_from_le_f16_bytes(slice[start], slice[start + 1])
             })
-            .collect::<Vec<f32>>();
+            .collect::<Box<[f32]>>();
 
         Self {
             values: values,
@@ -51,7 +51,7 @@ impl Image {
             .par_iter_mut()
             .enumerate()
             .for_each(|(index, value)| {
-                if index + 1 % 4 == 0 {
+                if (index + 1) % 4 == 0 {
                     return;
                 }
                 Self::compress_gamma_value(value, a, gamma);
@@ -87,9 +87,9 @@ impl Image {
             .unwrap()
     }
 
-    pub fn into_bytes(self) -> Vec<u8> {
+    pub fn into_bytes(self) -> Box<[u8]> {
         let max_start = SystemTime::now();
-        let (max_value_index, max_value) = self.get_max_value();
+        let (_max_value_index, max_value) = self.get_max_value();
         let max_end = SystemTime::now();
         let duration = max_end.duration_since(max_start).unwrap();
         println!("Max took {}s", duration.as_secs_f64());
@@ -97,27 +97,22 @@ impl Image {
         let u8_start = SystemTime::now();
         let bytes = self
             .values
-            .to_owned()
             .into_par_iter()
             .enumerate()
             .map(|(index, value)| {
                 if (index + 1) % 4 == 0 {
                     (value * F32_255) as u8
                 } else {
-                    Self::scale_0_1(value, &max_value) as u8
+                    (value / max_value * F32_255) as u8
                 }
             })
-            .collect::<Vec<u8>>();
+            .collect::<Box<[u8]>>();
 
         let u8_end = SystemTime::now();
         let duration = u8_end.duration_since(u8_start).unwrap();
         println!("u8 took {}s", duration.as_secs_f64());
 
         bytes
-    }
-
-    fn scale_0_1(input: f32, max_value: &f32) -> f32 {
-        input / max_value * F32_255
     }
 }
 
