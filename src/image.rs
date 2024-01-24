@@ -22,7 +22,7 @@ impl Image {
             .collect::<Box<[f32]>>();
 
         Self {
-            values: values,
+            values,
             width,
             height,
         }
@@ -85,6 +85,13 @@ impl Image {
                 a.partial_cmp(b).unwrap()
             })
             .unwrap()
+    }
+
+    pub fn as_bytes(&self) -> Box<[u8]> {
+        self.values
+            .par_iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect()
     }
 
     pub fn into_bytes(self) -> Box<[u8]> {
