@@ -27,7 +27,7 @@ use crate::d3d_device::{create_d3d_device, create_dxgi_device};
 use crate::display::get_display;
 use crate::image::Image;
 use crate::texture::get_texture_from_surface;
-use crate::write_image::write_image;
+use crate::write_image::save_jpeg;
 
 fn main() -> Result<()> {
     logger::init_fern().unwrap();
@@ -172,15 +172,7 @@ fn main() -> Result<()> {
     let image = image.into_bytes();
 
     let write_start = SystemTime::now();
-    write_image(
-        &image,
-        width as u32,
-        height as u32,
-        "screenshot.png",
-        ColorType::Rgba8,
-        ImageFormat::Png,
-    )
-    .unwrap();
+    save_jpeg(&image, width as u32, height as u32).unwrap();
     let write_end = SystemTime::now();
     let duration = write_end.duration_since(write_start).unwrap();
     println!("Write took {}s", duration.as_secs_f64());
