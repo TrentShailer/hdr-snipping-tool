@@ -8,7 +8,6 @@ mod write_image;
 use std::sync::mpsc::channel;
 use std::time::SystemTime;
 
-use half::f16;
 use log::error;
 
 use windows::core::{ComInterface, IInspectable, Result};
@@ -161,7 +160,7 @@ fn main() -> Result<()> {
     // good sdr -> sdr values 1.00, 0.470
 
     let gamma_start = SystemTime::now();
-    image.compress_gamma(f16::from_f32(1.00), f16::from_f32(0.47));
+    image.compress_gamma(1.00, 0.47);
     let gamma_end = SystemTime::now();
     let duration = gamma_end.duration_since(gamma_start).unwrap();
     println!("Gamma took {}s", duration.as_secs_f64());
