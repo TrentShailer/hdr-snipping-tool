@@ -169,7 +169,7 @@ fn main() -> Result<()> {
     let width = image.width;
     let height = image.height;
 
-    let image = image.into_bytes();
+    let image = image.into_rgba8();
 
     let write_start = SystemTime::now();
     save_jpeg(&image, width as u32, height as u32).unwrap();

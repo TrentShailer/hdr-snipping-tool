@@ -94,7 +94,7 @@ impl Image {
             .collect()
     }
 
-    pub fn into_bytes(self) -> Box<[u8]> {
+    pub fn into_rgba8(self) -> Box<[u8]> {
         let max_start = SystemTime::now();
         let (_max_value_index, max_value) = self.get_max_value();
         let max_end = SystemTime::now();
