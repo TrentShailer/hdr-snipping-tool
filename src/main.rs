@@ -1,3 +1,6 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+
+mod app;
 mod d3d_device;
 mod display;
 mod image;
@@ -7,10 +10,9 @@ mod write_image;
 
 use std::sync::mpsc::channel;
 use std::thread;
+use std::time::Duration;
 
-use eframe::{EventLoopBuilder, EventLoopBuilderHook};
-use egui::load::SizedTexture;
-use egui::{Color32, Context, Frame, Key, Pos2, Rect, Slider, TextureOptions, Vec2};
+// use app::App;
 use log::error;
 
 use inputbot::KeybdKey::{self};
@@ -25,7 +27,6 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11_MAP_READ, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
 };
 use windows::Win32::System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop;
-use winit::platform::windows::EventLoopBuilderExtWindows;
 
 use crate::d3d_device::{create_d3d_device, create_dxgi_device};
 use crate::display::get_display;
@@ -41,14 +42,41 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    KeybdKey::F13Key.bind(|| take_screenshot());
+    let (sender, receiver) = channel();
 
-    inputbot::handle_input_events();
+    thread::spawn(move || {
+        KeybdKey::F13Key.bind(move || {
+            let image = take_screenshot();
+            sender.send(image).unwrap();
+        });
+
+        inputbot::handle_input_events();
+    });
+
+    loop {
+        let image = receiver.recv().unwrap();
+        /*  let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_decorations(false)
+                .with_fullscreen(true),
+            default_theme: eframe::Theme::Dark,
+            follow_system_theme: false,
+            vsync: true,
+            ..Default::default()
+        };
+
+        eframe::run_native(
+            "Screenshot",
+            options,
+            Box::new(|cc| Box::new(App::new(image))),
+        )
+        .unwrap(); */
+    }
 
     Ok(())
 }
 
-fn take_screenshot() {
+fn take_screenshot() -> Image {
     // create d3d device for capture item
     let d3d_device = create_d3d_device().unwrap();
     let d3d_context = unsafe { d3d_device.GetImmediateContext().unwrap() };
@@ -154,94 +182,5 @@ fn take_screenshot() {
 
         image
     };
-
-    let event_loop_builder: Option<EventLoopBuilderHook> = Some(Box::new(|event_loop_builder| {
-        event_loop_builder.with_any_thread(true);
-    }));
-
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([image.width as f32, image.height as f32])
-            .with_fullscreen(true),
-        event_loop_builder,
-        ..Default::default()
-    };
-    eframe::run_native(
-        "Test",
-        options,
-        Box::new(|cc| {
-            egui_extras::install_image_loaders(&cc.egui_ctx);
-            Box::new(MyApp::new(image))
-        }),
-    )
-    .unwrap();
-
-    // open window
-    // let user select area
-    // esc to close window
-    // modify gamma value
-    // unlock alpha value
-    // save + copy to clipboard
-
-    // image.save_rgba8();
-}
-
-struct MyApp {
-    pub image: Image,
-    pub texture: Option<egui::TextureHandle>,
-}
-
-impl MyApp {
-    pub fn new(image: Image) -> Self {
-        Self {
-            image,
-            texture: None,
-        }
-    }
-
-    fn rebuild_texture(&mut self, ctx: &Context) {
-        let handle = ctx.load_texture(
-            "screenshot",
-            self.image.get_color_image(),
-            Default::default(),
-        );
-        self.texture = Some(handle);
-    }
-}
-
-impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default()
-            .frame(Frame::none())
-            .show(ctx, |ui| {
-                if ctx.input(|i| i.key_pressed(Key::Escape)) {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                }
-                if ctx.input(|i| i.key_pressed(Key::Enter)) {
-                    // TODO copy to clipboard
-                    self.image.save();
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                }
-
-                if let Some(texture) = &self.texture {
-                    let texture = egui::load::SizedTexture::new(
-                        texture.id(),
-                        egui::vec2(self.image.width as f32, self.image.height as f32),
-                    );
-                    ui.image(texture);
-                } else {
-                    self.rebuild_texture(ctx);
-                }
-            });
-        egui::Window::new("Settings").show(ctx, |ui| {
-            ui.add(Slider::new(&mut self.image.gamma, 0.01..=1.0).text("Gamma value"));
-            ui.add(Slider::new(&mut self.image.alpha, 0.01..=10.0).text("Alpha value"));
-            if ui.button("Auto calculate alpha").clicked() {
-                self.image.alpha = self.image.calculate_alpha();
-            }
-            if ui.button("Apply").clicked() {
-                self.rebuild_texture(ctx);
-            }
-        });
-    }
+    image
 }

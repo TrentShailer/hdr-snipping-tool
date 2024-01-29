@@ -46,6 +46,17 @@ impl Image {
         }
     }
 
+    pub fn empty() -> Self {
+        Self {
+            raw: Box::new([]),
+            current: Box::new([]),
+            width: 0,
+            height: 0,
+            alpha: 0.0,
+            gamma: 0.0,
+        }
+    }
+
     fn f32_from_le_f16_bytes(byte_0: u8, byte_1: u8) -> f32 {
         let sign: u8 = byte_1 & 0b1000_0000;
         let exponent: u8 = ((byte_1 & 0b0111_1100) >> 2) + 0b01110000;
