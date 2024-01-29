@@ -7,8 +7,12 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.31"
+eframe = "0.25.0"
+egui = "0.25.0"
+egui_extras = { version = "0.25.0", features = ["image"] }
 fern = "0.6.2"
 image = { version = "0.24.8", features = ["rayon"] }
+inputbot = "0.6.0"
 log = "0.4.20"
 owo-colors = "4.0.0"
 rayon = "1.8.1"
@@ -36,6 +40,7 @@ windows = { version = "0.52.0", features = [
     "Graphics_DirectX_Direct3D11",
     "Graphics_Imaging",
 ] }
+winit = "0.29.10"
 
 [profile.release]
 lto = true

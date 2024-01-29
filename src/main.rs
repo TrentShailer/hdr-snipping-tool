@@ -6,11 +6,14 @@ mod texture;
 mod write_image;
 
 use std::sync::mpsc::channel;
-use std::time::SystemTime;
+use std::thread;
 
-use ::image::{ColorType, ImageFormat};
+use eframe::{EventLoopBuilder, EventLoopBuilderHook};
+use egui::load::SizedTexture;
+use egui::{Color32, Context, Frame, Key, Pos2, Rect, Slider, TextureOptions, Vec2};
 use log::error;
 
+use inputbot::KeybdKey::{self};
 use windows::core::{ComInterface, IInspectable, Result};
 use windows::Foundation::TypedEventHandler;
 use windows::Graphics::Capture::{
@@ -22,6 +25,7 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11_MAP_READ, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
 };
 use windows::Win32::System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop;
+use winit::platform::windows::EventLoopBuilderExtWindows;
 
 use crate::d3d_device::{create_d3d_device, create_dxgi_device};
 use crate::display::get_display;
@@ -37,6 +41,19 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    KeybdKey::F13Key.bind(|| take_screenshot());
+
+    inputbot::handle_input_events();
+
+    Ok(())
+}
+
+fn take_screenshot() {
+    // create d3d device for capture item
+    let d3d_device = create_d3d_device().unwrap();
+    let d3d_context = unsafe { d3d_device.GetImmediateContext().unwrap() };
+    let dxgi_device = create_dxgi_device(&d3d_device).unwrap();
+
     let display = get_display().unwrap();
 
     // turn display into capture item
@@ -45,11 +62,6 @@ fn main() -> Result<()> {
     let capture_item: GraphicsCaptureItem =
         unsafe { interop.CreateForMonitor(display.handle) }.unwrap();
     let capture_size = capture_item.Size().unwrap();
-
-    // create d3d device for capture item
-    let d3d_device = create_d3d_device().unwrap();
-    let d3d_context = unsafe { d3d_device.GetImmediateContext().unwrap() };
-    let dxgi_device = create_dxgi_device(&d3d_device).unwrap();
 
     // create frame pool
     let frame_pool = Direct3D11CaptureFramePool::CreateFreeThreaded(
@@ -60,7 +72,6 @@ fn main() -> Result<()> {
     )
     .unwrap();
     let session = frame_pool.CreateCaptureSession(&capture_item).unwrap();
-
     // setup sender and reciever for frames
     let (sender, receiver) = channel();
 
@@ -83,7 +94,7 @@ fn main() -> Result<()> {
 
     // wait for frame
     let frame = receiver.recv().unwrap();
-    let texture_start = SystemTime::now();
+
     // Copy frame into new texture
     let texture = unsafe {
         let source_texture: ID3D11Texture2D =
@@ -113,13 +124,8 @@ fn main() -> Result<()> {
 
         copy_texture
     };
-    let texture_end = SystemTime::now();
-    let duration = texture_end.duration_since(texture_start).unwrap();
-    println!("texture in {}s", duration.as_secs_f64());
 
-    let mut image = unsafe {
-        let slice_start = SystemTime::now();
-
+    let image = unsafe {
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         texture.GetDesc(&mut desc as *mut _);
 
@@ -142,40 +148,100 @@ fn main() -> Result<()> {
             )
         };
 
-        let slice_end = SystemTime::now();
-        let duration = slice_end.duration_since(slice_start).unwrap();
-        println!("slice in {}s", duration.as_secs_f64());
-
-        let f32_start = SystemTime::now();
         let image: Image = Image::from_u8(slice, desc.Width as usize, desc.Height as usize);
-        let f32_end = SystemTime::now();
-        let duration = f32_end.duration_since(f32_start).unwrap();
-        println!("f32 took {}s", duration.as_secs_f64());
 
-        // TODO could move this to separate thread
-        d3d_context.Unmap(Some(&resource), 0);
+        thread::spawn(move || d3d_context.Unmap(Some(&resource), 0));
 
         image
     };
 
-    // good sdr -> sdr values 1.00, 0.470
+    let event_loop_builder: Option<EventLoopBuilderHook> = Some(Box::new(|event_loop_builder| {
+        event_loop_builder.with_any_thread(true);
+    }));
 
-    let gamma_start = SystemTime::now();
-    image.compress_gamma(1.00, 0.47);
-    let gamma_end = SystemTime::now();
-    let duration = gamma_end.duration_since(gamma_start).unwrap();
-    println!("Gamma took {}s", duration.as_secs_f64());
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([image.width as f32, image.height as f32])
+            .with_fullscreen(true),
+        event_loop_builder,
+        ..Default::default()
+    };
+    eframe::run_native(
+        "Test",
+        options,
+        Box::new(|cc| {
+            egui_extras::install_image_loaders(&cc.egui_ctx);
+            Box::new(MyApp::new(image))
+        }),
+    )
+    .unwrap();
 
-    let width = image.width;
-    let height = image.height;
+    // open window
+    // let user select area
+    // esc to close window
+    // modify gamma value
+    // unlock alpha value
+    // save + copy to clipboard
 
-    let image = image.into_rgba8();
+    // image.save_rgba8();
+}
 
-    let write_start = SystemTime::now();
-    save_jpeg(&image, width as u32, height as u32).unwrap();
-    let write_end = SystemTime::now();
-    let duration = write_end.duration_since(write_start).unwrap();
-    println!("Write took {}s", duration.as_secs_f64());
+struct MyApp {
+    pub image: Image,
+    pub texture: Option<egui::TextureHandle>,
+}
 
-    Ok(())
+impl MyApp {
+    pub fn new(image: Image) -> Self {
+        Self {
+            image,
+            texture: None,
+        }
+    }
+
+    fn rebuild_texture(&mut self, ctx: &Context) {
+        let handle = ctx.load_texture(
+            "screenshot",
+            self.image.get_color_image(),
+            Default::default(),
+        );
+        self.texture = Some(handle);
+    }
+}
+
+impl eframe::App for MyApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default()
+            .frame(Frame::none())
+            .show(ctx, |ui| {
+                if ctx.input(|i| i.key_pressed(Key::Escape)) {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                if ctx.input(|i| i.key_pressed(Key::Enter)) {
+                    // TODO copy to clipboard
+                    self.image.save();
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+
+                if let Some(texture) = &self.texture {
+                    let texture = egui::load::SizedTexture::new(
+                        texture.id(),
+                        egui::vec2(self.image.width as f32, self.image.height as f32),
+                    );
+                    ui.image(texture);
+                } else {
+                    self.rebuild_texture(ctx);
+                }
+            });
+        egui::Window::new("Settings").show(ctx, |ui| {
+            ui.add(Slider::new(&mut self.image.gamma, 0.01..=1.0).text("Gamma value"));
+            ui.add(Slider::new(&mut self.image.alpha, 0.01..=10.0).text("Alpha value"));
+            if ui.button("Auto calculate alpha").clicked() {
+                self.image.alpha = self.image.calculate_alpha();
+            }
+            if ui.button("Apply").clicked() {
+                self.rebuild_texture(ctx);
+            }
+        });
+    }
 }
