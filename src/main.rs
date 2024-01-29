@@ -1,6 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-mod app;
 mod d3d_device;
 mod display;
 mod image;
@@ -10,9 +9,7 @@ mod write_image;
 
 use std::sync::mpsc::channel;
 use std::thread;
-use std::time::Duration;
 
-// use app::App;
 use log::error;
 
 use inputbot::KeybdKey::{self};
@@ -55,22 +52,6 @@ fn main() -> Result<()> {
 
     loop {
         let image = receiver.recv().unwrap();
-        /*  let options = eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_decorations(false)
-                .with_fullscreen(true),
-            default_theme: eframe::Theme::Dark,
-            follow_system_theme: false,
-            vsync: true,
-            ..Default::default()
-        };
-
-        eframe::run_native(
-            "Screenshot",
-            options,
-            Box::new(|cc| Box::new(App::new(image))),
-        )
-        .unwrap(); */
     }
 
     Ok(())

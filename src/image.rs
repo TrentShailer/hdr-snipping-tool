@@ -1,11 +1,5 @@
-use std::{
-    borrow::{Borrow, Cow},
-    cmp::Ordering,
-    sync::Arc,
-};
+use std::cmp::Ordering;
 
-use egui::{ColorImage, ImageSource};
-use image::{DynamicImage, RgbaImage};
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
@@ -43,17 +37,6 @@ impl Image {
             height,
             alpha,
             gamma,
-        }
-    }
-
-    pub fn empty() -> Self {
-        Self {
-            raw: Box::new([]),
-            current: Box::new([]),
-            width: 0,
-            height: 0,
-            alpha: 0.0,
-            gamma: 0.0,
         }
     }
 
@@ -129,10 +112,6 @@ impl Image {
             .collect()
     }
 
-    pub fn get_color_image(&self) -> ColorImage {
-        egui::ColorImage::from_rgba_unmultiplied([self.width, self.height], &self.current)
-    }
-
     /* pub fn as_rgba8(&self) -> Box<[u8]> {
         self.current
             .par_iter()
@@ -146,12 +125,3 @@ impl Image {
 }
 
 const F32_255: f32 = 255.0;
-
-impl<'a> Into<ImageSource<'a>> for Image {
-    fn into(self) -> ImageSource<'a> {
-        ImageSource::Bytes {
-            uri: std::borrow::Cow::Borrowed(""),
-            bytes: egui::load::Bytes::Shared(self.current.into()),
-        }
-    }
-}

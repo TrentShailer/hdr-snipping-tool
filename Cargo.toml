@@ -7,8 +7,6 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.31"
-eframe = "0.25.0"
-egui = "0.25.0"
 fern = "0.6.2"
 image = { version = "0.24.8", features = ["rayon"] }
 inputbot = "0.6.0"
