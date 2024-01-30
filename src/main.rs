@@ -1,15 +1,20 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+mod app;
 mod d3d_device;
 mod display;
 mod image;
 mod logger;
+mod support;
 mod texture;
 mod write_image;
 
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::thread;
 
+use app::App;
+use glium::backend::Facade;
 use log::error;
 
 use inputbot::KeybdKey::{self};
@@ -29,7 +34,6 @@ use crate::d3d_device::{create_d3d_device, create_dxgi_device};
 use crate::display::get_display;
 use crate::image::Image;
 use crate::texture::get_texture_from_surface;
-use crate::write_image::save_jpeg;
 
 fn main() -> Result<()> {
     logger::init_fern().unwrap();
@@ -39,20 +43,27 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    let gui = support::init("Screenshot");
+    let proxy = gui.event_loop.create_proxy();
+
     let (sender, receiver) = channel();
 
     thread::spawn(move || {
         KeybdKey::F13Key.bind(move || {
             let image = take_screenshot();
             sender.send(image).unwrap();
+            proxy.send_event(support::AppEvent::Show).unwrap();
         });
 
         inputbot::handle_input_events();
     });
 
-    loop {
-        let image = receiver.recv().unwrap();
-    }
+    let proxy = gui.event_loop.create_proxy();
+    let mut app = App::new(receiver, proxy);
+
+    gui.main_loop(move |_, display, renderer, ui| {
+        app.render(ui, display.get_context(), renderer.textures());
+    });
 
     Ok(())
 }

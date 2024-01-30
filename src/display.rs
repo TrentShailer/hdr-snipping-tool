@@ -1,12 +1,31 @@
 use windows::core::Result;
-use windows::Win32::Foundation::{BOOL, LPARAM, RECT};
+use windows::Win32::Foundation::{BOOL, LPARAM, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
     EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFOEXW,
 };
+use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
 pub fn get_display() -> Result<DisplayInfo> {
     let displays = enumerate_displays()?;
-    Ok(displays.first().unwrap().to_owned())
+    let display = get_hovered_display(displays);
+    Ok(display)
+}
+
+fn get_hovered_display(displays: Vec<DisplayInfo>) -> DisplayInfo {
+    let mut pos: POINT = Default::default();
+    unsafe {
+        GetCursorPos(&mut pos).unwrap();
+    };
+
+    let display = displays
+        .into_iter()
+        .find(|display| point_in_rect(pos, display.rect));
+
+    display.unwrap()
+}
+
+fn point_in_rect(point: POINT, rect: RECT) -> bool {
+    point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
 }
 
 fn enumerate_displays() -> Result<Vec<DisplayInfo>> {
@@ -17,23 +36,25 @@ fn enumerate_displays() -> Result<Vec<DisplayInfo>> {
     }
 }
 
-extern "system" fn enum_monitor(monitor: HMONITOR, _: HDC, _: *mut RECT, state: LPARAM) -> BOOL {
+extern "system" fn enum_monitor(monitor: HMONITOR, _: HDC, rect: *mut RECT, state: LPARAM) -> BOOL {
     unsafe {
+        let rect = rect.read();
         let state = Box::leak(Box::from_raw(state.0 as *mut Vec<DisplayInfo>));
-        let display_info = DisplayInfo::new(monitor).unwrap();
+        let display_info = DisplayInfo::new(monitor, rect).unwrap();
         state.push(display_info);
     }
     true.into()
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DisplayInfo {
     pub handle: HMONITOR,
     pub display_name: String,
+    pub rect: RECT,
 }
 
 impl DisplayInfo {
-    pub fn new(monitor_handle: HMONITOR) -> Result<Self> {
+    pub fn new(monitor_handle: HMONITOR, rect: RECT) -> Result<Self> {
         let mut info = MONITORINFOEXW::default();
         info.monitorInfo.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
 
@@ -48,6 +69,7 @@ impl DisplayInfo {
         Ok(Self {
             handle: monitor_handle,
             display_name,
+            rect,
         })
     }
 }

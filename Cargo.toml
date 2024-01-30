@@ -9,6 +9,11 @@ edition = "2021"
 chrono = "0.4.31"
 fern = "0.6.2"
 image = { version = "0.24.8", features = ["rayon"] }
+copypasta = "0.8"
+glium = { version = "0.32.1", default-features = true }
+imgui = "0.11.0"
+imgui-glium-renderer = "0.11.0"
+imgui-winit-support = "0.11.0"
 inputbot = "0.6.0"
 log = "0.4.20"
 owo-colors = "4.0.0"
