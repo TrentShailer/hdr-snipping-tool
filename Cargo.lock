@@ -33,6 +33,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.79"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "080e9890a082662b09c1ad45f567faeeb47f22b5fb23895fbe1e651e718e25ca"
+
+[[package]]
 name = "arboard"
 version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -810,6 +816,7 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 name = "hdr-capture"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arboard",
  "chrono",
  "fern",
@@ -822,6 +829,7 @@ dependencies = [
  "log",
  "owo-colors",
  "rayon",
+ "thiserror",
  "windows",
 ]
 

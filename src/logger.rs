@@ -24,6 +24,7 @@ pub fn init_fern() -> Result<(), fern::InitError> {
         })
         .level(log::LevelFilter::Info)
         .chain(std::io::stdout())
+        .chain(fern::log_file("log.txt")?)
         .apply()?;
     Ok(())
 }
