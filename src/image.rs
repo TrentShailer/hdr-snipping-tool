@@ -14,7 +14,8 @@ pub struct Image {
     pub height: usize,
     pub alpha: f32,
     pub gamma: f32,
-    pub selection: [[u32; 2]; 2],
+    pub selection_pos: [u32; 2],
+    pub selection_size: [u32; 2],
 }
 
 impl Image {
@@ -39,7 +40,8 @@ impl Image {
             height,
             alpha,
             gamma,
-            selection: [[0, 0], [width as u32, height as u32]],
+            selection_pos: [0, 0],
+            selection_size: [width as u32, height as u32],
         }
     }
 
@@ -51,8 +53,22 @@ impl Image {
             height: 0,
             alpha: 0.0,
             gamma: 0.0,
-            selection: [[0, 0], [0, 0]],
+            selection_pos: [0, 0],
+            selection_size: [0, 0],
         }
+    }
+
+    pub fn get_selection_rect(&self) -> [[f32; 2]; 2] {
+        let pos = self.selection_pos;
+        let size = self.selection_size;
+
+        [
+            [pos[0] as f32, pos[1] as f32],
+            [
+                pos[0] as f32 + size[0] as f32,
+                pos[1] as f32 + size[1] as f32,
+            ],
+        ]
     }
 
     fn f32_from_le_f16_bytes(byte_0: u8, byte_1: u8) -> f32 {
@@ -123,7 +139,8 @@ impl Image {
     pub fn save(&self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
         save_jpeg(
             &self.current,
-            self.selection,
+            self.selection_pos,
+            self.selection_size,
             self.width as u32,
             self.height as u32,
         )
