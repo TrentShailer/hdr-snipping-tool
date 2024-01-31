@@ -1,3 +1,4 @@
+use anyhow::Context as ErrorContext;
 use glium::glutin;
 use glium::glutin::event::{Event, WindowEvent};
 use glium::glutin::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
@@ -19,12 +20,12 @@ pub struct Gui {
     pub font_size: f32,
 }
 
-pub fn init(window_builder: WindowBuilder) -> Gui {
+pub fn init(window_builder: WindowBuilder) -> anyhow::Result<Gui> {
     let event_loop = EventLoopBuilder::with_user_event().build();
     let context = glutin::ContextBuilder::new().with_vsync(true);
 
-    let display =
-        Display::new(window_builder, context, &event_loop).expect("Failed to initialize display");
+    let display = Display::new(window_builder, context, &event_loop)
+        .context("Failed to initialize display.")?;
 
     let mut imgui = Context::create();
     imgui.set_ini_filename(None);
@@ -52,16 +53,17 @@ pub fn init(window_builder: WindowBuilder) -> Gui {
         }),
     }]);
 
-    let renderer = Renderer::init(&mut imgui, &display).expect("Failed to initialize renderer");
+    let renderer =
+        Renderer::init(&mut imgui, &display).context("Failed to initialize renderer.")?;
 
-    Gui {
+    Ok(Gui {
         event_loop,
         display,
         imgui,
         platform,
         renderer,
         font_size,
-    }
+    })
 }
 
 impl Gui {
@@ -90,29 +92,29 @@ impl Gui {
                 }
                 Event::MainEventsCleared => {
                     let gl_window = display.gl_window();
-                    platform
+                    if let Err(e) = platform
                         .prepare_frame(imgui.io_mut(), gl_window.window())
-                        .expect("Failed to prepare frame");
+                        .context("Failed to prepare frame")
+                    {
+                        log::error!("{:?}", e);
+                        *control_flow = ControlFlow::Exit;
+                    };
                     gl_window.window().request_redraw();
                 }
                 Event::RedrawRequested(_) => {
-                    let ui = imgui.frame();
-
-                    let mut run = true;
-                    run_ui(&mut run, &display, &mut renderer, ui);
-                    if !run {
+                    if let Err(e) = redraw(
+                        &mut imgui,
+                        &mut run_ui,
+                        &display,
+                        &mut renderer,
+                        control_flow,
+                        &mut platform,
+                    )
+                    .context("Failed to redraw.")
+                    {
+                        log::error!("{:?}", e);
                         *control_flow = ControlFlow::Exit;
-                    }
-
-                    let gl_window = display.gl_window();
-                    let mut target = display.draw();
-                    target.clear_color_srgb(0.5, 0.5, 0.5, 1.0);
-                    platform.prepare_render(ui, gl_window.window());
-                    let draw_data = imgui.render();
-                    renderer
-                        .render(&mut target, draw_data)
-                        .expect("Rendering failed");
-                    target.finish().expect("Failed to swap buffers");
+                    };
                 }
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
@@ -126,4 +128,35 @@ impl Gui {
             }
         })
     }
+}
+
+fn redraw<F: FnMut(&mut bool, &Display, &mut Renderer, &mut Ui) + 'static>(
+    imgui: &mut Context,
+    run_ui: &mut F,
+    display: &Display,
+    renderer: &mut Renderer,
+    control_flow: &mut ControlFlow,
+    platform: &mut WinitPlatform,
+) -> anyhow::Result<()> {
+    let ui = imgui.frame();
+
+    let mut run = true;
+    run_ui(&mut run, display, renderer, ui);
+    if !run {
+        *control_flow = ControlFlow::Exit;
+    }
+
+    let gl_window = display.gl_window();
+    let mut target = display.draw();
+    target.clear_color_srgb(0.5, 0.5, 0.5, 1.0);
+    platform.prepare_render(ui, gl_window.window());
+    let draw_data = imgui.render();
+
+    renderer
+        .render(&mut target, draw_data)
+        .context("Rendering failed")?;
+
+    target.finish().context("Failed to swap buffers")?;
+
+    Ok(())
 }

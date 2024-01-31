@@ -9,6 +9,7 @@ mod logger;
 use std::sync::mpsc::channel;
 use std::thread;
 
+use anyhow::{bail, Context};
 use app::App;
 use capture::get_capture;
 
@@ -22,9 +23,14 @@ use windows::Graphics::Capture::GraphicsCaptureSession;
 fn main() {
     logger::init_fern().unwrap();
 
+    if let Err(e) = run() {
+        error!("{:?}", e);
+    }
+}
+
+fn run() -> anyhow::Result<()> {
     if !GraphicsCaptureSession::IsSupported().unwrap() {
-        error!("Graphics capture is not supported.");
-        return;
+        bail!("Graphics capture is not supported.");
     }
 
     let window = WindowBuilder::new()
@@ -32,7 +38,7 @@ fn main() {
         .with_fullscreen(Some(glutin::window::Fullscreen::Borderless(None)))
         .with_visible(false);
 
-    let gui = gui::init(window);
+    let gui = gui::init(window).context("Failed to create gui.")?;
     let proxy = gui.event_loop.create_proxy();
 
     let (sender, receiver) = channel();
@@ -53,4 +59,6 @@ fn main() {
     gui.main_loop(move |_, display, renderer, ui| {
         app.render(ui, display, renderer.textures());
     });
+
+    Ok(())
 }
