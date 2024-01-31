@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use image::{ImageBuffer, Rgba};
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
@@ -13,7 +14,7 @@ pub struct Image {
     pub height: usize,
     pub alpha: f32,
     pub gamma: f32,
-    pub selection: [usize; 4],
+    pub selection: [[u32; 2]; 2],
 }
 
 impl Image {
@@ -38,7 +39,7 @@ impl Image {
             height,
             alpha,
             gamma,
-            selection: [0, 0, width, height],
+            selection: [[0, 0], [width as u32, height as u32]],
         }
     }
 
@@ -50,7 +51,7 @@ impl Image {
             height: 0,
             alpha: 0.0,
             gamma: 0.0,
-            selection: [0, 0, 0, 0],
+            selection: [[0, 0], [0, 0]],
         }
     }
 
@@ -119,22 +120,13 @@ impl Image {
             .unwrap()
     }
 
-    pub fn as_bytes(&self) -> Box<[u8]> {
-        self.raw
-            .par_iter()
-            .flat_map(|value| value.to_le_bytes())
-            .collect()
-    }
-
-    /* pub fn as_rgba8(&self) -> Box<[u8]> {
-        self.current
-            .par_iter()
-            .map(|value| (value * F32_255) as u8)
-            .collect::<Box<[u8]>>()
-    } */
-
-    pub fn save(&self) {
-        save_jpeg(&self.current, self.width as u32, self.height as u32).unwrap();
+    pub fn save(&self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        save_jpeg(
+            &self.current,
+            self.selection,
+            self.width as u32,
+            self.height as u32,
+        )
     }
 }
 

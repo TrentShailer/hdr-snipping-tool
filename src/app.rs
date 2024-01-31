@@ -1,11 +1,9 @@
 use std::{error::Error, rc::Rc, sync::mpsc::Receiver};
 
+use arboard::{Clipboard, ImageData};
 use glium::{
     backend::Facade,
-    glutin::{
-        dpi::{LogicalSize, PhysicalPosition},
-        event_loop::EventLoopProxy,
-    },
+    glutin::event_loop::EventLoopProxy,
     texture::RawImage2d,
     uniforms::{MagnifySamplerFilter, MinifySamplerFilter, SamplerBehavior},
     Display, Texture2d,
@@ -78,10 +76,23 @@ impl App {
                 .gl_window()
                 .window()
                 .set_outer_position(image_display.get_position());
-            // return;
         }
 
         if ui.is_key_down(imgui::Key::Escape) {
+            self.proxy.send_event(AppEvent::Hide).unwrap();
+            return;
+        }
+
+        if ui.is_key_down(imgui::Key::Enter) {
+            let image = self.image.save();
+            let mut clipboard = Clipboard::new().unwrap();
+            clipboard
+                .set_image(ImageData {
+                    width: image.width() as usize,
+                    height: image.height() as usize,
+                    bytes: std::borrow::Cow::Borrowed(&image.as_raw()),
+                })
+                .unwrap();
             self.proxy.send_event(AppEvent::Hide).unwrap();
             return;
         }
@@ -122,11 +133,27 @@ impl App {
             if ui.button_with_size("Auto Alpha", [250.0, 25.0]) {
                 self.image.alpha = self.image.calculate_alpha();
             }
+
             if ui.button_with_size("Apply", [250.0, 25.0]) {
                 self.image.current =
                     Image::compress_gamma(&self.image.raw, self.image.alpha, self.image.gamma);
                 self.remake_texture(display.get_context(), textures)
                     .unwrap();
+            }
+
+            if ui.button_with_size("Save and Close", [250.0, 25.0]) {
+                let image = self.image.save();
+                let mut clipboard = Clipboard::new().unwrap();
+                clipboard
+                    .set_image(ImageData {
+                        width: image.width() as usize,
+                        height: image.height() as usize,
+                        bytes: std::borrow::Cow::Borrowed(&image.as_raw()),
+                    })
+                    .unwrap();
+
+                self.proxy.send_event(AppEvent::Hide).unwrap();
+                return;
             }
         });
     }

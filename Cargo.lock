@@ -33,6 +33,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "arboard"
+version = "3.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aafb29b107435aa276664c1db8954ac27a6e105cdad3c88287a199eb0e313c08"
+dependencies = [
+ "clipboard-win 4.5.0",
+ "core-graphics 0.22.3",
+ "image",
+ "log",
+ "objc",
+ "objc-foundation",
+ "objc_id",
+ "parking_lot",
+ "thiserror",
+ "winapi",
+ "x11rb 0.12.0",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -186,6 +205,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "clipboard-win"
+version = "4.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7191c27c2357d9b7ef96baac1773290d4ca63b24205b82a3fd8a0637afcf0362"
+dependencies = [
+ "error-code",
+ "str-buf",
+ "winapi",
+]
+
+[[package]]
 name = "cmake"
 version = "0.1.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -252,7 +282,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "133fc8675ee3a4ec9aa513584deda9aa0faeda3586b87f7f0f2ba082c66fb172"
 dependencies = [
- "clipboard-win",
+ "clipboard-win 3.1.1",
  "objc",
  "objc-foundation",
  "objc_id",
@@ -489,6 +519,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
+name = "error-code"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64f18991e7bf11e7ffee451b5318b5c1a73c52d0d0ada6e5a3017c8c1ced6a21"
+dependencies = [
+ "libc",
+ "str-buf",
+]
+
+[[package]]
 name = "expat-sys"
 version = "2.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -654,6 +694,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gethostname"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb65d4ba3173c56a500b555b532f72c42e8d1fe64962b518897f8959fae2c177"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -704,7 +754,7 @@ dependencies = [
  "gl_generator",
  "glutin",
  "lazy_static",
- "memoffset",
+ "memoffset 0.6.5",
  "smallvec",
  "takeable-option",
 ]
@@ -794,6 +844,7 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 name = "hdr-capture"
 version = "0.1.0"
 dependencies = [
+ "arboard",
  "chrono",
  "copypasta",
  "fern",
@@ -1115,6 +1166,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoffset"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1232,7 +1292,7 @@ dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "libc",
- "memoffset",
+ "memoffset 0.6.5",
 ]
 
 [[package]]
@@ -1245,7 +1305,19 @@ dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "libc",
- "memoffset",
+ "memoffset 0.6.5",
+]
+
+[[package]]
+name = "nix"
+version = "0.26.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
+dependencies = [
+ "bitflags",
+ "cfg-if 1.0.0",
+ "libc",
+ "memoffset 0.7.1",
 ]
 
 [[package]]
@@ -1640,6 +1712,12 @@ checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 dependencies = [
  "lock_api",
 ]
+
+[[package]]
+name = "str-buf"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e08d8363704e6c71fc928674353e6b7c23dcea9d82d7012c8faf2a3a025f8d0"
 
 [[package]]
 name = "strsim"
@@ -2270,7 +2348,7 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "980b9aa9226c3b7de8e2adb11bf20124327c054e0e5812d2aac0b5b5a87e7464"
 dependencies = [
- "x11rb",
+ "x11rb 0.10.1",
 ]
 
 [[package]]
@@ -2290,11 +2368,24 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "592b4883219f345e712b3209c62654ebda0bb50887f330cbd018d0f654bfd507"
 dependencies = [
- "gethostname",
+ "gethostname 0.2.3",
  "nix 0.24.3",
  "winapi",
  "winapi-wsapoll",
- "x11rb-protocol",
+ "x11rb-protocol 0.10.0",
+]
+
+[[package]]
+name = "x11rb"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1641b26d4dec61337c35a1b1aaf9e3cba8f46f0b43636c609ab0291a648040a"
+dependencies = [
+ "gethostname 0.3.0",
+ "nix 0.26.4",
+ "winapi",
+ "winapi-wsapoll",
+ "x11rb-protocol 0.12.0",
 ]
 
 [[package]]
@@ -2304,6 +2395,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56b245751c0ac9db0e006dc812031482784e434630205a93c73cfefcaabeac67"
 dependencies = [
  "nix 0.24.3",
+]
+
+[[package]]
+name = "x11rb-protocol"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82d6c3f9a0fb6701fab8f6cea9b0c0bd5d6876f1f89f7fada07e558077c344bc"
+dependencies = [
+ "nix 0.26.4",
 ]
 
 [[package]]
