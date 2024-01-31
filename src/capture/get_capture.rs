@@ -1,5 +1,6 @@
 use std::sync::mpsc::channel;
 
+use anyhow::Context;
 use display::DisplayInfo;
 use windows::core::{ComInterface, IInspectable};
 use windows::Foundation::TypedEventHandler;
@@ -17,20 +18,27 @@ use crate::image::Image;
 use super::d3d_device::{create_d3d_device, create_dxgi_device};
 use super::display::{self, get_display};
 
-pub fn get_capture() -> (Image, DisplayInfo) {
+pub fn get_capture() -> anyhow::Result<(Image, DisplayInfo)> {
     // create d3d device for capture item
-    let d3d_device = create_d3d_device().unwrap();
-    let d3d_context = unsafe { d3d_device.GetImmediateContext().unwrap() };
-    let dxgi_device = create_dxgi_device(&d3d_device).unwrap();
+    let d3d_device = create_d3d_device().context("Failed to create d3d_device")?;
+    let d3d_context = unsafe {
+        d3d_device
+            .GetImmediateContext()
+            .context("Failed to get d3d_device context.")?
+    };
+    let dxgi_device = create_dxgi_device(&d3d_device).context("Failed to create dxgi_device")?;
 
-    let display = get_display().unwrap();
+    let display = get_display().context("Failed to get display")?;
 
     // turn display into capture item
-    let interop =
-        windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>().unwrap();
-    let capture_item: GraphicsCaptureItem =
-        unsafe { interop.CreateForMonitor(display.handle) }.unwrap();
-    let capture_size = capture_item.Size().unwrap();
+    let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()
+        .context("Failed to create graphics capture interop")?;
+    let capture_item: GraphicsCaptureItem = unsafe {
+        interop
+            .CreateForMonitor(display.handle)
+            .context("Failed to create interop for display")?
+    };
+    let capture_size = capture_item.Size().context("Failed to get capture size")?;
 
     // create frame pool
     let frame_pool = Direct3D11CaptureFramePool::CreateFreeThreaded(
@@ -39,8 +47,10 @@ pub fn get_capture() -> (Image, DisplayInfo) {
         1,
         capture_size,
     )
-    .unwrap();
-    let session = frame_pool.CreateCaptureSession(&capture_item).unwrap();
+    .context("Failed to create frame pool")?;
+    let session = frame_pool
+        .CreateCaptureSession(&capture_item)
+        .context("Failed to create capture session")?;
 
     // setup sender and reciever for frames
     let (sender, receiver) = channel();
@@ -51,24 +61,26 @@ pub fn get_capture() -> (Image, DisplayInfo) {
             &TypedEventHandler::<Direct3D11CaptureFramePool, IInspectable>::new({
                 move |frame_pool, _| {
                     let frame_pool = frame_pool.as_ref().unwrap();
-                    let frame = frame_pool.TryGetNextFrame().unwrap();
-                    sender.send(frame).unwrap();
+                    let frame = frame_pool.TryGetNextFrame()?;
+                    sender.send(frame).expect("Failed to send frame.");
                     Ok(())
                 }
             }),
         )
-        .unwrap();
+        .context("Failed to setup frame arrival")?;
 
     // Start capture
-    session.StartCapture().unwrap();
+    session.StartCapture().context("Failed to start capture.")?;
 
     // wait for frame
-    let frame = receiver.recv().unwrap();
+    let frame = receiver.recv().context("Failed to recieve frame")?;
 
     // Copy frame into new texture
     let texture = unsafe {
         let source_texture: ID3D11Texture2D =
-            get_texture_from_surface(&frame.Surface().unwrap()).unwrap();
+            get_texture_from_surface(&frame.Surface().context("Failed to get frame surface")?)
+                .context("failed to get texture from surface")?;
+
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         source_texture.GetDesc(&mut desc);
         desc.BindFlags = 0;
@@ -80,17 +92,21 @@ pub fn get_capture() -> (Image, DisplayInfo) {
             let mut texture = None;
             d3d_device
                 .CreateTexture2D(&desc, None, Some(&mut texture))
-                .unwrap();
+                .context("Failed to create texture2D")?;
             texture.unwrap()
         };
 
         d3d_context.CopyResource(
-            Some(&copy_texture.cast().unwrap()),
-            Some(&source_texture.cast().unwrap()),
+            Some(&copy_texture.cast().context("Failed to cast copy_texture")?),
+            Some(
+                &source_texture
+                    .cast()
+                    .context("Failed to cast source_texture")?,
+            ),
         );
 
-        session.Close().unwrap();
-        frame_pool.Close().unwrap();
+        session.Close().context("Failed to close capture session")?;
+        frame_pool.Close().context("Failed to close frame pool")?;
 
         copy_texture
     };
@@ -99,7 +115,9 @@ pub fn get_capture() -> (Image, DisplayInfo) {
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         texture.GetDesc(&mut desc as *mut _);
 
-        let resource: ID3D11Resource = texture.cast().unwrap();
+        let resource: ID3D11Resource = texture
+            .cast()
+            .context("Failed to cast texture to resource")?;
         let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
         d3d_context
             .Map(
@@ -109,7 +127,7 @@ pub fn get_capture() -> (Image, DisplayInfo) {
                 0,
                 Some(&mut mapped),
             )
-            .unwrap();
+            .context("Failed to map texture resource")?;
 
         let slice: &[u8] = {
             std::slice::from_raw_parts(
@@ -129,5 +147,6 @@ pub fn get_capture() -> (Image, DisplayInfo) {
 
         image
     };
-    (image, display)
+
+    Ok((image, display))
 }

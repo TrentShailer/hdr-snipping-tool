@@ -6,7 +6,7 @@ mod gui;
 mod image;
 mod logger;
 
-use std::sync::mpsc::channel;
+use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
 use anyhow::{bail, Context};
@@ -14,6 +14,7 @@ use app::App;
 use capture::get_capture;
 
 use glium::glutin;
+use glium::glutin::event_loop::EventLoopProxy;
 use glium::glutin::window::WindowBuilder;
 use log::error;
 
@@ -45,9 +46,10 @@ fn run() -> anyhow::Result<()> {
 
     thread::spawn(move || {
         KeybdKey::F13Key.bind(move || {
-            let (image, display) = get_capture();
-            sender.send((image, display)).unwrap();
-            proxy.send_event(gui::AppEvent::Show).unwrap();
+            if let Err(e) = handle_capture(&sender, &proxy).context("Failed to handle capture") {
+                error!("{:?}", e);
+                return;
+            };
         });
 
         inputbot::handle_input_events();
@@ -59,6 +61,22 @@ fn run() -> anyhow::Result<()> {
     gui.main_loop(move |_, display, renderer, ui| {
         app.render(ui, display, renderer.textures());
     });
+
+    Ok(())
+}
+
+fn handle_capture(
+    sender: &Sender<(image::Image, capture::DisplayInfo)>,
+    proxy: &EventLoopProxy<gui::AppEvent>,
+) -> anyhow::Result<()> {
+    let (image, display) = get_capture().context("Failed to get capture")?;
+
+    sender
+        .send((image, display))
+        .context("Failed to send capture")?;
+    proxy
+        .send_event(gui::AppEvent::Show)
+        .context("Failed to send show event")?;
 
     Ok(())
 }
