@@ -1,3 +1,4 @@
+use glium::glutin::dpi::{LogicalPosition, LogicalSize};
 use windows::core::Result;
 use windows::Win32::Foundation::{BOOL, LPARAM, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
@@ -71,5 +72,16 @@ impl DisplayInfo {
             display_name,
             rect,
         })
+    }
+
+    pub fn get_position(&self) -> LogicalPosition<i32> {
+        LogicalPosition::new(self.rect.left, self.rect.top)
+    }
+
+    pub fn get_size(&self) -> LogicalSize<i32> {
+        LogicalSize::new(
+            self.rect.right - self.rect.left,
+            self.rect.bottom - self.rect.top,
+        )
     }
 }

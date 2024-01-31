@@ -13,6 +13,7 @@ pub struct Image {
     pub height: usize,
     pub alpha: f32,
     pub gamma: f32,
+    pub selection: [usize; 4],
 }
 
 impl Image {
@@ -37,6 +38,7 @@ impl Image {
             height,
             alpha,
             gamma,
+            selection: [0, 0, width, height],
         }
     }
 
@@ -48,6 +50,7 @@ impl Image {
             height: 0,
             alpha: 0.0,
             gamma: 0.0,
+            selection: [0, 0, 0, 0],
         }
     }
 

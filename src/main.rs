@@ -10,11 +10,10 @@ mod texture;
 mod write_image;
 
 use std::sync::mpsc::channel;
-use std::sync::Arc;
 use std::thread;
 
 use app::App;
-use glium::backend::Facade;
+use display::DisplayInfo;
 use log::error;
 
 use inputbot::KeybdKey::{self};
@@ -50,8 +49,8 @@ fn main() -> Result<()> {
 
     thread::spawn(move || {
         KeybdKey::F13Key.bind(move || {
-            let image = take_screenshot();
-            sender.send(image).unwrap();
+            let (image, display) = take_screenshot();
+            sender.send((image, display)).unwrap();
             proxy.send_event(support::AppEvent::Show).unwrap();
         });
 
@@ -62,13 +61,13 @@ fn main() -> Result<()> {
     let mut app = App::new(receiver, proxy);
 
     gui.main_loop(move |_, display, renderer, ui| {
-        app.render(ui, display.get_context(), renderer.textures());
+        app.render(ui, display, renderer.textures());
     });
 
     Ok(())
 }
 
-fn take_screenshot() -> Image {
+fn take_screenshot() -> (Image, DisplayInfo) {
     // create d3d device for capture item
     let d3d_device = create_d3d_device().unwrap();
     let d3d_context = unsafe { d3d_device.GetImmediateContext().unwrap() };
@@ -168,11 +167,15 @@ fn take_screenshot() -> Image {
             )
         };
 
-        let image: Image = Image::from_u8(slice, desc.Width as usize, desc.Height as usize);
+        let image: Image = Image::from_u8(
+            slice,
+            slice.len() / desc.Height as usize / 4 / 2, /*  desc.Width as usize */
+            desc.Height as usize,
+        );
 
         thread::spawn(move || d3d_context.Unmap(Some(&resource), 0));
 
         image
     };
-    image
+    (image, display)
 }
