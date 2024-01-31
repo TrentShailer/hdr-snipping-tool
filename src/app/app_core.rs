@@ -11,7 +11,7 @@ use glium::{
 use imgui::{TextureId, Textures, Ui};
 use imgui_glium_renderer::Texture;
 
-use crate::{display::DisplayInfo, image::Image, support::AppEvent};
+use crate::{capture::DisplayInfo, gui::AppEvent, image::Image};
 
 pub struct App {
     pub image: Image,
@@ -39,10 +39,6 @@ impl App {
         gl_ctx: &dyn Facade,
         textures: &mut Textures<Texture>,
     ) -> Result<(), Box<dyn Error>> {
-        /* if let Some(id) = self.texture_id {
-            textures.remove(id);
-        } */
-
         let raw = RawImage2d {
             data: std::borrow::Cow::Borrowed(&self.image.current),
             width: self.image.width as u32,
@@ -82,12 +78,12 @@ impl App {
                 .set_outer_position(image_display.get_position());
         }
 
-        if ui.is_key_down(imgui::Key::Escape) {
+        if ui.is_key_released(imgui::Key::Escape) {
             self.proxy.send_event(AppEvent::Hide).unwrap();
             return;
         }
 
-        if ui.is_key_down(imgui::Key::Enter) {
+        if ui.is_key_released(imgui::Key::Enter) {
             let image = self.image.save();
             let mut clipboard = Clipboard::new().unwrap();
             clipboard
@@ -111,8 +107,8 @@ impl App {
 
         let selection_rect = self.image.get_selection_rect();
         ui.get_foreground_draw_list()
-            .add_rect(selection_rect[0], selection_rect[1], 0xff_5e_e0_f6)
-            .thickness(1.0)
+            .add_rect(selection_rect[0], selection_rect[1], 0x40_5e_e0_f6)
+            .thickness(2.0)
             .build();
 
         let (size, pos) = ui

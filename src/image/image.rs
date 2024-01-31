@@ -5,7 +5,7 @@ use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
 
-use crate::write_image::save_jpeg;
+use super::save_jpeg;
 
 pub struct Image {
     pub raw: Box<[f32]>,

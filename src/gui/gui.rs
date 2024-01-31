@@ -6,18 +6,11 @@ use glium::{Display, Surface};
 use imgui::{Context, FontConfig, FontSource, Ui};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
-use std::path::Path;
 use std::time::Instant;
 
-mod clipboard;
+use super::AppEvent;
 
-#[derive(Debug)]
-pub enum AppEvent {
-    Show,
-    Hide,
-}
-
-pub struct System {
+pub struct Gui {
     pub event_loop: EventLoop<AppEvent>,
     pub display: glium::Display,
     pub imgui: Context,
@@ -26,65 +19,33 @@ pub struct System {
     pub font_size: f32,
 }
 
-pub fn init(title: &str) -> System {
-    let title = match Path::new(&title).file_name() {
-        Some(file_name) => file_name.to_str().unwrap(),
-        None => title,
-    };
+pub fn init(window_builder: WindowBuilder) -> Gui {
     let event_loop = EventLoopBuilder::with_user_event().build();
     let context = glutin::ContextBuilder::new().with_vsync(true);
-    let builder = WindowBuilder::new()
-        .with_title(title.to_owned())
-        .with_fullscreen(Some(glutin::window::Fullscreen::Borderless(None)))
-        .with_visible(false);
+
     let display =
-        Display::new(builder, context, &event_loop).expect("Failed to initialize display");
+        Display::new(window_builder, context, &event_loop).expect("Failed to initialize display");
 
     let mut imgui = Context::create();
     imgui.set_ini_filename(None);
-
-    if let Some(backend) = clipboard::init() {
-        imgui.set_clipboard_backend(backend);
-    } else {
-        eprintln!("Failed to initialize clipboard");
-    }
 
     let mut platform = WinitPlatform::init(&mut imgui);
     {
         let gl_window = display.gl_window();
         let window = gl_window.window();
 
-        let dpi_mode = if let Ok(factor) = std::env::var("IMGUI_EXAMPLE_FORCE_DPI_FACTOR") {
-            // Allow forcing of HiDPI factor for debugging purposes
-            match factor.parse::<f64>() {
-                Ok(f) => HiDpiMode::Locked(f),
-                Err(e) => panic!("Invalid scaling factor: {}", e),
-            }
-        } else {
-            HiDpiMode::Default
-        };
+        let dpi_mode = HiDpiMode::Default;
 
         platform.attach_window(imgui.io_mut(), window, dpi_mode);
     }
 
-    // Fixed font size. Note imgui_winit_support uses "logical
-    // pixels", which are physical pixels scaled by the devices
-    // scaling factor. Meaning, 13.0 pixels should look the same size
-    // on two different screens, and thus we do not need to scale this
-    // value (as the scaling is handled by winit)
     let font_size = 13.0;
 
     imgui.fonts().add_font(&[FontSource::TtfData {
         data: include_bytes!("../fonts/Inter-Regular.ttf"),
         size_pixels: font_size,
         config: Some(FontConfig {
-            // As imgui-glium-renderer isn't gamma-correct with
-            // it's font rendering, we apply an arbitrary
-            // multiplier to make the font a bit "heavier". With
-            // default imgui-glow-renderer this is unnecessary.
             rasterizer_multiply: 1.5,
-            // Oversampling font helps improve text rendering at
-            // expense of larger font atlas texture.
             oversample_h: 4,
             oversample_v: 4,
             ..FontConfig::default()
@@ -93,7 +54,7 @@ pub fn init(title: &str) -> System {
 
     let renderer = Renderer::init(&mut imgui, &display).expect("Failed to initialize renderer");
 
-    System {
+    Gui {
         event_loop,
         display,
         imgui,
@@ -103,12 +64,12 @@ pub fn init(title: &str) -> System {
     }
 }
 
-impl System {
+impl Gui {
     pub fn main_loop<F: FnMut(&mut bool, &Display, &mut Renderer, &mut Ui) + 'static>(
         self,
         mut run_ui: F,
     ) {
-        let System {
+        let Gui {
             event_loop,
             display,
             mut imgui,
@@ -145,7 +106,7 @@ impl System {
 
                     let gl_window = display.gl_window();
                     let mut target = display.draw();
-                    target.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
+                    target.clear_color_srgb(0.5, 0.5, 0.5, 1.0);
                     platform.prepare_render(ui, gl_window.window());
                     let draw_data = imgui.render();
                     renderer
@@ -157,15 +118,7 @@ impl System {
                     event: WindowEvent::CloseRequested,
                     ..
                 } => *control_flow = ControlFlow::Exit,
-                Event::UserEvent(v) => match v {
-                    AppEvent::Show => {
-                        display.gl_window().window().set_visible(true);
-                        display.gl_window().window().focus_window();
-                    }
-                    AppEvent::Hide => {
-                        display.gl_window().window().set_visible(false);
-                    }
-                },
+                Event::UserEvent(v) => v.handle(&display, &mut imgui, &mut platform, &mut renderer),
                 event => {
                     let gl_window = display.gl_window();
                     platform.handle_event(imgui.io_mut(), gl_window.window(), &event);
