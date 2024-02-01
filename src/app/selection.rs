@@ -16,6 +16,7 @@ impl App {
 
         if ui.is_mouse_released(imgui::MouseButton::Left) && self.selecting {
             self.selecting = false;
+            self.save_and_close();
         }
 
         if !is_inside(mouse_pos, [0.0, 0.0], window_size.into()) {
