@@ -33,7 +33,7 @@ impl Image {
         let max = Self::get_max_value(&raw);
         println!("{}", max);
 
-        let gamma = 0.45;
+        let gamma = 0.5;
         let alpha = max.powf(-gamma);
         let current = compress_gamma(&raw, alpha, gamma);
 
