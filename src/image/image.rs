@@ -9,6 +9,7 @@ use super::{
     f32_from_f16_bytes::f32_from_le_f16_bytes, gamma_compression::compress_gamma, save_image,
 };
 
+#[derive(Clone)]
 pub struct Image {
     pub raw: Box<[f32]>,
     pub current: Box<[u8]>,

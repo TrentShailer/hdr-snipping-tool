@@ -84,6 +84,8 @@ impl App {
         }
 
         if ui.is_key_released(imgui::Key::Enter) {
+            self.proxy.send_event(AppEvent::Hide).unwrap();
+
             let image = self.image.save();
             let mut clipboard = Clipboard::new().unwrap();
             clipboard
@@ -93,7 +95,6 @@ impl App {
                     bytes: std::borrow::Cow::Borrowed(&image.as_raw()),
                 })
                 .unwrap();
-            self.proxy.send_event(AppEvent::Hide).unwrap();
             return;
         }
 
@@ -144,6 +145,8 @@ impl App {
                 }
 
                 if ui.button_with_size("Save and Close", [250.0, 25.0]) {
+                    self.proxy.send_event(AppEvent::Hide).unwrap();
+
                     let image = self.image.save();
                     let mut clipboard = Clipboard::new().unwrap();
                     clipboard
@@ -153,8 +156,6 @@ impl App {
                             bytes: std::borrow::Cow::Borrowed(&image.as_raw()),
                         })
                         .unwrap();
-
-                    self.proxy.send_event(AppEvent::Hide).unwrap();
                 }
 
                 (ui.window_size(), ui.window_pos())

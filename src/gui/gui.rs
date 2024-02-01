@@ -7,7 +7,6 @@ use glium::{Display, Surface};
 use imgui::{Context, FontConfig, FontSource, Ui};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
-use std::time::Instant;
 
 use super::AppEvent;
 
@@ -79,7 +78,6 @@ impl Gui {
             mut renderer,
             ..
         } = self;
-        let mut last_frame = Instant::now();
 
         event_loop.run(move |event, _, control_flow| {
             if !display.gl_window().window().is_visible().unwrap() {
@@ -88,12 +86,8 @@ impl Gui {
                 *control_flow = glutin::event_loop::ControlFlow::Poll;
             }
 
-            match event {
-                Event::NewEvents(_) => {
-                    let now = Instant::now();
-                    imgui.io_mut().update_delta_time(now - last_frame);
-                    last_frame = now;
-                }
+            match &event {
+                Event::NewEvents(_) => {}
                 Event::MainEventsCleared => {
                     let gl_window = display.gl_window();
                     if let Err(e) = platform
@@ -130,10 +124,22 @@ impl Gui {
                         display.gl_window().window().focus_window();
                     }
                     AppEvent::Hide => {
+                        dbg!("Hide");
                         display.gl_window().window().set_visible(false);
-                        // TODO flush events buffer
                     }
                 },
+                Event::WindowEvent {
+                    window_id,
+                    event: _,
+                } if window_id == &display.gl_window().window().id() => {
+                    // ignore events when the window is invisible
+                    if !display.gl_window().window().is_visible().unwrap() {
+                        return;
+                    }
+
+                    let gl_window = display.gl_window();
+                    platform.handle_event(imgui.io_mut(), gl_window.window(), &event);
+                }
                 event => {
                     let gl_window = display.gl_window();
                     platform.handle_event(imgui.io_mut(), gl_window.window(), &event);
