@@ -89,16 +89,11 @@ impl App {
             )
             .build();
 
-        // draw selection
-        let selection_rect = self.image.get_selection_rect();
-        ui.get_foreground_draw_list()
-            .add_rect(selection_rect[0], selection_rect[1], 0x40_5e_e0_f6)
-            .thickness(2.0)
-            .build();
+        self.draw_selection(ui, display);
 
         let (size, pos) = self.draw_settings(ui, display, textures);
 
-        self.handle_selection(ui, pos, size);
+        self.handle_selection(ui, display, pos, size);
 
         self.draw_mouse_guides(ui, display);
     }

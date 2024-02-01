@@ -39,7 +39,7 @@ pub fn init(window_builder: WindowBuilder) -> anyhow::Result<Gui> {
         platform.attach_window(imgui.io_mut(), window, dpi_mode);
     }
 
-    let font_size = 13.0;
+    let font_size = 14.0;
 
     imgui.fonts().add_font(&[FontSource::TtfData {
         data: include_bytes!("../fonts/Inter-Regular.ttf"),

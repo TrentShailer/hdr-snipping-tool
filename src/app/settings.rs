@@ -2,6 +2,8 @@ use glium::{backend::Facade, Display};
 use imgui::{Textures, Ui};
 use imgui_glium_renderer::Texture;
 
+use crate::gui::AppEvent;
+
 use super::App;
 
 impl App {
@@ -35,15 +37,21 @@ impl App {
                         .unwrap();
                 };
 
-                if ui.button_with_size("Auto Alpha", [250.0, 25.0]) {
+                if ui.button_with_size("Auto Alpha", [275.0, 25.0]) {
                     self.image.alpha = self.image.calculate_alpha();
                     self.image.compress_gamma();
                     self.remake_texture(display.get_context(), textures)
                         .unwrap();
                 }
 
-                if ui.button_with_size("Save and Close", [250.0, 25.0]) {
+                ui.spacing();
+
+                if ui.button_with_size("Save and Close", [275.0, 25.0]) {
                     self.save_and_close();
+                }
+
+                if ui.button_with_size("Exit", [275.0, 25.0]) {
+                    self.proxy.send_event(AppEvent::Hide).unwrap();
                 }
 
                 (ui.window_size(), ui.window_pos())

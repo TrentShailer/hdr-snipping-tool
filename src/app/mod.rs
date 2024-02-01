@@ -1,4 +1,5 @@
 mod app_core;
+mod draw_selection;
 mod keybinds;
 mod mouse_guides;
 mod save_and_close;
