@@ -124,7 +124,6 @@ impl App {
                     self.image.compress_gamma();
                     self.remake_texture(display.get_context(), textures)
                         .unwrap();
-                    self.proxy.send_event(AppEvent::Redraw).unwrap();
                 }
 
                 if ui
@@ -135,7 +134,6 @@ impl App {
                     self.image.compress_gamma();
                     self.remake_texture(display.get_context(), textures)
                         .unwrap();
-                    self.proxy.send_event(AppEvent::Redraw).unwrap();
                 };
 
                 if ui.button_with_size("Auto Alpha", [250.0, 25.0]) {
@@ -143,7 +141,6 @@ impl App {
                     self.image.compress_gamma();
                     self.remake_texture(display.get_context(), textures)
                         .unwrap();
-                    self.proxy.send_event(AppEvent::Redraw).unwrap();
                 }
 
                 if ui.button_with_size("Save and Close", [250.0, 25.0]) {

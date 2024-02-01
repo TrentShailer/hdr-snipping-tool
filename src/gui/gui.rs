@@ -81,20 +81,11 @@ impl Gui {
         } = self;
         let mut last_frame = Instant::now();
 
-        let mut just_requested_redraw = false;
-
         event_loop.run(move |event, _, control_flow| {
-            *control_flow = glutin::event_loop::ControlFlow::Wait;
-
-            if let Event::UserEvent(v) = &event {
-                if v == &AppEvent::Redraw {
-                    if just_requested_redraw {
-                        just_requested_redraw = false;
-                        return;
-                    } else {
-                        just_requested_redraw = true;
-                    }
-                }
+            if !display.gl_window().window().is_visible().unwrap() {
+                *control_flow = glutin::event_loop::ControlFlow::Wait;
+            } else {
+                *control_flow = glutin::event_loop::ControlFlow::Poll;
             }
 
             match event {
@@ -140,21 +131,7 @@ impl Gui {
                     }
                     AppEvent::Hide => {
                         display.gl_window().window().set_visible(false);
-                    }
-                    AppEvent::Redraw => {
-                        if let Err(e) = redraw(
-                            &mut imgui,
-                            &mut run_ui,
-                            &display,
-                            &mut renderer,
-                            control_flow,
-                            &mut platform,
-                        )
-                        .context("Failed to redraw.")
-                        {
-                            log::error!("{:?}", e);
-                            *control_flow = ControlFlow::Exit;
-                        };
+                        // TODO flush events buffer
                     }
                 },
                 event => {

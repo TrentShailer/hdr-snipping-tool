@@ -31,7 +31,6 @@ impl Image {
             .collect::<Box<[f32]>>();
 
         let max = Self::get_max_value(&raw);
-        println!("{}", max);
 
         let gamma = 0.5;
         let alpha = max.powf(-gamma);

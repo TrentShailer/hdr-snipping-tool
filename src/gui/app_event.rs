@@ -2,5 +2,4 @@
 pub enum AppEvent {
     Show,
     Hide,
-    Redraw,
 }
