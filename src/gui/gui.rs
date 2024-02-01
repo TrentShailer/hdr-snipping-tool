@@ -124,7 +124,6 @@ impl Gui {
                         display.gl_window().window().focus_window();
                     }
                     AppEvent::Hide => {
-                        dbg!("Hide");
                         display.gl_window().window().set_visible(false);
                     }
                 },
