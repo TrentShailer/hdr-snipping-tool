@@ -41,8 +41,8 @@ impl App {
     ) -> Result<(), Box<dyn Error>> {
         let raw = RawImage2d {
             data: std::borrow::Cow::Borrowed(&self.image.current),
-            width: self.image.width as u32,
-            height: self.image.height as u32,
+            width: self.image.width,
+            height: self.image.height,
             format: glium::texture::ClientFormat::U8U8U8U8,
         };
         let gl_texture = Texture2d::new(gl_ctx, raw)?;
@@ -116,25 +116,34 @@ impl App {
             .always_auto_resize(true)
             .collapsible(false)
             .build(|| {
-                if ui.slider("Gamma", 0.01, 1.0, &mut self.image.gamma) {
-                    self.image.current =
-                        Image::compress_gamma(&self.image.raw, self.image.alpha, self.image.gamma);
+                if ui
+                    .input_float("Gamma", &mut self.image.gamma)
+                    .step(0.025)
+                    .build()
+                {
+                    self.image.compress_gamma();
+                    self.remake_texture(display.get_context(), textures)
+                        .unwrap();
+                    self.proxy.send_event(AppEvent::Redraw).unwrap();
                 }
 
-                if ui.slider("Alpha", 0.01, 10.0, &mut self.image.alpha) {
-                    self.image.current =
-                        Image::compress_gamma(&self.image.raw, self.image.alpha, self.image.gamma);
-                }
+                if ui
+                    .input_float("Alpha", &mut self.image.alpha)
+                    .step(0.025)
+                    .build()
+                {
+                    self.image.compress_gamma();
+                    self.remake_texture(display.get_context(), textures)
+                        .unwrap();
+                    self.proxy.send_event(AppEvent::Redraw).unwrap();
+                };
 
                 if ui.button_with_size("Auto Alpha", [250.0, 25.0]) {
                     self.image.alpha = self.image.calculate_alpha();
-                }
-
-                if ui.button_with_size("Apply", [250.0, 25.0]) {
-                    self.image.current =
-                        Image::compress_gamma(&self.image.raw, self.image.alpha, self.image.gamma);
+                    self.image.compress_gamma();
                     self.remake_texture(display.get_context(), textures)
                         .unwrap();
+                    self.proxy.send_event(AppEvent::Redraw).unwrap();
                 }
 
                 if ui.button_with_size("Save and Close", [250.0, 25.0]) {

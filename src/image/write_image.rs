@@ -6,7 +6,7 @@ use std::{
 use chrono::Local;
 use image::{codecs::png::PngEncoder, GenericImageView, ImageBuffer, Rgba};
 
-pub fn save_jpeg(
+pub fn save_image(
     image: &[u8],
     selection_pos: [u32; 2],
     selection_size: [u32; 2],

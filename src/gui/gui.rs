@@ -81,8 +81,21 @@ impl Gui {
         } = self;
         let mut last_frame = Instant::now();
 
+        let mut just_requested_redraw = false;
+
         event_loop.run(move |event, _, control_flow| {
             *control_flow = glutin::event_loop::ControlFlow::Wait;
+
+            if let Event::UserEvent(v) = &event {
+                if v == &AppEvent::Redraw {
+                    if just_requested_redraw {
+                        just_requested_redraw = false;
+                        return;
+                    } else {
+                        just_requested_redraw = true;
+                    }
+                }
+            }
 
             match event {
                 Event::NewEvents(_) => {
@@ -120,7 +133,30 @@ impl Gui {
                     event: WindowEvent::CloseRequested,
                     ..
                 } => *control_flow = ControlFlow::Exit,
-                Event::UserEvent(v) => v.handle(&display, &mut imgui, &mut platform, &mut renderer),
+                Event::UserEvent(v) => match v {
+                    AppEvent::Show => {
+                        display.gl_window().window().set_visible(true);
+                        display.gl_window().window().focus_window();
+                    }
+                    AppEvent::Hide => {
+                        display.gl_window().window().set_visible(false);
+                    }
+                    AppEvent::Redraw => {
+                        if let Err(e) = redraw(
+                            &mut imgui,
+                            &mut run_ui,
+                            &display,
+                            &mut renderer,
+                            control_flow,
+                            &mut platform,
+                        )
+                        .context("Failed to redraw.")
+                        {
+                            log::error!("{:?}", e);
+                            *control_flow = ControlFlow::Exit;
+                        };
+                    }
+                },
                 event => {
                     let gl_window = display.gl_window();
                     platform.handle_event(imgui.io_mut(), gl_window.window(), &event);

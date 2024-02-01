@@ -139,8 +139,8 @@ pub fn get_capture() -> anyhow::Result<(Image, DisplayInfo)> {
         // TODO find out why capture is returning more data then neccecary
         let image: Image = Image::from_u8(
             slice,
-            slice.len() / desc.Height as usize / 4 / 2, /*  desc.Width as usize */
-            desc.Height as usize,
+            slice.len() as u32 / desc.Height / 4 / 2, /*  desc.Width as usize */
+            desc.Height,
         );
 
         d3d_context.Unmap(Some(&resource), 0);
