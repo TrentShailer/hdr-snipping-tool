@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = "0.4.31"
+chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
 fern = "0.6.2"
-image = { version = "0.24.8", features = ["rayon"] }
+image = { version = "0.24.8", default-features = false, features = ["png"] }
 glium = { version = "0.32.1", default-features = true }
 imgui = "0.11.0"
 imgui-glium-renderer = "0.11.0"
@@ -18,28 +18,17 @@ log = "0.4.20"
 owo-colors = "4.0.0"
 rayon = "1.8.1"
 windows = { version = "0.52.0", features = [
-	"Foundation",
-	"Win32_Foundation",
-	"Win32_UI_WindowsAndMessaging",
-	"Win32_System_Console",
-	"Win32_Graphics_Dwm",
-	"Win32_Graphics_Gdi",
-	"Win32_Graphics_Dxgi",
-	"Win32_Graphics_Dxgi_Common",
-	"Win32_Graphics_Direct3D_Fxc",
-	"Win32_Graphics_Direct3D",
 	"Win32_Graphics_Direct3D11",
-	"Win32_System_WinRT",
-	"Win32_System_WinRT_Direct3D11",
-	"Win32_System_WinRT_Graphics_Capture",
-	"UI",
-	"Storage",
-	"Storage_Streams",
-	"Graphics",
+	"Win32_UI_WindowsAndMessaging",
+	"Win32_Graphics_Dxgi_Common",
+	"Win32_Graphics_Gdi",
 	"Graphics_Capture",
-	"Graphics_DirectX",
+	"Win32_Graphics_Direct3D_Fxc",
+	"Win32_System_WinRT_Direct3D11",
+	"Foundation",
+	"Win32_System_WinRT_Graphics_Capture",
 	"Graphics_DirectX_Direct3D11",
-	"Graphics_Imaging",
+	"Win32_Foundation",
 ] }
 arboard = "3.3.0"
 anyhow = "1.0.79"
