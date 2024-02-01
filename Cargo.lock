@@ -741,7 +741,6 @@ dependencies = [
  "log",
  "owo-colors",
  "rayon",
- "thiserror",
  "windows",
 ]
 
