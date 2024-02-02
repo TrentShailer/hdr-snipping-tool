@@ -21,11 +21,7 @@ impl Settings {
             .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
         {
             let settings = Self::default();
-            let toml_string =
-                toml::to_string_pretty(&settings).context("Failed to serialize settings.")?;
-
-            fs::write(SETTINGS_FILE_PATH, toml_string.as_bytes())
-                .context("Failed to write settings file.")?;
+            settings.save().context("Failed to save settings")?;
 
             return Ok(settings);
         }
@@ -35,15 +31,29 @@ impl Settings {
         file.read_to_string(&mut contents)
             .context("Failed to read settings file.")?;
 
-        let settings = toml::from_str(&contents).context("Failed to deserialize settings.")?;
+        let mut settings: Settings =
+            toml::from_str(&contents).context("Failed to deserialize settings.")?;
+
+        if settings.version != Self::default().version {
+            settings.version = Self::default().version;
+            settings.save().context("Failed to save settings")?;
+        }
 
         Ok(settings)
     }
 
     fn default() -> Self {
         Self {
-            version: String::from("1.0.0"),
+            version: String::from("1.0.1"),
             screenshot_key: KeyCode::PrintScreen,
         }
+    }
+
+    fn save(&self) -> anyhow::Result<()> {
+        let toml_string = toml::to_string_pretty(self).context("Failed to serialize settings.")?;
+
+        fs::write(SETTINGS_FILE_PATH, toml_string.as_bytes())
+            .context("Failed to write settings file.")?;
+        Ok(())
     }
 }
