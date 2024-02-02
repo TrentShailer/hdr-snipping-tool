@@ -2,3 +2,4 @@
 *.png
 *.jpg
 log.txt
+!/media/*.png
