@@ -10,7 +10,7 @@ This will open the screenshot window where you can tweak the gamma and alpha val
 
 Gamma controls the contrast of the image, and alpha controls the brightness of the image.
 
-You can then select the area you want to capture, or press enter or the Save and Close button to capture everything.
+You can then select the area you want to capture, or press Enter or the Save and Close button to capture everything. You can press Esc to code without saving.
 
 The screenshot is copied to your clipboard and saved as a png next to the executable.
 
