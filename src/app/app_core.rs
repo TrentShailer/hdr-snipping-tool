@@ -63,6 +63,7 @@ impl App {
         // receive image
         if let Ok((image, image_display)) = self.receiver.try_recv() {
             self.image = image;
+            self.selecting = false;
 
             self.remake_texture(display.get_context(), textures)
                 .unwrap();

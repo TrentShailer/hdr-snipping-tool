@@ -125,6 +125,9 @@ impl Gui {
                     }
                     AppEvent::Hide => {
                         display.gl_window().window().set_visible(false);
+                        imgui
+                            .io_mut()
+                            .add_mouse_button_event(imgui::MouseButton::Left, false);
                     }
                 },
                 Event::WindowEvent {
