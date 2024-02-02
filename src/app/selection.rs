@@ -1,5 +1,6 @@
 use glium::Display;
-use imgui::Ui;
+use imgui::{Textures, Ui};
+use imgui_glium_renderer::Texture;
 
 use super::App;
 
@@ -8,6 +9,7 @@ impl App {
         &mut self,
         ui: &mut Ui,
         display: &Display,
+        textures: &mut Textures<Texture>,
         pos: [f32; 2],
         size: [f32; 2],
     ) {
@@ -15,8 +17,9 @@ impl App {
         let window_size = display.gl_window().window().inner_size();
 
         if ui.is_mouse_released(imgui::MouseButton::Left) && self.selecting {
+            println!("Test");
             self.selecting = false;
-            self.save_and_close();
+            self.save_and_close(display, textures);
         }
 
         if !is_inside(mouse_pos, [0.0, 0.0], window_size.into()) {

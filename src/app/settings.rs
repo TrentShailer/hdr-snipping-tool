@@ -2,7 +2,7 @@ use glium::{backend::Facade, Display};
 use imgui::{Textures, Ui};
 use imgui_glium_renderer::Texture;
 
-use crate::gui::AppEvent;
+use crate::{gui::AppEvent, image::Image};
 
 use super::App;
 
@@ -47,11 +47,13 @@ impl App {
                 ui.spacing();
 
                 if ui.button_with_size("Save and Close", [275.0, 25.0]) {
-                    self.save_and_close();
+                    self.save_and_close(display, textures);
                 }
 
                 if ui.button_with_size("Exit", [275.0, 25.0]) {
                     self.proxy.send_event(AppEvent::Hide).unwrap();
+                    self.image = Image::blank();
+                    self.remake_texture(display, textures).unwrap();
                 }
 
                 (ui.window_size(), ui.window_pos())

@@ -79,7 +79,7 @@ impl App {
                 .set_outer_position(image_display.get_position());
         }
 
-        self.handle_keybinds(ui);
+        self.handle_keybinds(ui, display, textures);
 
         // draw image
         ui.get_background_draw_list()
@@ -94,7 +94,7 @@ impl App {
 
         let (size, pos) = self.draw_settings(ui, display, textures);
 
-        self.handle_selection(ui, display, pos, size);
+        self.handle_selection(ui, display, textures, pos, size);
 
         self.draw_mouse_guides(ui, display);
     }
