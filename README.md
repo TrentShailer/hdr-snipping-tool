@@ -34,9 +34,13 @@ The screenshot is copied to your clipboard and saved as a png next to the execut
 
 ## Screenshot Comparison
 
-| Windows Snipping Tool | HDR Snipping Tool |
-| --- | --- |
-| ![Windows example 1][win-example-1] | ![HDR example 1][hdr-example-1] |
+### Windows Snipping Tool
+
+![Windows example 1][win-example-1]
+
+### HDR Snipping Tool
+
+![HDR example 1][hdr-example-1]
 
 [win-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/main/media/window-snipping-tool-example-1.png?raw=true "Windows snipping tool example showing a screenshot from Death Standing with blown out highlights"
 
