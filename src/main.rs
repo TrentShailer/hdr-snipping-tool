@@ -5,9 +5,9 @@ mod capture;
 mod gui;
 mod image;
 mod logger;
+mod settings;
 
 use std::sync::mpsc::{channel, Sender};
-use std::thread;
 
 use anyhow::{bail, Context};
 use app::App;
@@ -16,9 +16,10 @@ use capture::get_capture;
 use glium::glutin;
 use glium::glutin::event_loop::EventLoopProxy;
 use glium::glutin::window::WindowBuilder;
+use livesplit_hotkey::{Hook, Hotkey};
 use log::error;
 
-use inputbot::KeybdKey::{self};
+use settings::Settings;
 use windows::Graphics::Capture::GraphicsCaptureSession;
 
 fn main() {
@@ -34,26 +35,26 @@ fn run() -> anyhow::Result<()> {
         bail!("Graphics capture is not supported.");
     }
 
+    let settings = Settings::load().context("Failed to load settings")?;
+
     let window = WindowBuilder::new()
         .with_title("Screenshot")
         .with_fullscreen(Some(glutin::window::Fullscreen::Borderless(None)))
         .with_visible(false);
 
     let gui = gui::init(window).context("Failed to create gui.")?;
-    let proxy = gui.event_loop.create_proxy();
 
+    let proxy = gui.event_loop.create_proxy();
     let (sender, receiver) = channel();
 
-    thread::spawn(move || {
-        KeybdKey::F13Key.bind(move || {
-            if let Err(e) = handle_capture(&sender, &proxy).context("Failed to handle capture") {
-                error!("{:?}", e);
-                return;
-            };
-        });
+    let hook = Hook::new().context("Failed to create hotkey hook")?;
 
-        inputbot::handle_input_events();
-    });
+    hook.register(Hotkey::from(settings.screenshot_key), move || {
+        if let Err(e) = handle_capture(&sender, &proxy).context("Failed to handle capture") {
+            error!("{:?}", e);
+        }
+    })
+    .context("Failed to register hotkey")?;
 
     let proxy = gui.event_loop.create_proxy();
     let mut app = App::new(receiver, proxy);

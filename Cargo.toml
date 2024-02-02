@@ -1,9 +1,9 @@
 [package]
 name = "hdr-snipping-tool"
-version = "0.1.0"
+# Also update version in src/settings.rs
+version = "1.0.0"
+authors = ["Trent Shailer <trent.shailer@gmail.com>"]
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
@@ -13,7 +13,6 @@ glium = { version = "0.32.1", default-features = true }
 imgui = "0.11.0"
 imgui-glium-renderer = "0.11.0"
 imgui-winit-support = "0.11.0"
-inputbot = "0.6.0"
 log = "0.4.20"
 owo-colors = "4.0.0"
 rayon = "1.8.1"
@@ -32,6 +31,9 @@ windows = { version = "0.52.0", features = [
 ] }
 arboard = "3.3.0"
 anyhow = "1.0.79"
+serde = { version = "1.0.196", features = ["derive"] }
+toml = "0.8.9"
+livesplit-hotkey = "0.7.0"
 
 [profile.release]
 lto = true

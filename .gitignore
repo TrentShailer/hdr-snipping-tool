@@ -3,3 +3,4 @@
 *.jpg
 log.txt
 !/media/*.png
+hdr-config.toml

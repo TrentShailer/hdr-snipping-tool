@@ -4,7 +4,7 @@ A Windows Snipping Tool alternative that better handles HDR displays and applica
 
 ## Usage
 
-Launch the app, then use the Print Screen Key (customizable) to capture the screen the mouse is on.
+Launch the app, then use the Print Screen Key ([customizable](https://docs.rs/livesplit-hotkey/0.7.0/livesplit_hotkey/enum.KeyCode.html)) to capture the screen the mouse is on.
 
 This will open the screenshot window where you can tweak the gamma and alpha values to get the desired result.
 
