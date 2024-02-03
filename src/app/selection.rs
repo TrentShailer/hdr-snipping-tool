@@ -17,7 +17,6 @@ impl App {
         let window_size = display.gl_window().window().inner_size();
 
         if ui.is_mouse_released(imgui::MouseButton::Left) && self.selecting {
-            println!("Test");
             self.selecting = false;
             self.save_and_close(display, textures);
         }
