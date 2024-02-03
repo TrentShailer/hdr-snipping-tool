@@ -6,6 +6,7 @@ mod gui;
 mod image;
 mod logger;
 mod settings;
+mod single_instance;
 
 use std::sync::mpsc::{channel, Sender};
 
@@ -20,6 +21,7 @@ use livesplit_hotkey::{Hook, Hotkey};
 use log::error;
 
 use settings::Settings;
+use single_instance::is_first_instance;
 use windows::Graphics::Capture::GraphicsCaptureSession;
 
 fn main() {
@@ -31,6 +33,12 @@ fn main() {
 }
 
 fn run() -> anyhow::Result<()> {
+    let first_instance =
+        is_first_instance().context("Failed to ensure only one instance is running")?;
+    if !first_instance {
+        return Ok(());
+    }
+
     if !GraphicsCaptureSession::IsSupported().unwrap() {
         bail!("Graphics capture is not supported.");
     }
