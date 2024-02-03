@@ -4,6 +4,16 @@ use imgui_glium_renderer::Texture;
 
 use super::App;
 
+#[derive(PartialEq)]
+pub enum SelectionSate {
+    /// User is not currenty selecting
+    None,
+    /// User has clicked down but not dragged
+    StartedSelecting,
+    /// User had clicked and dragged
+    Selecting,
+}
+
 impl App {
     pub fn handle_selection(
         &mut self,
@@ -16,9 +26,15 @@ impl App {
         let mouse_pos = ui.io().mouse_pos;
         let window_size = display.gl_window().window().inner_size();
 
-        if ui.is_mouse_released(imgui::MouseButton::Left) && self.selecting {
-            self.selecting = false;
-            self.save_and_close(display, textures);
+        if ui.is_mouse_released(imgui::MouseButton::Left)
+            && self.selection_state != SelectionSate::None
+        {
+            // prevent registering clicks as area selection
+            if self.selection_state == SelectionSate::Selecting {
+                self.save_and_close(display, textures);
+            }
+
+            self.selection_state = SelectionSate::None;
         }
 
         if !is_inside(mouse_pos, [0.0, 0.0], window_size.into()) {
@@ -26,14 +42,17 @@ impl App {
         }
 
         if ui.is_mouse_down(imgui::MouseButton::Left)
-            && !self.selecting
+            && self.selection_state == SelectionSate::None
             && !is_inside(mouse_pos, pos, size)
         {
-            self.selecting = true;
+            self.selection_state = SelectionSate::StartedSelecting;
             self.selection_start = mouse_pos;
         }
 
-        if ui.is_mouse_dragging(imgui::MouseButton::Left) && self.selecting {
+        if ui.is_mouse_dragging(imgui::MouseButton::Left)
+            && self.selection_state != SelectionSate::None
+        {
+            self.selection_state = SelectionSate::Selecting;
             let start_pos = self.selection_start;
 
             let left = f32::min(mouse_pos[0], start_pos[0]);
