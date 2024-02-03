@@ -4,3 +4,4 @@
 log.txt
 !/media/*.png
 hdr-config.toml
+*~lock~

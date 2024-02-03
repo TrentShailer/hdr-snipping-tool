@@ -5,6 +5,8 @@ version = "1.0.1"
 authors = ["Trent Shailer <trent.shailer@gmail.com>"]
 edition = "2021"
 
+build = "build.rs"
+
 [dependencies]
 windows = { version = "0.52.0", features = [
 	"Win32_Graphics_Direct3D11",
@@ -36,6 +38,10 @@ anyhow = "1.0.79"
 serde = { version = "1.0.196", features = ["derive"] }
 toml = "0.8.9"
 livesplit-hotkey = "0.7.0"
+tray-icon = "0.11.2"
+
+[build-dependencies]
+embed-resource = "2.4"
 
 [profile.release]
 lto = true

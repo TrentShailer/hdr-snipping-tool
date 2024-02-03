@@ -7,6 +7,7 @@ use glium::{Display, Surface};
 use imgui::{Context, FontConfig, FontSource, Ui};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
+use tray_icon::menu::MenuEvent;
 
 use super::AppEvent;
 
@@ -84,6 +85,12 @@ impl Gui {
                 *control_flow = glutin::event_loop::ControlFlow::Wait;
             } else {
                 *control_flow = glutin::event_loop::ControlFlow::Poll;
+            }
+
+            if let Ok(tray_event) = MenuEvent::receiver().try_recv() {
+                if tray_event.id == "0" {
+                    *control_flow = ControlFlow::Exit;
+                }
             }
 
             match &event {
