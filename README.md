@@ -8,7 +8,7 @@ Launch the app, then use the Print Screen Key ([customizable in hdr-config.toml,
 
 This will open the screenshot window where you can tweak the gamma and alpha values to get the desired result.
 
-Gamma controls the contrast of the image, and alpha controls the brightness of the image.
+Gamma controls the image's contrast, and alpha controls the image's brightness.
 
 You can then select the area you want to capture, or press Enter or the Save and Close button to capture everything. You can press Esc to code without saving.
 
@@ -26,7 +26,7 @@ The screenshot is copied to your clipboard and saved as a png next to the execut
 
 ## Limitations
 
-- Imperfect tone mapping, colors, contrast, and brightness will look different, even on SDR displays.
+- Imperfect tone mapping: colours, contrast, and brightness will look different, even on SDR displays.
 - A single screenshot can only consist of one display.
 - Windows only.
 - No freeform mode or window mode.
