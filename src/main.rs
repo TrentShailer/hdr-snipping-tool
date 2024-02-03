@@ -6,6 +6,7 @@ mod gui;
 mod image;
 mod logger;
 mod settings;
+mod single_instance;
 
 use std::sync::mpsc::{channel, Sender};
 
@@ -13,13 +14,12 @@ use anyhow::{bail, Context};
 use app::App;
 use capture::get_capture;
 
-use glium::glutin;
 use glium::glutin::event_loop::EventLoopProxy;
-use glium::glutin::window::WindowBuilder;
 use livesplit_hotkey::{Hook, Hotkey};
 use log::error;
 
 use settings::Settings;
+use single_instance::is_first_instance;
 use windows::Graphics::Capture::GraphicsCaptureSession;
 
 fn main() {
@@ -31,19 +31,24 @@ fn main() {
 }
 
 fn run() -> anyhow::Result<()> {
+    let first_instance =
+        is_first_instance().context("Failed to ensure only one instance is running")?;
+    if !first_instance {
+        return Ok(());
+    }
+
     if !GraphicsCaptureSession::IsSupported().unwrap() {
         bail!("Graphics capture is not supported.");
     }
 
     let settings = Settings::load().context("Failed to load settings")?;
 
-    let window = WindowBuilder::new()
-        .with_title("Screenshot")
-        .with_fullscreen(Some(glutin::window::Fullscreen::Borderless(None)))
-        .with_visible(false);
+    let (gui, tray_icon) = gui::init_gui().context("Failed to init gui")?;
+    tray_icon
+        .set_visible(true)
+        .context("Failed to make tray icon visible")?;
 
-    let gui = gui::init(window).context("Failed to create gui.")?;
-
+    // Setup screenshot keybind
     let proxy = gui.event_loop.create_proxy();
     let (sender, receiver) = channel();
 
@@ -56,6 +61,7 @@ fn run() -> anyhow::Result<()> {
     })
     .context("Failed to register hotkey")?;
 
+    // Create app
     let proxy = gui.event_loop.create_proxy();
     let mut app = App::new(receiver, proxy);
 

@@ -12,12 +12,14 @@ use imgui_glium_renderer::Texture;
 
 use crate::{capture::DisplayInfo, gui::AppEvent, image::Image};
 
+use super::selection::SelectionSate;
+
 pub struct App {
     pub image: Image,
     pub proxy: EventLoopProxy<AppEvent>,
     pub receiver: Receiver<(Image, DisplayInfo)>,
     pub texture_id: Option<TextureId>,
-    pub selecting: bool,
+    pub selection_state: SelectionSate,
     pub selection_start: [f32; 2],
 }
 
@@ -28,7 +30,7 @@ impl App {
             proxy,
             receiver,
             texture_id: None,
-            selecting: false,
+            selection_state: SelectionSate::None,
             selection_start: [0.0, 0.0],
         }
     }
@@ -63,7 +65,7 @@ impl App {
         // receive image
         if let Ok((image, image_display)) = self.receiver.try_recv() {
             self.image = image;
-            self.selecting = false;
+            self.selection_state = SelectionSate::None;
 
             self.remake_texture(display.get_context(), textures)
                 .unwrap();
