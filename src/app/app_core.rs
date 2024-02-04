@@ -2,7 +2,7 @@ use std::{error::Error, rc::Rc, sync::mpsc::Receiver};
 
 use glium::{
     backend::Facade,
-    glutin::event_loop::EventLoopProxy,
+    glutin::{dpi::LogicalPosition, event_loop::EventLoopProxy},
     texture::RawImage2d,
     uniforms::{MagnifySamplerFilter, MinifySamplerFilter, SamplerBehavior},
     Display, Texture2d,
@@ -20,7 +20,7 @@ pub struct App {
     pub receiver: Receiver<(Image, DisplayInfo)>,
     pub texture_id: Option<TextureId>,
     pub selection_state: SelectionSate,
-    pub selection_start: [f32; 2],
+    pub selection_start: LogicalPosition<f32>,
 }
 
 impl App {
@@ -31,7 +31,7 @@ impl App {
             receiver,
             texture_id: None,
             selection_state: SelectionSate::None,
-            selection_start: [0.0, 0.0],
+            selection_start: LogicalPosition::new(0.0, 0.0),
         }
     }
 
@@ -42,8 +42,8 @@ impl App {
     ) -> Result<(), Box<dyn Error>> {
         let raw = RawImage2d {
             data: std::borrow::Cow::Borrowed(&self.image.current),
-            width: self.image.width,
-            height: self.image.height,
+            width: self.image.size.width,
+            height: self.image.size.height,
             format: glium::texture::ClientFormat::U8U8U8U8,
         };
         let gl_texture = Texture2d::new(gl_ctx, raw)?;
@@ -84,11 +84,13 @@ impl App {
         self.handle_keybinds(ui, display, textures);
 
         // draw image
+        let scale = display.gl_window().window().scale_factor();
+        let image_size = self.image.size.to_logical(scale);
         ui.get_background_draw_list()
             .add_image(
                 self.texture_id.unwrap(),
                 [0.0, 0.0],
-                [self.image.width as f32, self.image.height as f32],
+                [image_size.width, image_size.height],
             )
             .build();
 
