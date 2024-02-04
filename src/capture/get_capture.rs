@@ -38,6 +38,7 @@ pub fn get_capture() -> anyhow::Result<(Image, DisplayInfo)> {
             .CreateForMonitor(display.handle)
             .context("Failed to create interop for display")?
     };
+
     let capture_size = capture_item.Size().context("Failed to get capture size")?;
 
     // create frame pool
@@ -51,6 +52,10 @@ pub fn get_capture() -> anyhow::Result<(Image, DisplayInfo)> {
     let session = frame_pool
         .CreateCaptureSession(&capture_item)
         .context("Failed to create capture session")?;
+
+    session
+        .SetIsCursorCaptureEnabled(false)
+        .context("Failed to remove cursor from capture")?;
 
     // setup sender and reciever for frames
     let (sender, receiver) = channel();
