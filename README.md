@@ -30,7 +30,6 @@ The screenshot is copied to your clipboard and saved as a png next to the execut
 - A single screenshot can only consist of one display.
 - Windows only.
 - No freeform mode or window mode.
-- The mouse cursor may be included in the screenshot.
 
 ## Screenshot Comparison
 
