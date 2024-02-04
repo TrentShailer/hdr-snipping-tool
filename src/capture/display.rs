@@ -1,5 +1,5 @@
 use anyhow::Context;
-use glium::glutin::dpi::{LogicalPosition, LogicalSize};
+use glium::glutin::dpi::{PhysicalPosition, PhysicalSize};
 use windows::Win32::Foundation::{BOOL, LPARAM, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
     EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFOEXW,
@@ -79,12 +79,12 @@ impl DisplayInfo {
         })
     }
 
-    pub fn get_position(&self) -> LogicalPosition<i32> {
-        LogicalPosition::new(self.rect.left, self.rect.top)
+    pub fn get_position(&self) -> PhysicalPosition<i32> {
+        PhysicalPosition::new(self.rect.left, self.rect.top)
     }
 
-    pub fn get_size(&self) -> LogicalSize<i32> {
-        LogicalSize::new(
+    pub fn get_size(&self) -> PhysicalSize<i32> {
+        PhysicalSize::new(
             self.rect.right - self.rect.left,
             self.rect.bottom - self.rect.top,
         )

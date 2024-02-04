@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use glium::glutin::dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize};
 use image::{ImageBuffer, Rgba};
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
@@ -13,12 +14,11 @@ use super::{
 pub struct Image {
     pub raw: Box<[f32]>,
     pub current: Box<[u8]>,
-    pub width: u32,
-    pub height: u32,
+    pub size: PhysicalSize<u32>,
     pub alpha: f32,
     pub gamma: f32,
-    pub selection_pos: [u32; 2],
-    pub selection_size: [u32; 2],
+    pub selection_pos: PhysicalPosition<u32>,
+    pub selection_size: PhysicalSize<u32>,
 }
 
 impl Image {
@@ -40,12 +40,11 @@ impl Image {
         Self {
             raw,
             current,
-            width,
-            height,
+            size: PhysicalSize::new(width, height),
             alpha,
             gamma,
-            selection_pos: [0, 0],
-            selection_size: [width, height],
+            selection_pos: PhysicalPosition::new(0, 0),
+            selection_size: PhysicalSize::new(width, height),
         }
     }
 
@@ -53,12 +52,11 @@ impl Image {
         Self {
             raw: Box::new([]),
             current: Box::new([]),
-            width: 0,
-            height: 0,
+            size: PhysicalSize::new(0, 0),
             alpha: 0.0,
             gamma: 0.0,
-            selection_pos: [0, 0],
-            selection_size: [0, 0],
+            selection_pos: PhysicalPosition::new(0, 0),
+            selection_size: PhysicalSize::new(0, 0),
         }
     }
 
@@ -66,16 +64,13 @@ impl Image {
         self.current = compress_gamma(&self.raw, self.alpha, self.gamma);
     }
 
-    pub fn get_selection_rect(&self) -> [[f32; 2]; 2] {
-        let pos = self.selection_pos;
-        let size = self.selection_size;
+    pub fn get_selection_rect(&self, scale_factor: f64) -> [LogicalPosition<f32>; 2] {
+        let pos = self.selection_pos.to_logical(scale_factor);
+        let size: LogicalSize<f32> = self.selection_size.to_logical(scale_factor);
 
         [
-            [pos[0] as f32, pos[1] as f32],
-            [
-                pos[0] as f32 + size[0] as f32,
-                pos[1] as f32 + size[1] as f32,
-            ],
+            pos,
+            LogicalPosition::new(pos.x + size.width, pos.y + size.height),
         ]
     }
 
@@ -115,8 +110,7 @@ impl Image {
             &self.current,
             self.selection_pos,
             self.selection_size,
-            self.width,
-            self.height,
+            self.size,
         )
     }
 }

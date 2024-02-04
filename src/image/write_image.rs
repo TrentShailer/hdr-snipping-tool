@@ -4,23 +4,23 @@ use std::{
 };
 
 use chrono::Local;
+use glium::glutin::dpi::{PhysicalPosition, PhysicalSize};
 use image::{codecs::png::PngEncoder, GenericImageView, ImageBuffer, Rgba};
 
 pub fn save_image(
     image: &[u8],
-    selection_pos: [u32; 2],
-    selection_size: [u32; 2],
-    width: u32,
-    height: u32,
+    selection_pos: PhysicalPosition<u32>,
+    selection_size: PhysicalSize<u32>,
+    size: PhysicalSize<u32>,
 ) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(width, height, image.to_owned())
+        ImageBuffer::from_raw(size.width, size.height, image.to_owned())
             .unwrap()
             .view(
-                selection_pos[0],
-                selection_pos[1],
-                selection_size[0],
-                selection_size[1],
+                selection_pos.x,
+                selection_pos.y,
+                selection_size.width,
+                selection_size.height,
             )
             .to_image();
 

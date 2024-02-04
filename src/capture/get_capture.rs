@@ -2,6 +2,7 @@ use std::sync::mpsc::channel;
 
 use anyhow::Context;
 use display::DisplayInfo;
+use log::warn;
 use windows::core::{ComInterface, IInspectable};
 use windows::Foundation::TypedEventHandler;
 use windows::Graphics::Capture::{Direct3D11CaptureFramePool, GraphicsCaptureItem};
@@ -141,10 +142,19 @@ pub fn get_capture() -> anyhow::Result<(Image, DisplayInfo)> {
             )
         };
 
-        // TODO find out why capture is returning more data then neccecary
+        let data_width = mapped.RowPitch / 4 / 2;
+        let expected_width = desc.Width;
+
+        if data_width != expected_width {
+            warn!(
+                "data width '{}' does not match expected width '{}'",
+                data_width, expected_width
+            );
+        }
+
         let image: Image = Image::from_u8(
             slice,
-            slice.len() as u32 / desc.Height / 4 / 2, /*  desc.Width as usize */
+            mapped.RowPitch / 4 / 2, /*  desc.Width as usize */
             desc.Height,
         );
 

@@ -19,7 +19,7 @@ pub fn is_first_instance() -> anyhow::Result<bool> {
         }
 
         let err = result.err().unwrap();
-        // 0x80070002 is the error code for if no mutex with that names exists, any other error should bd reported
+        // 0x80070002 is the error code for if no mutex with that names exists, any other error should be reported
         if err.code() != HRESULT(0x80070002u32 as i32) {
             return Err(err.into());
         }
