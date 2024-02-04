@@ -44,7 +44,7 @@ impl Settings {
 
     fn default() -> Self {
         Self {
-            version: String::from("1.1.0"),
+            version: String::from("1.1.1"),
             screenshot_key: KeyCode::PrintScreen,
         }
     }
