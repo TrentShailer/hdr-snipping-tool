@@ -16,7 +16,7 @@ use capture::get_capture;
 
 use glium::glutin::event_loop::EventLoopProxy;
 use livesplit_hotkey::{Hook, Hotkey};
-use log::error;
+use log::{error, warn};
 
 use settings::Settings;
 use single_instance::is_first_instance;
@@ -34,6 +34,7 @@ fn run() -> anyhow::Result<()> {
     let first_instance =
         is_first_instance().context("Failed to ensure only one instance is running")?;
     if !first_instance {
+        warn!("Another instance is already running.");
         return Ok(());
     }
 
