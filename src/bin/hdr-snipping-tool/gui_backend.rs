@@ -1,31 +1,50 @@
-use anyhow::Context as ErrorContext;
 use glium::glutin;
 use glium::glutin::event::{Event, WindowEvent};
 use glium::glutin::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
-use glium::glutin::window::WindowBuilder;
+use glium::glutin::platform::windows::IconExtWindows;
+use glium::glutin::window::{Fullscreen, WindowBuilder};
 use glium::{Display, Surface};
+use hdr_snipping_tool::PhysicalSize;
 use imgui::{Context, FontConfig, FontSource, Ui};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
-use tray_icon::menu::MenuEvent;
+use snafu::{Report, ResultExt, Whatever};
+use tray_icon::menu::{Menu, MenuEvent, MenuItem};
+use tray_icon::{TrayIcon, TrayIconBuilder};
 
-use super::AppEvent;
+#[derive(Debug, PartialEq)]
+pub enum GuiBackendEvent {
+    ShowWindow,
+    HideWindow,
+}
 
-pub struct Gui {
-    pub event_loop: EventLoop<AppEvent>,
+pub struct GuiBackend {
+    pub event_loop: EventLoop<GuiBackendEvent>,
     pub display: glium::Display,
     pub imgui: Context,
     pub platform: WinitPlatform,
     pub renderer: Renderer,
     pub font_size: f32,
+    pub tray_icon: TrayIcon,
 }
 
-pub fn init(window_builder: WindowBuilder) -> anyhow::Result<Gui> {
+/// Initialize the app window and tray icon
+pub fn init() -> Result<GuiBackend, Whatever> {
     let event_loop = EventLoopBuilder::with_user_event().build();
     let context = glutin::ContextBuilder::new().with_vsync(true);
 
+    let window_icon =
+        glium::glutin::window::Icon::from_resource(1, Some(PhysicalSize::new(64, 64)))
+            .whatever_context("failed to load icon")?;
+
+    let window_builder = WindowBuilder::new()
+        .with_title("HDR Snipping Tool")
+        .with_fullscreen(Some(Fullscreen::Borderless(None)))
+        .with_visible(false)
+        .with_window_icon(Some(window_icon));
+
     let display = Display::new(window_builder, context, &event_loop)
-        .context("Failed to initialize display.")?;
+        .whatever_context("Failed to initialize display.")?;
 
     let mut imgui = Context::create();
     imgui.set_ini_filename(None);
@@ -43,7 +62,7 @@ pub fn init(window_builder: WindowBuilder) -> anyhow::Result<Gui> {
     let font_size = 14.0;
 
     imgui.fonts().add_font(&[FontSource::TtfData {
-        data: include_bytes!("../fonts/Inter-Regular.ttf"),
+        data: include_bytes!("./fonts/Inter-Regular.ttf"),
         size_pixels: font_size,
         config: Some(FontConfig {
             rasterizer_multiply: 1.5,
@@ -54,24 +73,48 @@ pub fn init(window_builder: WindowBuilder) -> anyhow::Result<Gui> {
     }]);
 
     let renderer =
-        Renderer::init(&mut imgui, &display).context("Failed to initialize renderer.")?;
+        Renderer::init(&mut imgui, &display).whatever_context("Failed to initialize renderer.")?;
 
-    Ok(Gui {
+    let tray_icon = init_tray_icon().whatever_context("Failed to initialize tray icon")?;
+    tray_icon
+        .set_visible(true)
+        .whatever_context("Failed to show tray icon")?;
+
+    Ok(GuiBackend {
         event_loop,
         display,
         imgui,
         platform,
         renderer,
         font_size,
+        tray_icon,
     })
 }
 
-impl Gui {
+fn init_tray_icon() -> Result<TrayIcon, Whatever> {
+    let icon = tray_icon::Icon::from_resource(1, Some((24, 24)))
+        .whatever_context("failed to build icon")?;
+
+    let item = MenuItem::with_id(0, "Quit HDR Snipping Tool", true, None);
+
+    let tray_menu = Menu::with_items(&[&item]).whatever_context("Failed to build menu")?;
+
+    let tray_icon = TrayIconBuilder::new()
+        .with_menu(Box::new(tray_menu))
+        .with_tooltip("HDR Snipping Tool")
+        .with_icon(icon)
+        .build()
+        .whatever_context("Failed to build tray icon")?;
+
+    Ok(tray_icon)
+}
+
+impl GuiBackend {
     pub fn main_loop<F: FnMut(&mut bool, &Display, &mut Renderer, &mut Ui) + 'static>(
         self,
         mut run_ui: F,
     ) {
-        let Gui {
+        let GuiBackend {
             event_loop,
             display,
             mut imgui,
@@ -99,9 +142,9 @@ impl Gui {
                     let gl_window = display.gl_window();
                     if let Err(e) = platform
                         .prepare_frame(imgui.io_mut(), gl_window.window())
-                        .context("Failed to prepare frame")
+                        .whatever_context::<_, Whatever>("Failed to prepare frame")
                     {
-                        log::error!("{:?}", e);
+                        log::error!("{}", Report::from_error(e).to_string());
                         *control_flow = ControlFlow::Exit;
                     };
                     gl_window.window().request_redraw();
@@ -115,9 +158,9 @@ impl Gui {
                         control_flow,
                         &mut platform,
                     )
-                    .context("Failed to redraw.")
+                    .whatever_context::<_, Whatever>("Failed to redraw.")
                     {
-                        log::error!("{:?}", e);
+                        log::error!("{}", Report::from_error(e).to_string());
                         *control_flow = ControlFlow::Exit;
                     };
                 }
@@ -126,11 +169,11 @@ impl Gui {
                     ..
                 } => *control_flow = ControlFlow::Exit,
                 Event::UserEvent(v) => match v {
-                    AppEvent::Show => {
+                    GuiBackendEvent::ShowWindow => {
                         display.gl_window().window().set_visible(true);
                         display.gl_window().window().focus_window();
                     }
-                    AppEvent::Hide => {
+                    GuiBackendEvent::HideWindow => {
                         display.gl_window().window().set_visible(false);
                         imgui
                             .io_mut()
@@ -165,7 +208,7 @@ fn redraw<F: FnMut(&mut bool, &Display, &mut Renderer, &mut Ui) + 'static>(
     renderer: &mut Renderer,
     control_flow: &mut ControlFlow,
     platform: &mut WinitPlatform,
-) -> anyhow::Result<()> {
+) -> Result<(), Whatever> {
     let ui = imgui.frame();
 
     let mut run = true;
@@ -182,9 +225,9 @@ fn redraw<F: FnMut(&mut bool, &Display, &mut Renderer, &mut Ui) + 'static>(
 
     renderer
         .render(&mut target, draw_data)
-        .context("Rendering failed")?;
+        .whatever_context("Rendering failed")?;
 
-    target.finish().context("Failed to swap buffers")?;
+    target.finish().whatever_context("Failed to swap buffers")?;
 
     Ok(())
 }
