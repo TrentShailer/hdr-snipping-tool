@@ -1,8 +1,8 @@
 use std::{fs, io::Read};
 
-use anyhow::Context;
 use livesplit_hotkey::KeyCode;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Whatever};
 
 const SETTINGS_FILE_PATH: &str = "./hdr-config.toml";
 
@@ -13,7 +13,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn load() -> anyhow::Result<Self> {
+    pub fn load() -> Result<Self, Whatever> {
         let file = fs::File::open(SETTINGS_FILE_PATH);
 
         if file
@@ -21,22 +21,26 @@ impl Settings {
             .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
         {
             let settings = Self::default();
-            settings.save().context("Failed to save settings")?;
+            settings
+                .save()
+                .whatever_context("Failed to save settings")?;
 
             return Ok(settings);
         }
 
-        let mut file = file.context("Failed to open settings file.")?;
+        let mut file = file.whatever_context("Failed to open settings file.")?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)
-            .context("Failed to read settings file.")?;
+            .whatever_context("Failed to read settings file.")?;
 
         let mut settings: Settings =
-            toml::from_str(&contents).context("Failed to deserialize settings.")?;
+            toml::from_str(&contents).whatever_context("Failed to deserialize settings.")?;
 
         if settings.version != Self::default().version {
             settings.version = Self::default().version;
-            settings.save().context("Failed to save settings")?;
+            settings
+                .save()
+                .whatever_context("Failed to save settings")?;
         }
 
         Ok(settings)
@@ -49,11 +53,12 @@ impl Settings {
         }
     }
 
-    fn save(&self) -> anyhow::Result<()> {
-        let toml_string = toml::to_string_pretty(self).context("Failed to serialize settings.")?;
+    fn save(&self) -> Result<(), Whatever> {
+        let toml_string =
+            toml::to_string_pretty(self).whatever_context("Failed to serialize settings.")?;
 
         fs::write(SETTINGS_FILE_PATH, toml_string.as_bytes())
-            .context("Failed to write settings file.")?;
+            .whatever_context("Failed to write settings file.")?;
         Ok(())
     }
 }
