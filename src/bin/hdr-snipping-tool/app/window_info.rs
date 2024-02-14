@@ -11,10 +11,6 @@ pub struct WindowInfo {
 }
 
 impl WindowInfo {
-    pub fn logical_pos(&self) -> LogicalPosition<f32> {
-        self.pos.to_logical(self.scale)
-    }
-
     pub fn logical_size(&self) -> LogicalSize<f32> {
         self.size.to_logical(self.scale)
     }
@@ -29,7 +25,7 @@ impl WindowInfo {
     /// Get the logical bounds of the window. <br>
     /// returns in order, top, left, bottom, right
     pub fn logical_bounds(&self) -> LogicalBounds {
-        LogicalBounds::from((self.logical_pos(), self.logical_size()))
+        LogicalBounds::from((LogicalPosition::new(0.0, 0.0), self.logical_size()))
     }
 }
 
