@@ -9,7 +9,10 @@ pub struct LogicalBounds {
 
 impl LogicalBounds {
     pub fn contains(&self, point: &LogicalPosition<f32>) -> bool {
-        point.x >= self.left && point.y >= self.top && point.x =< self.right && point.y =< self.bottom;
+        point.x >= self.left
+            && point.y >= self.top
+            && point.x <= self.right
+            && point.y <= self.bottom
     }
 }
 
