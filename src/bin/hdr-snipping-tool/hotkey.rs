@@ -1,4 +1,4 @@
-use std::sync::mpsc::Sender;
+use std::sync::{mpsc::Sender, Arc};
 
 use glium::glutin::event_loop::EventLoopProxy;
 use hdr_snipping_tool::{CaptureProvider, DisplayInfo, HdrCapture};
@@ -9,17 +9,17 @@ use super::gui_backend::GuiBackendEvent;
 
 pub fn init_hotkey<C>(
     hotkey: KeyCode,
-    capture_provider: C,
+    capture_provider: Arc<C>,
     sender: Sender<(HdrCapture, DisplayInfo)>,
     proxy: EventLoopProxy<GuiBackendEvent>,
 ) -> Result<Hook, Whatever>
 where
-    C: CaptureProvider + Send + 'static,
+    C: CaptureProvider + Send + Sync + 'static,
 {
     let hook = Hook::new().whatever_context("Failed to create hotkey hook")?;
 
     hook.register(Hotkey::from(hotkey), move || {
-        if let Err(e) = handle_capture(&capture_provider, &sender, &proxy)
+        if let Err(e) = handle_capture(capture_provider.as_ref(), &sender, &proxy)
             .whatever_context::<_, Whatever>("Failed to handle capture")
         {
             log::error!("{}", Report::from_error(e).to_string());

@@ -6,9 +6,11 @@ mod hotkey;
 mod logger;
 mod settings;
 
-use std::sync::mpsc::channel;
+use std::sync::{mpsc::channel, Arc};
 
 use app::App;
+use glium::glutin::event_loop::{EventLoop, EventLoopBuilder};
+use gui_backend::GuiBackendEvent;
 use hdr_snipping_tool::CaptureProvider;
 use hotkey::init_hotkey;
 use settings::Settings;
@@ -95,34 +97,43 @@ fn main() {
 
 pub fn start_app<C>(capture_provider: C) -> Result<(), Whatever>
 where
-    C: CaptureProvider + Send + 'static,
+    C: CaptureProvider + Send + Sync + 'static,
 {
-    let settings = Settings::load().whatever_context("Failed to load settings")?;
+    let capture_provider = Arc::new(capture_provider);
+    let mut event_loop: EventLoop<GuiBackendEvent> = EventLoopBuilder::with_user_event().build();
 
-    let window = gui_backend::init().whatever_context("Failed to initialize app window")?;
+    loop {
+        let settings = Settings::load().whatever_context("Failed to load settings")?;
+        let window = gui_backend::init(&mut event_loop)
+            .whatever_context("Failed to initialize app window")?;
 
-    let (capture_sender, capture_receiver) = channel();
-    let event_proxy = window.event_loop.create_proxy();
-    let _hotkey_hook = init_hotkey(
-        settings.screenshot_key,
-        capture_provider,
-        capture_sender,
-        event_proxy,
-    )
-    .whatever_context("Failed to initialize hotkey")?;
+        let (capture_sender, capture_receiver) = channel();
+        let event_proxy = window.event_loop.create_proxy();
+        let _hotkey_hook = init_hotkey(
+            settings.screenshot_key,
+            Arc::clone(&capture_provider),
+            capture_sender,
+            event_proxy,
+        )
+        .whatever_context("Failed to initialize hotkey")?;
 
-    let event_proxy = window.event_loop.create_proxy();
-    let mut app = App::new(capture_receiver, event_proxy);
+        let event_proxy = window.event_loop.create_proxy();
+        let mut app = App::new(capture_receiver, event_proxy);
 
-    window.main_loop(move |run, display, renderer, ui| {
-        if let Err(e) = app
-            .update(ui, display, renderer)
-            .whatever_context::<_, Whatever>("Failure in update loop")
-        {
-            log::error!("{}", Report::from_error(e).to_string());
-            *run = false;
-        };
-    });
+        let exit_code = window.main_loop(move |run, display, renderer, ui| {
+            if let Err(e) = app
+                .update(ui, display, renderer)
+                .whatever_context::<_, Whatever>("Failure in update loop")
+            {
+                log::error!("{}", Report::from_error(e).to_string());
+                *run = false;
+            };
+        });
+
+        if exit_code == 0 {
+            break;
+        }
+    }
 
     Ok(())
 }
