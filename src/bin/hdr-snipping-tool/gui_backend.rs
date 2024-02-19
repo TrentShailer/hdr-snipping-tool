@@ -1,6 +1,7 @@
 use glium::glutin;
 use glium::glutin::event::{Event, WindowEvent};
-use glium::glutin::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
+use glium::glutin::event_loop::{ControlFlow, EventLoop};
+use glium::glutin::platform::run_return::EventLoopExtRunReturn;
 use glium::glutin::platform::windows::IconExtWindows;
 use glium::glutin::window::{Fullscreen, WindowBuilder};
 use glium::{Display, Surface};
@@ -16,10 +17,11 @@ use tray_icon::{TrayIcon, TrayIconBuilder};
 pub enum GuiBackendEvent {
     ShowWindow,
     HideWindow,
+    ReloadGui,
 }
 
-pub struct GuiBackend {
-    pub event_loop: EventLoop<GuiBackendEvent>,
+pub struct GuiBackend<'a> {
+    pub event_loop: &'a mut EventLoop<GuiBackendEvent>,
     pub display: glium::Display,
     pub imgui: Context,
     pub platform: WinitPlatform,
@@ -29,8 +31,7 @@ pub struct GuiBackend {
 }
 
 /// Initialize the app window and tray icon
-pub fn init() -> Result<GuiBackend, Whatever> {
-    let event_loop = EventLoopBuilder::with_user_event().build();
+pub fn init(event_loop: &mut EventLoop<GuiBackendEvent>) -> Result<GuiBackend, Whatever> {
     let context = glutin::ContextBuilder::new().with_vsync(true);
 
     let window_icon =
@@ -43,7 +44,7 @@ pub fn init() -> Result<GuiBackend, Whatever> {
         .with_visible(false)
         .with_window_icon(Some(window_icon));
 
-    let display = Display::new(window_builder, context, &event_loop)
+    let display = Display::new(window_builder, context, event_loop)
         .whatever_context("Failed to initialize display.")?;
 
     let mut imgui = Context::create();
@@ -95,9 +96,11 @@ fn init_tray_icon() -> Result<TrayIcon, Whatever> {
     let icon = tray_icon::Icon::from_resource(1, Some((24, 24)))
         .whatever_context("failed to build icon")?;
 
-    let item = MenuItem::with_id(0, "Quit HDR Snipping Tool", true, None);
+    let quit_item = MenuItem::with_id(0, "Quit HDR Snipping Tool", true, None);
+    let reload_item = MenuItem::with_id(1, "Reload HDR Snipping Tool", true, None);
 
-    let tray_menu = Menu::with_items(&[&item]).whatever_context("Failed to build menu")?;
+    let tray_menu =
+        Menu::with_items(&[&reload_item, &quit_item]).whatever_context("Failed to build menu")?;
 
     let tray_icon = TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
@@ -109,11 +112,11 @@ fn init_tray_icon() -> Result<TrayIcon, Whatever> {
     Ok(tray_icon)
 }
 
-impl GuiBackend {
+impl<'a> GuiBackend<'a> {
     pub fn main_loop<F: FnMut(&mut bool, &Display, &mut Renderer, &mut Ui) + 'static>(
         self,
         mut run_ui: F,
-    ) {
+    ) -> i32 {
         let GuiBackend {
             event_loop,
             display,
@@ -123,7 +126,7 @@ impl GuiBackend {
             ..
         } = self;
 
-        event_loop.run(move |event, _, control_flow| {
+        let exit_code = event_loop.run_return(|event, _, control_flow| {
             if !display.gl_window().window().is_visible().unwrap() {
                 *control_flow = glutin::event_loop::ControlFlow::Wait;
             } else {
@@ -131,9 +134,11 @@ impl GuiBackend {
             }
 
             if let Ok(tray_event) = MenuEvent::receiver().try_recv() {
-                if tray_event.id == "0" {
-                    *control_flow = ControlFlow::Exit;
-                }
+                match tray_event.id.0.as_str() {
+                    "0" => *control_flow = ControlFlow::ExitWithCode(0),
+                    "1" => *control_flow = ControlFlow::ExitWithCode(1),
+                    _ => {}
+                };
             }
 
             match &event {
@@ -179,6 +184,13 @@ impl GuiBackend {
                             .io_mut()
                             .add_mouse_button_event(imgui::MouseButton::Left, false);
                     }
+                    GuiBackendEvent::ReloadGui => {
+                        display.gl_window().window().set_visible(false);
+                        imgui
+                            .io_mut()
+                            .add_mouse_button_event(imgui::MouseButton::Left, false);
+                        *control_flow = ControlFlow::ExitWithCode(2)
+                    }
                 },
                 Event::WindowEvent {
                     window_id,
@@ -197,7 +209,9 @@ impl GuiBackend {
                     platform.handle_event(imgui.io_mut(), gl_window.window(), &event);
                 }
             }
-        })
+        });
+
+        exit_code
     }
 }
 
