@@ -17,6 +17,7 @@ use tray_icon::{TrayIcon, TrayIconBuilder};
 pub enum GuiBackendEvent {
     ShowWindow,
     HideWindow,
+    ReloadGui,
 }
 
 pub struct GuiBackend<'a> {
@@ -96,7 +97,7 @@ fn init_tray_icon() -> Result<TrayIcon, Whatever> {
         .whatever_context("failed to build icon")?;
 
     let quit_item = MenuItem::with_id(0, "Quit HDR Snipping Tool", true, None);
-    let reload_item = MenuItem::with_id(1, "Reload GUI", true, None);
+    let reload_item = MenuItem::with_id(1, "Reload HDR Snipping Tool", true, None);
 
     let tray_menu =
         Menu::with_items(&[&reload_item, &quit_item]).whatever_context("Failed to build menu")?;
@@ -182,6 +183,13 @@ impl<'a> GuiBackend<'a> {
                         imgui
                             .io_mut()
                             .add_mouse_button_event(imgui::MouseButton::Left, false);
+                    }
+                    GuiBackendEvent::ReloadGui => {
+                        display.gl_window().window().set_visible(false);
+                        imgui
+                            .io_mut()
+                            .add_mouse_button_event(imgui::MouseButton::Left, false);
+                        *control_flow = ControlFlow::ExitWithCode(2)
                     }
                 },
                 Event::WindowEvent {

@@ -12,5 +12,9 @@ impl App {
             self.event_queue
                 .append(&mut [AppEvent::Save, AppEvent::Close].into());
         }
+
+        if ui.is_key_pressed(imgui::Key::F5) {
+            self.event_queue.push_back(AppEvent::ReloadGui);
+        }
     }
 }

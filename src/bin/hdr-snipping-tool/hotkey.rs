@@ -10,7 +10,7 @@ use super::gui_backend::GuiBackendEvent;
 pub fn init_hotkey<C>(
     hotkey: KeyCode,
     capture_provider: Arc<C>,
-    sender: Sender<(HdrCapture, DisplayInfo)>,
+    sender: Arc<Sender<(HdrCapture, DisplayInfo)>>,
     proxy: EventLoopProxy<GuiBackendEvent>,
 ) -> Result<Hook, Whatever>
 where
@@ -19,7 +19,7 @@ where
     let hook = Hook::new().whatever_context("Failed to create hotkey hook")?;
 
     hook.register(Hotkey::from(hotkey), move || {
-        if let Err(e) = handle_capture(capture_provider.as_ref(), &sender, &proxy)
+        if let Err(e) = handle_capture(capture_provider.as_ref(), sender.as_ref(), &proxy)
             .whatever_context::<_, Whatever>("Failed to handle capture")
         {
             log::error!("{}", Report::from_error(e).to_string());
@@ -30,7 +30,7 @@ where
     Ok(hook)
 }
 
-fn handle_capture<C>(
+pub fn handle_capture<C>(
     capture_provider: &C,
     sender: &Sender<(HdrCapture, DisplayInfo)>,
     proxy: &EventLoopProxy<GuiBackendEvent>,

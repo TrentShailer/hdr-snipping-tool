@@ -102,6 +102,8 @@ where
     let capture_provider = Arc::new(capture_provider);
     let mut event_loop: EventLoop<GuiBackendEvent> = EventLoopBuilder::with_user_event().build();
 
+    let mut prev_exit_code = -1;
+
     loop {
         let settings = Settings::load().whatever_context("Failed to load settings")?;
         let window = gui_backend::init(&mut event_loop)
@@ -109,16 +111,30 @@ where
 
         let (capture_sender, capture_receiver) = channel();
         let event_proxy = window.event_loop.create_proxy();
+
+        let capture_sender = Arc::new(capture_sender);
+
         let _hotkey_hook = init_hotkey(
             settings.screenshot_key,
             Arc::clone(&capture_provider),
-            capture_sender,
+            Arc::clone(&capture_sender),
             event_proxy,
         )
         .whatever_context("Failed to initialize hotkey")?;
 
         let event_proxy = window.event_loop.create_proxy();
         let mut app = App::new(capture_receiver, event_proxy);
+
+        if prev_exit_code == 2 {
+            let event_proxy = window.event_loop.create_proxy();
+
+            hotkey::handle_capture(
+                capture_provider.as_ref(),
+                capture_sender.as_ref(),
+                &event_proxy,
+            )
+            .whatever_context("Failed to capture on gui reload")?;
+        }
 
         let exit_code = window.main_loop(move |run, display, renderer, ui| {
             if let Err(e) = app
@@ -133,6 +149,8 @@ where
         if exit_code == 0 {
             break;
         }
+
+        prev_exit_code = exit_code;
     }
 
     Ok(())

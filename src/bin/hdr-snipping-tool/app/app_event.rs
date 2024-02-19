@@ -19,6 +19,7 @@ pub enum AppEvent {
     RebuildTexture,
     Save,
     Close,
+    ReloadGui,
 }
 
 impl App {
@@ -52,6 +53,10 @@ impl App {
                 .rebuild_texture(display, renderer)
                 .whatever_context("Failed to rebuild texture")?,
             AppEvent::Tonemap => self.tone_map(),
+            AppEvent::ReloadGui => self
+                .event_proxy
+                .send_event(GuiBackendEvent::ReloadGui)
+                .whatever_context("Failed to send reload event to gui backend")?,
         };
         Ok(())
     }
