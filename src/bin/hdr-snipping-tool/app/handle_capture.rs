@@ -12,7 +12,7 @@ impl App {
         renderer: &mut Renderer,
     ) -> Result<(), Whatever> {
         if let Ok((hdr, display_info)) = self.capture_receiver.try_recv() {
-            let tone_mapper = GammaCompressionTonemapper::new(&hdr);
+            let tone_mapper = GammaCompressionTonemapper::new(&hdr, self.settings.default_gamma);
             self.capture = Capture::new(hdr, Box::new(tone_mapper));
             self.selection_state = SelectionSate::None;
 

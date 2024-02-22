@@ -16,8 +16,8 @@ pub struct GammaCompressionTonemapper {
 }
 
 impl GammaCompressionTonemapper {
-    pub fn new(capture: &HdrCapture) -> Self {
-        let gamma = 0.5;
+    pub fn new(capture: &HdrCapture, default_gamma: f32) -> Self {
+        let gamma = default_gamma;
         let max = capture.get_max_value();
         let alpha = max.powf(-gamma);
 

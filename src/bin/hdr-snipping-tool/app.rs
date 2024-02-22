@@ -14,7 +14,7 @@ use imgui::{TextureId, Ui};
 use imgui_glium_renderer::Renderer;
 use snafu::{ResultExt, Whatever};
 
-use crate::gui_backend::GuiBackendEvent;
+use crate::{gui_backend::GuiBackendEvent, settings::Settings};
 
 use self::{app_event::AppEvent, selection::SelectionSate, window_info::WindowInfo};
 
@@ -27,16 +27,19 @@ pub struct App {
     pub image_texture_id: Option<TextureId>,
     pub selection_state: SelectionSate,
     pub selection_start: LogicalPosition<f32>,
+    pub settings: Settings,
 }
 
 impl App {
     pub fn new(
         capture_receiver: Receiver<(HdrCapture, DisplayInfo)>,
         event_proxy: EventLoopProxy<GuiBackendEvent>,
+        settings: Settings,
     ) -> Self {
         Self {
             capture_receiver,
             event_proxy,
+            settings,
             event_queue: VecDeque::default(),
             capture: Capture::default(),
             window: WindowInfo::default(),
