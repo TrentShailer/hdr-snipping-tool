@@ -109,10 +109,26 @@ impl App {
         if ui.is_mouse_dragging(imgui::MouseButton::Left)
             && self.selection_state != SelectionSate::None
         {
-            self.selection_state = SelectionSate::Selecting;
-
-            self.capture.selection =
+            let mut selection =
                 Selection::from_points(self.selection_start, mouse_pos, self.window.scale);
+
+            // if we are starting selecting, accept initial valuye
+            // else if we are already selecting, make sure size is at least 1x1
+            if self.selection_state != SelectionSate::Selecting {
+                self.capture.selection = selection;
+            } else {
+                if selection.size.width == 0 {
+                    selection.size.width = self.capture.selection.size.width;
+                }
+
+                if selection.size.height == 0 {
+                    selection.size.height = self.capture.selection.size.height;
+                }
+
+                self.capture.selection = selection;
+            }
+
+            self.selection_state = SelectionSate::Selecting;
         }
     }
 }
