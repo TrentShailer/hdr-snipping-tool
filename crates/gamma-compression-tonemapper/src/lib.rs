@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use hdr_capture::{HdrCapture, SdrCapture, Tonemapper};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
@@ -10,20 +12,48 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 pub struct GammaCompressionTonemapper {
     pub alpha: f32,
     pub gamma: f32,
+    pub default_gamma: f32,
 }
 
 impl GammaCompressionTonemapper {
-    pub fn new(capture: &HdrCapture, default_gamma: f32) -> Self {
-        let gamma = default_gamma;
-        let max = capture.get_max_value();
-        let alpha = max.powf(-gamma);
-
-        Self { alpha, gamma }
+    pub fn new(gamma: f32) -> Self {
+        Self {
+            alpha: 0.5,
+            gamma,
+            default_gamma: gamma,
+        }
     }
 
     pub fn calculate_alpha(&self, capture: &HdrCapture) -> f32 {
-        let max = capture.get_max_value();
+        let max = Self::get_max_value(capture);
         max.powf(-self.gamma)
+    }
+
+    fn get_max_value(capture: &HdrCapture) -> &f32 {
+        capture
+            .data
+            .par_iter()
+            .enumerate()
+            .max_by(|(a_index, a), (b_index, b)| {
+                let is_a_alpha = (a_index + 1) % 4 == 0;
+                let is_b_alpha = (b_index + 1) % 4 == 0;
+
+                if is_a_alpha && !is_b_alpha {
+                    return Ordering::Less;
+                }
+
+                if !is_a_alpha && is_b_alpha {
+                    return Ordering::Greater;
+                }
+
+                if is_a_alpha && is_b_alpha {
+                    return Ordering::Equal;
+                }
+
+                a.total_cmp(b)
+            })
+            .unwrap()
+            .1
     }
 }
 
@@ -49,23 +79,13 @@ impl Tonemapper for GammaCompressionTonemapper {
         }
     }
 
-    #[cfg(feature = "imgui")]
-    fn render_settings(&mut self, ui: &imgui::Ui, hdr_capture: &HdrCapture) -> bool {
-        let mut value_changed = false;
-        if ui.input_float("Gamma", &mut self.gamma).step(0.025).build() {
-            value_changed = true;
-        }
+    fn reset_settings(&mut self, hdr_capture: &HdrCapture) {
+        self.gamma = self.default_gamma;
 
-        if ui.input_float("Alpha", &mut self.alpha).step(0.025).build() {
-            value_changed = true;
-        };
+        let max = Self::get_max_value(hdr_capture);
+        let alpha = max.powf(-self.gamma);
 
-        if ui.button_with_size("Auto Alpha", [275.0, 25.0]) {
-            self.alpha = self.calculate_alpha(hdr_capture);
-            value_changed = true;
-        }
-
-        value_changed
+        self.alpha = alpha;
     }
 }
 

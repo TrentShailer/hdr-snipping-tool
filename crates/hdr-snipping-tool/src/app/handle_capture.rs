@@ -1,13 +1,15 @@
-use gamma_compression_tonemapper::GammaCompressionTonemapper;
 use glow::Texture;
-use hdr_capture::Capture;
+use hdr_capture::{Capture, Tonemapper};
 use imgui::Textures;
 use snafu::{ResultExt, Whatever};
 use winit::window::Window;
 
-use super::{app_event::AppEvent, selection::SelectionSate, window_info::WindowInfo, App};
+use super::{
+    app_event::AppEvent, selection::SelectionSate, settings::ImguiSettings,
+    window_info::WindowInfo, App,
+};
 
-impl App {
+impl<T: Tonemapper + ImguiSettings> App<T> {
     pub fn handle_capture(
         &mut self,
         window: &Window,
@@ -15,12 +17,14 @@ impl App {
         gl: &glow::Context,
     ) -> Result<(), Whatever> {
         if let Ok((hdr, display_info)) = self.capture_receiver.try_recv() {
-            let tone_mapper = GammaCompressionTonemapper::new(&hdr, self.settings.default_gamma);
-            self.capture = Capture::new(hdr, Box::new(tone_mapper));
+            self.tonemapper.reset_settings(&hdr);
+            let sdr = self.tonemapper.tonemap(&hdr);
+            self.capture = Capture::new(hdr, sdr);
+
             self.selection_state = SelectionSate::None;
 
             self.event_queue.push_back(AppEvent::RebuildTexture);
-            self.handle_events(window, textures, gl)
+            self.handle_events(textures, gl)
                 .whatever_context("Failed to handle events")?;
 
             let _ = window.request_inner_size(display_info.size);

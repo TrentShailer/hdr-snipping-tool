@@ -1,21 +1,19 @@
-use hdr_capture::LogicalBounds;
+mod gamma_compression_tonemapper;
+
+use hdr_capture::{HdrCapture, LogicalBounds, Tonemapper};
 use imgui::Ui;
 use winit::dpi::{LogicalPosition, LogicalSize};
 
 use super::{app_event::AppEvent, App};
 
-impl App {
+impl<T: Tonemapper + ImguiSettings> App<T> {
     /// Draws the settings window and returns its position and size
     pub fn draw_settings(&mut self, ui: &Ui) -> LogicalBounds {
         ui.window("Settings")
             .always_auto_resize(true)
             .collapsible(false)
             .build(|| {
-                if self
-                    .capture
-                    .tone_mapper
-                    .render_settings(ui, &self.capture.hdr)
-                {
+                if self.tonemapper.render_settings(ui, &self.capture.hdr) {
                     self.event_queue
                         .append(&mut [AppEvent::Tonemap, AppEvent::RebuildTexture].into());
                 }
@@ -38,4 +36,8 @@ impl App {
             })
             .unwrap()
     }
+}
+
+pub trait ImguiSettings {
+    fn render_settings(&mut self, ui: &imgui::Ui, hdr_capture: &HdrCapture) -> bool;
 }

@@ -9,6 +9,7 @@ mod settings;
 use std::sync::{mpsc::channel, Arc};
 
 use app::App;
+use gamma_compression_tonemapper::GammaCompressionTonemapper;
 use gui_backend::GuiBackendEvent;
 use hdr_capture::CaptureProvider;
 use hotkey::init_hotkey;
@@ -124,8 +125,9 @@ where
     )
     .whatever_context("Failed to initialize hotkey")?;
 
+    let tonemapper = GammaCompressionTonemapper::new(settings.default_gamma);
     let event_proxy = window.event_loop.create_proxy();
-    let mut app = App::new(capture_receiver, event_proxy, settings);
+    let mut app = App::new(capture_receiver, event_proxy, settings, tonemapper);
 
     /* if prev_exit_code == 2 {
         let event_proxy = window.event_loop.create_proxy();

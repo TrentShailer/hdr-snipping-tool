@@ -1,14 +1,12 @@
 use arboard::{Clipboard, ImageData};
-use gamma_compression_tonemapper::GammaCompressionTonemapper;
 use glow::{HasContext, Texture};
-use hdr_capture::{Capture, HdrCapture};
+use hdr_capture::{Capture, Tonemapper};
 use imgui::Textures;
 use snafu::{ResultExt, Whatever};
-use winit::window::Window;
 
 use crate::gui_backend::GuiBackendEvent;
 
-use super::App;
+use super::{settings::ImguiSettings, App};
 
 pub enum AppEvent {
     Tonemap,
@@ -17,10 +15,9 @@ pub enum AppEvent {
     Close,
 }
 
-impl App {
+impl<T: Tonemapper + ImguiSettings> App<T> {
     pub fn handle_events(
         &mut self,
-        window: &Window,
         textures: &mut Textures<Texture>,
         gl: &glow::Context,
     ) -> Result<(), Whatever> {
@@ -48,17 +45,13 @@ impl App {
             AppEvent::RebuildTexture => self
                 .rebuild_texture(textures, gl)
                 .whatever_context("Failed to rebuild texture")?,
-            AppEvent::Tonemap => self.tone_map(),
-            /* AppEvent::ReloadGui => self
-            .event_proxy
-            .send_event(GuiBackendEvent::ReloadGui)
-            .whatever_context("Failed to send reload event to gui backend")?, */
+            AppEvent::Tonemap => self.tonemap(),
         };
         Ok(())
     }
 
-    fn tone_map(&mut self) {
-        self.capture.sdr = self.capture.tone_mapper.tonemap(&self.capture.hdr);
+    fn tonemap(&mut self) {
+        self.capture.sdr = self.tonemapper.tonemap(&self.capture.hdr);
     }
 
     fn rebuild_texture(
@@ -104,10 +97,7 @@ impl App {
         textures: &mut Textures<Texture>,
         gl: &glow::Context,
     ) -> Result<(), Whatever> {
-        self.capture = Capture::new(
-            HdrCapture::default(),
-            Box::new(GammaCompressionTonemapper::default()),
-        );
+        self.capture = Capture::default();
 
         self.rebuild_texture(textures, gl)
             .whatever_context("Failed to rebuild texture")?;

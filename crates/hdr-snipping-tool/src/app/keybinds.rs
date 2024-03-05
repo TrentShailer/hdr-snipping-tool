@@ -1,8 +1,9 @@
+use hdr_capture::Tonemapper;
 use imgui::Ui;
 
-use super::{app_event::AppEvent, App};
+use super::{app_event::AppEvent, settings::ImguiSettings, App};
 
-impl App {
+impl<T: Tonemapper + ImguiSettings> App<T> {
     pub fn handle_keybinds(&mut self, ui: &Ui) {
         if ui.is_key_released(imgui::Key::Escape) {
             self.event_queue.push_back(AppEvent::Close);

@@ -1,8 +1,8 @@
-use hdr_capture::{LogicalBounds, Selection};
+use hdr_capture::{LogicalBounds, Selection, Tonemapper};
 use imgui::Ui;
 use winit::dpi::LogicalPosition;
 
-use super::{app_event::AppEvent, App};
+use super::{app_event::AppEvent, settings::ImguiSettings, App};
 
 #[derive(PartialEq, Default)]
 pub enum SelectionSate {
@@ -15,7 +15,7 @@ pub enum SelectionSate {
     Selecting,
 }
 
-impl App {
+impl<T: Tonemapper + ImguiSettings> App<T> {
     pub fn draw_selection(&self, ui: &Ui) {
         // draw border
         let selection = self.capture.selection.logcal_bounds(self.window.scale);

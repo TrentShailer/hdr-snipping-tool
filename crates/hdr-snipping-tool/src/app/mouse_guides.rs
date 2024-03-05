@@ -1,9 +1,10 @@
+use hdr_capture::Tonemapper;
 use imgui::Ui;
 use winit::dpi::LogicalPosition;
 
-use super::App;
+use super::{settings::ImguiSettings, App};
 
-impl App {
+impl<T: Tonemapper + ImguiSettings> App<T> {
     pub fn draw_mouse_guides(&mut self, ui: &Ui) {
         let mouse_pos: LogicalPosition<f32> = ui.io().mouse_pos.into();
         let window = self.window.logical_bounds();

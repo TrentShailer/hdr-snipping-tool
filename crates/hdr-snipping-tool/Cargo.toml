@@ -6,12 +6,8 @@ edition = "2021"
 build = "build.rs"
 
 [dependencies]
-hdr-capture = { path = "../hdr-capture", features = [
-	"imgui-settings-renderer",
-] }
-gamma-compression-tonemapper = { path = "../gamma-compression-tonemapper", features = [
-	"imgui",
-] }
+hdr-capture = { path = "../hdr-capture" }
+gamma-compression-tonemapper = { path = "../gamma-compression-tonemapper" }
 
 arboard = "3.3.0"
 chrono = { version = "0.4.33", default-features = false, features = ["clock"] }

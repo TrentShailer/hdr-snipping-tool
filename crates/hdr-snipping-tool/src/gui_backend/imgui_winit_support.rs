@@ -148,6 +148,7 @@ enum ActiveHiDpiMode {
 /// **Note: if you use a mode other than default and the DPI factor is adjusted, winit and imgui-rs
 /// will use different logical coordinates, so be careful if you pass around logical size or
 /// position values.**
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum HiDpiMode {
     /// The DPI factor from winit is used directly without adjustment

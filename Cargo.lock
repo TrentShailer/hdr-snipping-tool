@@ -772,7 +772,6 @@ name = "gamma-compression-tonemapper"
 version = "1.4.0"
 dependencies = [
  "hdr-capture",
- "imgui",
  "rayon",
 ]
 
@@ -1107,7 +1106,6 @@ version = "1.4.0"
 dependencies = [
  "chrono",
  "image",
- "imgui",
  "rayon",
  "snafu 0.8.1",
  "winit",

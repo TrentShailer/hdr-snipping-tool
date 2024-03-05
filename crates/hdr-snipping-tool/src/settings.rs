@@ -16,7 +16,7 @@ impl Settings {
     fn default() -> Self {
         Self {
             screenshot_key: KeyCode::PrintScreen,
-            default_gamma: 0.454545,
+            default_gamma: 0.48,
         }
     }
 }

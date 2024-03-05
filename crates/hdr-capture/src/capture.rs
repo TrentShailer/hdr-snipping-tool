@@ -18,24 +18,20 @@ pub use hdr_capture::HdrCapture;
 pub use sdr_capture::SdrCapture;
 pub use selection::Selection;
 
-use crate::Tonemapper;
-
+#[derive(Default)]
 pub struct Capture {
     pub hdr: HdrCapture,
     pub sdr: SdrCapture,
     pub selection: Selection,
-    pub tone_mapper: Box<dyn Tonemapper>,
 }
 
 impl Capture {
-    pub fn new(hdr: HdrCapture, tone_mapper: Box<dyn Tonemapper>) -> Self {
-        let sdr_capture = SdrCapture::from_hdr(&hdr, tone_mapper.as_ref());
+    pub fn new(hdr: HdrCapture, sdr: SdrCapture) -> Self {
         let selection = Selection::from(&hdr);
 
         Self {
             hdr,
-            sdr: sdr_capture,
-            tone_mapper,
+            sdr,
             selection,
         }
     }
