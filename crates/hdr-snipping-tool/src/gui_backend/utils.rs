@@ -1,5 +1,6 @@
 use std::num::NonZeroU32;
 
+use error_trace::{ErrorTrace, OptionExt, ResultExt};
 use glutin::{
     config::ConfigTemplateBuilder,
     context::{ContextApi, ContextAttributesBuilder, NotCurrentGlContext, PossiblyCurrentContext},
@@ -7,7 +8,6 @@ use glutin::{
     surface::{GlSurface, Surface, SurfaceAttributesBuilder, SwapInterval, WindowSurface},
 };
 use raw_window_handle::HasRawWindowHandle;
-use snafu::{OptionExt, ResultExt, Whatever};
 use tray_icon::{
     menu::{Menu, MenuItem},
     TrayIcon, TrayIconBuilder,
@@ -25,9 +25,9 @@ use super::GuiBackendEvent;
 pub fn create_window(
     event_loop: &mut EventLoop<GuiBackendEvent>,
     context_api: Option<ContextApi>,
-) -> Result<(Window, Surface<WindowSurface>, PossiblyCurrentContext), Whatever> {
-    let window_icon = winit::window::Icon::from_resource(1, Some(PhysicalSize::new(64, 64)))
-        .whatever_context("failed to load icon")?;
+) -> Result<(Window, Surface<WindowSurface>, PossiblyCurrentContext), ErrorTrace> {
+    let window_icon =
+        winit::window::Icon::from_resource(1, Some(PhysicalSize::new(64, 64))).track()?;
 
     let window_builder = WindowBuilder::new()
         .with_title("HDR Snipping Tool")
@@ -38,11 +38,11 @@ pub fn create_window(
     let (window, cfg) = glutin_winit::DisplayBuilder::new()
         .with_window_builder(Some(window_builder))
         .build(&event_loop, ConfigTemplateBuilder::new(), |mut configs| {
-            configs.next().unwrap()
+            configs.next().log_none().unwrap()
         })
-        .whatever_context("Failed to create OpenGL window")?;
+        .track()?;
 
-    let window = window.whatever_context("Failed to create window")?;
+    let window = window.track()?;
 
     let mut context_attribs = ContextAttributesBuilder::new();
     if let Some(context_api) = context_api {
@@ -52,37 +52,34 @@ pub fn create_window(
     let context = unsafe {
         cfg.display()
             .create_context(&cfg, &context_attribs)
-            .expect("Failed to create OpenGL context")
+            .track()?
     };
 
-    let window_monitor = window
-        .current_monitor()
-        .whatever_context("Failed to get window's monitor")?;
+    let window_monitor = window.current_monitor().track()?;
 
     let surface_attribs = SurfaceAttributesBuilder::<WindowSurface>::new()
         .with_srgb(Some(true))
         .build(
             window.raw_window_handle(),
-            NonZeroU32::new(window_monitor.size().width).unwrap(),
-            NonZeroU32::new(window_monitor.size().height).unwrap(),
+            NonZeroU32::new(window_monitor.size().width).track()?,
+            NonZeroU32::new(window_monitor.size().height).track()?,
         );
 
     let surface = unsafe {
         cfg.display()
             .create_window_surface(&cfg, &surface_attribs)
-            .expect("Failed to create OpenGL surface")
+            .track()?
     };
 
-    let context = context
-        .make_current(&surface)
-        .expect("Failed to make OpenGL context current");
+    let context = context.make_current(&surface).track()?;
 
     surface
-        .set_swap_interval(&context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
-        .expect("Failed to set swap interval");
+        .set_swap_interval(&context, SwapInterval::Wait(NonZeroU32::new(1).track()?))
+        .track()?;
 
     Ok((window, surface, context))
 }
+
 pub fn glow_context(context: &PossiblyCurrentContext) -> glow::Context {
     unsafe {
         glow::Context::from_loader_function_cstr(|s| context.display().get_proc_address(s).cast())
@@ -105,22 +102,19 @@ pub fn imgui_init(window: &Window) -> (WinitPlatform, imgui::Context) {
     (winit_platform, imgui_context)
 }
 
-pub fn init_tray_icon() -> Result<TrayIcon, Whatever> {
-    let icon = tray_icon::Icon::from_resource(1, Some((24, 24)))
-        .whatever_context("failed to build icon")?;
+pub fn init_tray_icon() -> Result<TrayIcon, ErrorTrace> {
+    let icon = tray_icon::Icon::from_resource(1, Some((24, 24))).track()?;
 
     let quit_item = MenuItem::with_id(0, "Quit HDR Snipping Tool", true, None);
-    let reload_item = MenuItem::with_id(1, "Reload HDR Snipping Tool", true, None);
 
-    let tray_menu =
-        Menu::with_items(&[&reload_item, &quit_item]).whatever_context("Failed to build menu")?;
+    let tray_menu = Menu::with_items(&[&quit_item]).track()?;
 
     let tray_icon = TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
         .with_tooltip("HDR Snipping Tool")
         .with_icon(icon)
         .build()
-        .whatever_context("Failed to build tray icon")?;
+        .track()?;
 
     Ok(tray_icon)
 }

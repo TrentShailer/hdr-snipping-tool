@@ -1,13 +1,10 @@
+use error_trace::{ErrorTrace, ResultExt};
 use glow::Texture;
 use hdr_capture::{Capture, Tonemapper};
 use imgui::Textures;
-use snafu::{ResultExt, Whatever};
 use winit::window::Window;
 
-use super::{
-    app_event::AppEvent, selection::SelectionSate, settings::ImguiSettings,
-    window_info::WindowInfo, App,
-};
+use super::{selection::SelectionSate, settings::ImguiSettings, window_info::WindowInfo, App};
 
 impl<T: Tonemapper + ImguiSettings> App<T> {
     pub fn handle_capture(
@@ -15,7 +12,7 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
         window: &Window,
         textures: &mut Textures<Texture>,
         gl: &glow::Context,
-    ) -> Result<(), Whatever> {
+    ) -> Result<(), ErrorTrace> {
         if let Ok((hdr, display_info)) = self.capture_receiver.try_recv() {
             self.tonemapper.reset_settings(&hdr);
             let sdr = self.tonemapper.tonemap(&hdr);
@@ -23,15 +20,12 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
 
             self.selection_state = SelectionSate::None;
 
-            self.event_queue.push_back(AppEvent::RebuildTexture);
-            self.handle_events(textures, gl)
-                .whatever_context("Failed to handle events")?;
+            self.rebuild_texture(textures, gl).track()?;
 
             let _ = window.request_inner_size(display_info.size);
             window.set_outer_position(display_info.position);
 
-            self.window =
-                WindowInfo::try_from(window).whatever_context("Failed to get window info")?;
+            self.window = WindowInfo::try_from(window).track()?;
         }
         Ok(())
     }

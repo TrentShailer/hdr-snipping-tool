@@ -1,8 +1,9 @@
+use error_trace::{ErrorTrace, ResultExt};
 use hdr_capture::{LogicalBounds, Selection, Tonemapper};
 use imgui::Ui;
 use winit::dpi::LogicalPosition;
 
-use super::{app_event::AppEvent, settings::ImguiSettings, App};
+use super::{settings::ImguiSettings, App};
 
 #[derive(PartialEq, Default)]
 pub enum SelectionSate {
@@ -78,7 +79,11 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
             .build();
     }
 
-    pub fn handle_selection(&mut self, ui: &Ui, settings_bounds: LogicalBounds) {
+    pub fn handle_selection(
+        &mut self,
+        ui: &Ui,
+        settings_bounds: LogicalBounds,
+    ) -> Result<(), ErrorTrace> {
         let mouse_pos: LogicalPosition<f32> = ui.io().mouse_pos.into();
         let window = self.window.logical_bounds();
 
@@ -87,16 +92,16 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
         {
             // prevent registering clicks as area selection
             if self.selection_state == SelectionSate::Selecting {
-                self.event_queue
-                    .append(&mut [AppEvent::Save, AppEvent::Close].into());
+                self.save().track()?;
+                self.close().track()?;
             }
 
             self.selection_state = SelectionSate::None;
-            return;
+            return Ok(());
         }
 
         if !window.contains(&mouse_pos) {
-            return;
+            return Ok(());
         }
 
         if ui.is_mouse_down(imgui::MouseButton::Left)
@@ -131,5 +136,7 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
 
             self.selection_state = SelectionSate::Selecting;
         }
+
+        Ok(())
     }
 }

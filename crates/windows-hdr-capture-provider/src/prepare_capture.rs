@@ -87,7 +87,7 @@ pub fn prepare_capture(
                 move |frame_pool, _| {
                     let frame_pool = frame_pool.as_ref().unwrap();
                     let frame = frame_pool.TryGetNextFrame()?;
-                    sender.send(frame).expect("Failed to send frame.");
+                    let _ = sender.send(frame);
                     Ok(())
                 }
             }),

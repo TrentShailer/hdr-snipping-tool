@@ -37,12 +37,14 @@ impl Capture {
     }
 
     pub fn save_capture(&self) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>, SaveError> {
-        let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(
+        let img: ImageBuffer<Rgba<u8>, Vec<u8>> = match ImageBuffer::from_raw(
             self.sdr.size.width,
             self.sdr.size.height,
             self.sdr.data.to_owned(),
-        )
-        .unwrap()
+        ) {
+            Some(v) => v,
+            None => return Err(SaveError::Size),
+        }
         .view(
             self.selection.pos.x,
             self.selection.pos.y,
@@ -71,4 +73,6 @@ pub enum SaveError {
     Io { source: io::Error },
     #[snafu(display("An image error ocurred"))]
     Image { source: image::ImageError },
+    #[snafu(display("Image contained more data than specified for it's size"))]
+    Size,
 }

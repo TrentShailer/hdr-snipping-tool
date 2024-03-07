@@ -606,6 +606,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "error-trace"
+version = "0.4.4"
+source = "git+https://github.com/trentshailer/error-trace-rs.git#d3e58ed28b7af6499f39fa6d6aa7e2993a01de54"
+dependencies = [
+ "log",
+ "owo-colors",
+]
+
+[[package]]
 name = "evdev"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1118,6 +1127,7 @@ dependencies = [
  "arboard",
  "chrono",
  "embed-resource",
+ "error-trace",
  "fern",
  "gamma-compression-tonemapper",
  "glow",
@@ -1132,7 +1142,6 @@ dependencies = [
  "owo-colors",
  "raw-window-handle 0.5.2",
  "serde",
- "snafu 0.8.1",
  "toml",
  "tray-icon",
  "windows",

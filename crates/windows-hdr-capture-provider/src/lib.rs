@@ -3,6 +3,8 @@ mod get_display;
 mod prepare_capture;
 mod process_frame;
 
+use std::sync::mpsc::RecvError;
+
 use hdr_capture::{CaptureProvider, DisplayInfo, HdrCapture};
 use snafu::{ResultExt, Snafu};
 
@@ -25,7 +27,7 @@ impl CaptureProvider for WindowsCapture {
         let (framepool, capture_session, capture_receiver) =
             prepare_capture(&display, &dxgi_device).context(FramepoolSnafu)?;
 
-        let frame = capture_receiver.recv().unwrap();
+        let frame = capture_receiver.recv().context(RecvSnafu)?;
 
         let capture = process_frame(frame, &d3d_device, &d3d_context).context(ProcessFrameSnafu)?;
 
@@ -59,4 +61,7 @@ pub enum Error {
         source: windows::core::Error,
         call: &'static str,
     },
+
+    #[snafu(display("Sender for frame reciever has been closed."))]
+    Recv { source: RecvError },
 }

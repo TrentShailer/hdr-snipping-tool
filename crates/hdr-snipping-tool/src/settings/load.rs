@@ -1,6 +1,6 @@
 use std::{fs, io::Read};
 
-use snafu::{ResultExt, Whatever};
+use error_trace::{ErrorTrace, ResultExt};
 
 use super::{
     old_settings::{Pre1_2_0Settings, PreDefaultGammaSettings},
@@ -22,7 +22,7 @@ impl Settings {
         Self::default()
     }
 
-    pub fn load() -> Result<Self, Whatever> {
+    pub fn load() -> Result<Self, ErrorTrace> {
         let file = fs::File::open(SETTINGS_FILE_PATH);
 
         if file
@@ -30,36 +30,29 @@ impl Settings {
             .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
         {
             let settings = Self::default();
-            settings
-                .save()
-                .whatever_context("Failed to save settings")?;
+            settings.save().track()?;
 
             return Ok(settings);
         }
 
-        let mut file = file.whatever_context("Failed to open settings file.")?;
+        let mut file = file.track()?;
         let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .whatever_context("Failed to read settings file.")?;
+        file.read_to_string(&mut contents).track()?;
 
         let settings: Settings = match toml::from_str(&contents) {
             Ok(v) => v,
             Err(_) => Self::migrate(&contents),
         };
 
-        settings
-            .save()
-            .whatever_context("Failed to save settings")?;
+        settings.save().track()?;
 
         Ok(settings)
     }
 
-    fn save(&self) -> Result<(), Whatever> {
-        let toml_string =
-            toml::to_string_pretty(self).whatever_context("Failed to serialize settings.")?;
+    fn save(&self) -> Result<(), ErrorTrace> {
+        let toml_string = toml::to_string_pretty(self).track()?;
 
-        fs::write(SETTINGS_FILE_PATH, toml_string.as_bytes())
-            .whatever_context("Failed to write settings file.")?;
+        fs::write(SETTINGS_FILE_PATH, toml_string.as_bytes()).track()?;
         Ok(())
     }
 }

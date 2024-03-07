@@ -4,12 +4,12 @@ mod utils;
 use std::num::NonZeroU32;
 use std::time::Instant;
 
+use error_trace::{ErrorTrace, OptionExt, ResultExt};
 use glow::HasContext;
 use glutin::context::PossiblyCurrentContext;
 use glutin::surface::{GlSurface, Surface, WindowSurface};
 use imgui::{Context, Textures, Ui};
 use imgui_glow_renderer::Renderer;
-use snafu::{ResultExt, Whatever};
 use tray_icon::menu::MenuEvent;
 use tray_icon::TrayIcon;
 use winit::event::Event;
@@ -40,9 +40,8 @@ pub struct GuiBackend<'a> {
 }
 
 /// Initialize the app window and tray icon
-pub fn init(event_loop: &mut EventLoop<GuiBackendEvent>) -> Result<GuiBackend, Whatever> {
-    let (window, surface, context) =
-        create_window(event_loop, None).whatever_context("Failed to create window")?;
+pub fn init(event_loop: &mut EventLoop<GuiBackendEvent>) -> Result<GuiBackend, ErrorTrace> {
+    let (window, surface, context) = create_window(event_loop, None).track()?;
 
     let (winit_platform, mut imgui_context) = imgui_init(&window);
 
@@ -51,13 +50,11 @@ pub fn init(event_loop: &mut EventLoop<GuiBackendEvent>) -> Result<GuiBackend, W
 
     let mut textures = imgui::Textures::<glow::Texture>::default();
 
-    let imgui_renderer = Renderer::initialize(&gl, &mut imgui_context, &mut textures, false)
-        .whatever_context("Failed to create renderer")?;
+    let imgui_renderer =
+        Renderer::initialize(&gl, &mut imgui_context, &mut textures, false).track()?;
 
-    let tray_icon = init_tray_icon().whatever_context("Failed to initialize tray icon")?;
-    tray_icon
-        .set_visible(true)
-        .whatever_context("Failed to show tray icon")?;
+    let tray_icon = init_tray_icon().track()?;
+    tray_icon.set_visible(true).track()?;
 
     Ok(GuiBackend {
         context,
@@ -74,7 +71,7 @@ pub fn init(event_loop: &mut EventLoop<GuiBackendEvent>) -> Result<GuiBackend, W
 }
 
 impl<'a> GuiBackend<'a> {
-    pub fn run<F>(self, mut run_ui: F) -> Result<(), Whatever>
+    pub fn run<F>(self, mut run_ui: F) -> Result<(), ErrorTrace>
     where
         F: FnMut(&mut Ui, &Window, &mut Textures<glow::Texture>, &glow::Context) + 'static,
     {
@@ -94,94 +91,95 @@ impl<'a> GuiBackend<'a> {
         let mut last_frame = Instant::now();
         event_loop
             .run_on_demand(|event, window_target| {
-                if !window.is_visible().unwrap() {
-                    window_target.set_control_flow(ControlFlow::Wait);
-                } else {
-                    window_target.set_control_flow(ControlFlow::Poll);
-                }
-
-                if let Ok(tray_event) = MenuEvent::receiver().try_recv() {
-                    match tray_event.id.0.as_str() {
-                        "0" => window_target.exit(),
-                        "1" => window_target.exit(),
-                        _ => {}
-                    };
-                }
-
-                match &event {
-                    Event::NewEvents(_) => {
-                        let now = Instant::now();
-                        imgui_context
-                            .io_mut()
-                            .update_delta_time(now.duration_since(last_frame));
-                        last_frame = now;
+                if let Err(e) = (|| {
+                    if !window.is_visible().track()? {
+                        window_target.set_control_flow(ControlFlow::Wait);
+                    } else {
+                        window_target.set_control_flow(ControlFlow::Poll);
                     }
-                    winit::event::Event::AboutToWait => {
-                        winit_platform
-                            .prepare_frame(imgui_context.io_mut(), &window)
-                            .unwrap();
 
-                        window.request_redraw();
+                    if let Ok(tray_event) = MenuEvent::receiver().try_recv() {
+                        match tray_event.id.0.as_str() {
+                            "0" => window_target.exit(),
+                            "1" => window_target.exit(),
+                            _ => {}
+                        };
                     }
-                    winit::event::Event::WindowEvent {
-                        event: winit::event::WindowEvent::RedrawRequested,
-                        ..
-                    } => {
-                        unsafe { gl.clear(glow::COLOR_BUFFER_BIT) };
 
-                        let ui = imgui_context.frame();
-                        run_ui(ui, &window, &mut textures, &gl);
-
-                        winit_platform.prepare_render(ui, &window);
-                        let draw_data = imgui_context.render();
-                        imgui_renderer
-                            .render(&gl, &textures, draw_data)
-                            .expect("error rendering imgui");
-
-                        surface
-                            .swap_buffers(&context)
-                            .expect("Failed to swap buffers");
-                    }
-                    winit::event::Event::WindowEvent {
-                        event: winit::event::WindowEvent::Resized(new_size),
-                        ..
-                    } => {
-                        if new_size.width > 0 && new_size.height > 0 {
-                            surface.resize(
-                                &context,
-                                NonZeroU32::new(new_size.width).unwrap(),
-                                NonZeroU32::new(new_size.height).unwrap(),
-                            );
-                        }
-                        winit_platform.handle_event(imgui_context.io_mut(), &window, &event);
-                    }
-                    winit::event::Event::WindowEvent {
-                        event: winit::event::WindowEvent::CloseRequested,
-                        ..
-                    } => {
-                        window_target.exit();
-                    }
-                    winit::event::Event::LoopExiting => {
-                        imgui_renderer.destroy(&gl);
-                    }
-                    Event::UserEvent(v) => match v {
-                        GuiBackendEvent::ShowWindow => {
-                            window.set_visible(true);
-                            window.focus_window();
-                        }
-                        GuiBackendEvent::HideWindow => {
-                            window.set_visible(false);
+                    match &event {
+                        Event::NewEvents(_) => {
+                            let now = Instant::now();
                             imgui_context
                                 .io_mut()
-                                .add_mouse_button_event(imgui::MouseButton::Left, false);
+                                .update_delta_time(now.duration_since(last_frame));
+                            last_frame = now;
                         }
-                    },
-                    event => {
-                        winit_platform.handle_event(imgui_context.io_mut(), &window, &event);
+                        winit::event::Event::AboutToWait => {
+                            winit_platform
+                                .prepare_frame(imgui_context.io_mut(), &window)
+                                .track()?;
+
+                            window.request_redraw();
+                        }
+                        winit::event::Event::WindowEvent {
+                            event: winit::event::WindowEvent::RedrawRequested,
+                            ..
+                        } => {
+                            unsafe { gl.clear(glow::COLOR_BUFFER_BIT) };
+
+                            let ui = imgui_context.frame();
+                            run_ui(ui, &window, &mut textures, &gl);
+
+                            winit_platform.prepare_render(ui, &window);
+                            let draw_data = imgui_context.render();
+                            imgui_renderer.render(&gl, &textures, draw_data).track()?;
+
+                            surface.swap_buffers(&context).track()?;
+                        }
+                        winit::event::Event::WindowEvent {
+                            event: winit::event::WindowEvent::Resized(new_size),
+                            ..
+                        } => {
+                            if new_size.width > 0 && new_size.height > 0 {
+                                surface.resize(
+                                    &context,
+                                    NonZeroU32::new(new_size.width).track()?,
+                                    NonZeroU32::new(new_size.height).track()?,
+                                );
+                            }
+                            winit_platform.handle_event(imgui_context.io_mut(), &window, &event);
+                        }
+                        winit::event::Event::WindowEvent {
+                            event: winit::event::WindowEvent::CloseRequested,
+                            ..
+                        } => {
+                            window_target.exit();
+                        }
+                        winit::event::Event::LoopExiting => {
+                            imgui_renderer.destroy(&gl);
+                        }
+                        Event::UserEvent(v) => match v {
+                            GuiBackendEvent::ShowWindow => {
+                                window.set_visible(true);
+                                window.focus_window();
+                            }
+                            GuiBackendEvent::HideWindow => {
+                                window.set_visible(false);
+                                imgui_context
+                                    .io_mut()
+                                    .add_mouse_button_event(imgui::MouseButton::Left, false);
+                            }
+                        },
+                        event => {
+                            winit_platform.handle_event(imgui_context.io_mut(), &window, &event);
+                        }
                     }
+                    Ok::<(), ErrorTrace>(())
+                })() {
+                    log::error!("{}", e.to_string());
                 }
             })
-            .whatever_context("Failure in event loop")?;
+            .track()?;
 
         Ok(())
     }

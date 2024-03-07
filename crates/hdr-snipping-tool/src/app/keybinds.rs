@@ -1,21 +1,20 @@
+use error_trace::{ErrorTrace, ResultExt};
 use hdr_capture::Tonemapper;
 use imgui::Ui;
 
-use super::{app_event::AppEvent, settings::ImguiSettings, App};
+use super::{settings::ImguiSettings, App};
 
 impl<T: Tonemapper + ImguiSettings> App<T> {
-    pub fn handle_keybinds(&mut self, ui: &Ui) {
+    pub fn handle_keybinds(&mut self, ui: &Ui) -> Result<(), ErrorTrace> {
         if ui.is_key_released(imgui::Key::Escape) {
-            self.event_queue.push_back(AppEvent::Close);
+            self.close().track()?;
         }
 
         if ui.is_key_released(imgui::Key::Enter) {
-            self.event_queue
-                .append(&mut [AppEvent::Save, AppEvent::Close].into());
+            self.save().track()?;
+            self.close().track()?;
         }
 
-        /* if ui.is_key_pressed(imgui::Key::F5) {
-            self.event_queue.push_back(AppEvent::ReloadGui);
-        } */
+        Ok(())
     }
 }
