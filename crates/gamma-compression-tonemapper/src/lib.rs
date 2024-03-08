@@ -25,11 +25,11 @@ impl GammaCompressionTonemapper {
     }
 
     pub fn calculate_alpha(&self, capture: &HdrCapture) -> f32 {
-        let max = Self::get_max_value(capture);
-        max.powf(-self.gamma)
+        let whitepoint = Self::get_whitepoint(capture);
+        whitepoint.powf(-self.gamma)
     }
 
-    fn get_max_value(capture: &HdrCapture) -> &f32 {
+    fn get_whitepoint(capture: &HdrCapture) -> &f32 {
         capture
             .data
             .par_iter()
@@ -81,11 +81,7 @@ impl Tonemapper for GammaCompressionTonemapper {
 
     fn reset_settings(&mut self, hdr_capture: &HdrCapture) {
         self.gamma = self.default_gamma;
-
-        let max = Self::get_max_value(hdr_capture);
-        let alpha = max.powf(-self.gamma);
-
-        self.alpha = alpha;
+        self.alpha = self.calculate_alpha(hdr_capture);
     }
 }
 
