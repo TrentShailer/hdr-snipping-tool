@@ -7,6 +7,7 @@ use glutin::{
     display::{GetGlDisplay, GlDisplay},
     surface::{GlSurface, Surface, SurfaceAttributesBuilder, SwapInterval, WindowSurface},
 };
+use imgui::{FontConfig, FontSource};
 use raw_window_handle::HasRawWindowHandle;
 use tray_icon::{
     menu::{Menu, MenuItem},
@@ -93,9 +94,19 @@ pub fn imgui_init(window: &Window) -> (WinitPlatform, imgui::Context) {
     let mut winit_platform = WinitPlatform::init(&mut imgui_context);
     winit_platform.attach_window(imgui_context.io_mut(), window, HiDpiMode::Rounded);
 
-    imgui_context
-        .fonts()
-        .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
+    let inter_font = FontSource::TtfData {
+        data: include_bytes!("../fonts/Inter-Regular.ttf"),
+        size_pixels: 13.5,
+        config: Some(FontConfig {
+            oversample_h: 4,
+            oversample_v: 4,
+            ..Default::default()
+        }),
+    };
+
+    imgui_context.fonts().add_font(&[
+        inter_font, /* imgui::FontSource::DefaultFontData { config: None } */
+    ]);
 
     imgui_context.io_mut().font_global_scale = (1.0 / winit_platform.hidpi_factor()) as f32;
 
