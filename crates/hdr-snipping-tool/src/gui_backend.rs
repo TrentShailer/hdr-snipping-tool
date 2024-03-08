@@ -92,11 +92,7 @@ impl<'a> GuiBackend<'a> {
         event_loop
             .run_on_demand(|event, window_target| {
                 if let Err(e) = (|| {
-                    if !window.is_visible().track()? {
-                        window_target.set_control_flow(ControlFlow::Wait);
-                    } else {
-                        window_target.set_control_flow(ControlFlow::Poll);
-                    }
+                    window_target.set_control_flow(ControlFlow::Wait);
 
                     if let Ok(tray_event) = MenuEvent::receiver().try_recv() {
                         match tray_event.id.0.as_str() {
@@ -171,7 +167,14 @@ impl<'a> GuiBackend<'a> {
                             }
                         },
                         event => {
-                            winit_platform.handle_event(imgui_context.io_mut(), &window, &event);
+                            // prevent input queuing when closed
+                            if window.is_visible().track()? {
+                                winit_platform.handle_event(
+                                    imgui_context.io_mut(),
+                                    &window,
+                                    &event,
+                                );
+                            }
                         }
                     }
                     Ok::<(), ErrorTrace>(())
