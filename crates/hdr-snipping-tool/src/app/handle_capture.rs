@@ -16,7 +16,9 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
         if let Ok((hdr, display_info)) = self.capture_receiver.try_recv() {
             self.tonemapper.reset_settings(&hdr);
             let sdr = self.tonemapper.tonemap(&hdr);
-            self.capture = Capture::new(hdr, sdr);
+            let mut capture = Capture::new(hdr, sdr);
+            capture.selection.size = display_info.size;
+            self.capture = capture;
 
             self.selection_state = SelectionSate::None;
 

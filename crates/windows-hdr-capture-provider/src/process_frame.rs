@@ -1,5 +1,5 @@
 use hdr_capture::HdrCapture;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use snafu::{ResultExt, Snafu};
 use windows::{
     core::ComInterface,
@@ -95,30 +95,14 @@ pub fn process_frame(
                 call: "d3d_context.Map",
             })?;
 
-        let slice: &[u8] = {
-            std::slice::from_raw_parts(
-                mapped.pData as *const _,
-                (desc.Height * mapped.RowPitch) as usize,
-            )
-        };
+        let slice: &[u8] = std::slice::from_raw_parts(
+            mapped.pData as *const _,
+            (desc.Height * mapped.RowPitch) as usize,
+        );
 
-        let data_width = mapped.RowPitch / 4 / 2;
-        let expected_width = desc.Width;
-
-        if data_width != expected_width {
-            log::warn!(
-                "data width '{}' does not match expected width '{}'",
-                data_width,
-                expected_width
-            );
-        }
-
-        let capture = (0..slice.len() / 2)
-            .into_par_iter()
-            .map(|byte_index| {
-                let start = byte_index * 2;
-                f32_from_le_f16_bytes(slice[start], slice[start + 1])
-            })
+        let capture = slice
+            .par_chunks_exact(2)
+            .map(|parts| f32_from_le_f16_bytes(parts[0], parts[1]))
             .collect::<Box<[f32]>>();
 
         let size = PhysicalSize::new(mapped.RowPitch / 4 / 2, desc.Height);
