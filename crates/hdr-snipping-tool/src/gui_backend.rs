@@ -102,7 +102,11 @@ impl<'a> GuiBackend<'a> {
         event_loop
             .run_on_demand(|event, window_target| {
                 if let Err(e) = (|| {
-                    window_target.set_control_flow(ControlFlow::Wait);
+                    if window.is_visible().track()? {
+                        window_target.set_control_flow(ControlFlow::Poll);
+                    } else {
+                        window_target.set_control_flow(ControlFlow::Wait);
+                    }
 
                     if let Ok(_event) = global_hotkey_channel.try_recv() {
                         if !window.is_visible().track()? {

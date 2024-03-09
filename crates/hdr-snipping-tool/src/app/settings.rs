@@ -1,5 +1,7 @@
 mod gamma_compression_tonemapper;
 
+use std::time::{Duration, Instant};
+
 use error_trace::{ErrorTrace, OptionExt, ResultExt};
 use glow::Texture;
 use hdr_capture::{HdrCapture, LogicalBounds, Tonemapper};
@@ -21,10 +23,14 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
             .collapsible(false)
             .build(|| {
                 if self.tonemapper.render_settings(ui, &self.capture.hdr) {
-                    self.tonemap();
-                    if let Err(e) = self.rebuild_texture(textures, gl).track() {
-                        log::error!("{}", e.to_string());
-                    };
+                    if Instant::now().duration_since(self.last_tonemap) > Duration::from_millis(25)
+                    {
+                        self.last_tonemap = Instant::now();
+                        self.tonemap();
+                        if let Err(e) = self.rebuild_texture(textures, gl).track() {
+                            log::error!("{}", e.to_string());
+                        };
+                    }
                 }
 
                 ui.spacing();

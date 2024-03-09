@@ -104,7 +104,7 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
             return Ok(());
         }
 
-        if ui.is_mouse_down(imgui::MouseButton::Left)
+        if ui.is_mouse_clicked(imgui::MouseButton::Left)
             && self.selection_state == SelectionSate::None
             && !settings_bounds.contains(&mouse_pos)
         {

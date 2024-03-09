@@ -5,10 +5,10 @@ mod selection;
 mod settings;
 mod window_info;
 
-use std::sync::mpsc::Receiver;
+use std::{sync::mpsc::Receiver, time::Instant};
 
 use arboard::{Clipboard, ImageData};
-use error_trace::{ErrorTrace, ResultExt};
+use error_trace::{ErrorTrace, OptionExt, ResultExt};
 use glow::{HasContext, Texture};
 use hdr_capture::{Capture, DisplayInfo, HdrCapture, Tonemapper};
 use imgui::{TextureId, Textures, Ui};
@@ -30,6 +30,7 @@ where
     pub image_texture_id: Option<TextureId>,
     pub selection_state: SelectionSate,
     pub selection_start: LogicalPosition<f32>,
+    pub last_tonemap: Instant,
     pub settings: Settings,
 }
 
@@ -53,6 +54,7 @@ where
             window: WindowInfo::default(),
             selection_start: LogicalPosition::default(),
             selection_state: SelectionSate::default(),
+            last_tonemap: Instant::now(),
         }
     }
 
@@ -98,6 +100,7 @@ where
         gl: &glow::Context,
     ) -> Result<(), ErrorTrace> {
         let gl_texture = unsafe { gl.create_texture() }.track()?;
+
         unsafe {
             gl.bind_texture(glow::TEXTURE_2D, Some(gl_texture));
             gl.tex_parameter_i32(
@@ -123,8 +126,17 @@ where
             )
         }
 
-        let texture_id = textures.insert(gl_texture);
-        self.image_texture_id = Some(texture_id);
+        if let Some(texture_id) = self.image_texture_id {
+            let old_texture = textures.get(texture_id).track()?;
+            unsafe {
+                gl.delete_texture(*old_texture);
+            }
+
+            textures.replace(texture_id, gl_texture);
+        } else {
+            let texture_id = textures.insert(gl_texture);
+            self.image_texture_id = Some(texture_id);
+        }
 
         Ok(())
     }
