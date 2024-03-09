@@ -4,10 +4,10 @@ use hdr_capture::{HdrCapture, SdrCapture, Tonemapper};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 /// Perform HDR -> SDR tonemapping using the gamma compression algorithm.<br>
-/// Maps from the domain \[0,a^(-1/γ)] to the domain \[0,1].<br>
+/// Maps from the domain <code>\[0,a^(-1/γ)]</code> to the domain <code>\[0,1]</code>.<br>
 /// a > 0; 0 < γ < 1;<br>
-/// γ regulated contrast, lower = lower, but also increases exposure of underexposed parts if lower.<br>
-/// if a < 1 it can decrease the exposure of over exposed parts of the image.
+/// γ regulates contrast.<br>
+/// a regulates brightness.
 #[derive(Debug, Default)]
 pub struct GammaCompressionTonemapper {
     pub alpha: f32,
