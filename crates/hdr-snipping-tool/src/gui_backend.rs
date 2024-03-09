@@ -2,12 +2,15 @@ mod imgui_winit_support;
 mod utils;
 
 use std::num::NonZeroU32;
+use std::sync::mpsc::Sender;
 use std::time::Instant;
 
 use error_trace::{ErrorTrace, OptionExt, ResultExt};
+use global_hotkey::GlobalHotKeyEvent;
 use glow::HasContext;
 use glutin::context::PossiblyCurrentContext;
 use glutin::surface::{GlSurface, Surface, WindowSurface};
+use hdr_capture::{CaptureProvider, DisplayInfo, HdrCapture};
 use imgui::{Context, Textures, Ui};
 use imgui_glow_renderer::Renderer;
 use tray_icon::menu::MenuEvent;
@@ -22,7 +25,6 @@ use self::utils::{create_window, glow_context, imgui_init, init_tray_icon};
 
 #[derive(Debug, PartialEq)]
 pub enum GuiBackendEvent {
-    ShowWindow,
     HideWindow,
 }
 
@@ -71,9 +73,15 @@ pub fn init(event_loop: &mut EventLoop<GuiBackendEvent>) -> Result<GuiBackend, E
 }
 
 impl<'a> GuiBackend<'a> {
-    pub fn run<F>(self, mut run_ui: F) -> Result<(), ErrorTrace>
+    pub fn run<C, F>(
+        self,
+        capture_provider: C,
+        capture_sender: Sender<(HdrCapture, DisplayInfo)>,
+        mut run_ui: F,
+    ) -> Result<(), ErrorTrace>
     where
         F: FnMut(&mut Ui, &Window, &mut Textures<glow::Texture>, &glow::Context) + 'static,
+        C: CaptureProvider + Send + Sync + 'static,
     {
         let GuiBackend {
             context,
@@ -88,16 +96,26 @@ impl<'a> GuiBackend<'a> {
             ..
         } = self;
 
+        let global_hotkey_channel = GlobalHotKeyEvent::receiver();
+
         let mut last_frame = Instant::now();
         event_loop
             .run_on_demand(|event, window_target| {
                 if let Err(e) = (|| {
                     window_target.set_control_flow(ControlFlow::Wait);
 
+                    if let Ok(_event) = global_hotkey_channel.try_recv() {
+                        if !window.is_visible().track()? {
+                            let capture = capture_provider.take_capture().track()?;
+                            capture_sender.send(capture).track()?;
+                            window.set_visible(true);
+                            window.focus_window();
+                        }
+                    }
+
                     if let Ok(tray_event) = MenuEvent::receiver().try_recv() {
                         match tray_event.id.0.as_str() {
                             "0" => window_target.exit(),
-                            "1" => window_target.exit(),
                             _ => {}
                         };
                     }
@@ -155,10 +173,6 @@ impl<'a> GuiBackend<'a> {
                             imgui_renderer.destroy(&gl);
                         }
                         Event::UserEvent(v) => match v {
-                            GuiBackendEvent::ShowWindow => {
-                                window.set_visible(true);
-                                window.focus_window();
-                            }
                             GuiBackendEvent::HideWindow => {
                                 window.set_visible(false);
                                 imgui_context

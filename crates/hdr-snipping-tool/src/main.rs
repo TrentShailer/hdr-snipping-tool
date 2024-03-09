@@ -2,19 +2,18 @@
 
 mod app;
 mod gui_backend;
-mod hotkey;
 mod logger;
 mod settings;
 
-use std::sync::{mpsc::channel, Arc};
+use std::sync::mpsc::channel;
 
 use app::App;
 
 use error_trace::{ErrorTrace, ResultExt};
 use gamma_compression_tonemapper::GammaCompressionTonemapper;
+use global_hotkey::{hotkey::HotKey, GlobalHotKeyManager};
 use gui_backend::GuiBackendEvent;
 use hdr_capture::CaptureProvider;
-use hotkey::init_hotkey;
 use settings::Settings;
 use winit::event_loop::{EventLoop, EventLoopBuilder};
 
@@ -101,7 +100,6 @@ pub fn start_app<C>(capture_provider: C) -> Result<(), ErrorTrace>
 where
     C: CaptureProvider + Send + Sync + 'static,
 {
-    let capture_provider = Arc::new(capture_provider);
     let mut event_loop: EventLoop<GuiBackendEvent> =
         EventLoopBuilder::with_user_event().build().track()?;
 
@@ -109,28 +107,25 @@ where
     let window = gui_backend::init(&mut event_loop).context("Failed to initialize app window")?;
 
     let (capture_sender, capture_receiver) = channel();
-    let event_proxy = window.event_loop.create_proxy();
 
-    let capture_sender = Arc::new(capture_sender);
-
-    let _hotkey_hook = init_hotkey(
-        settings.screenshot_key,
-        Arc::clone(&capture_provider),
-        Arc::clone(&capture_sender),
-        event_proxy,
-    )
-    .context("Failed to initialize hotkey")?;
+    let hotkey_manager = GlobalHotKeyManager::new().unwrap();
+    let hotkey = HotKey::new(None, settings.screenshot_key);
+    hotkey_manager.register(hotkey).track()?;
 
     let tonemapper = GammaCompressionTonemapper::new(settings.default_gamma);
     let event_proxy = window.event_loop.create_proxy();
     let mut app = App::new(capture_receiver, event_proxy, settings, tonemapper);
 
     window
-        .run(move |ui, window, textures, gl| {
-            if let Err(e) = app.update(ui, window, textures, gl).track() {
-                log::error!("{}", e.to_string());
-            };
-        })
+        .run(
+            capture_provider,
+            capture_sender,
+            move |ui, window, textures, gl| {
+                if let Err(e) = app.update(ui, window, textures, gl).track() {
+                    log::error!("{}", e.to_string());
+                };
+            },
+        )
         .context("Failure running app")?;
 
     Ok(())

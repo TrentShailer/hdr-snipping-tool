@@ -2,23 +2,12 @@ use std::{fs, io::Read};
 
 use error_trace::{ErrorTrace, ResultExt};
 
-use super::{
-    old_settings::{Pre1_2_0Settings, PreDefaultGammaSettings},
-    Settings,
-};
+use super::Settings;
 
 const SETTINGS_FILE_PATH: &str = "./hdr-config.toml";
 
 impl Settings {
-    pub fn migrate(contents: &str) -> Self {
-        if let Ok(old_settings) = toml::from_str::<Pre1_2_0Settings>(contents) {
-            return Settings::from(old_settings);
-        }
-
-        if let Ok(old_settings) = toml::from_str::<PreDefaultGammaSettings>(contents) {
-            return Settings::from(old_settings);
-        }
-
+    pub fn migrate(_contents: &str) -> Self {
         Self::default()
     }
 
