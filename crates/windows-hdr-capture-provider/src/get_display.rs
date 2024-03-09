@@ -80,8 +80,8 @@ extern "system" fn enum_monitor(monitor: HMONITOR, _: HDC, rect: *mut RECT, stat
         let rect = rect.read();
         let state = Box::leak(Box::from_raw(state.0 as *mut Vec<WindowsDisplay>));
 
-        let width = (rect.right - rect.left).abs() as u32;
-        let height = (rect.bottom - rect.top).abs() as u32;
+        let width = (rect.right - rect.left).unsigned_abs();
+        let height = (rect.bottom - rect.top).unsigned_abs();
 
         let display_size = PhysicalSize::new(width, height);
         let display_position = PhysicalPosition::new(rect.left, rect.top);
