@@ -1,0 +1,8 @@
+[package]
+name = "gamma-compression-tonemapper"
+version = "1.4.0"
+edition = "2021"
+
+[dependencies]
+rayon = "1.9.0"
+hdr-capture = { path = "../hdr-capture" }

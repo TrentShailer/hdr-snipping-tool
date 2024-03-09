@@ -4,13 +4,11 @@ A Windows Snipping Tool alternative that better handles HDR displays and applica
 
 ## Usage
 
-Launch the app, then use the Print Screen Key ([customizable in hdr-config.toml, requires relaunch](https://docs.rs/livesplit-hotkey/0.7.0/livesplit_hotkey/enum.KeyCode.html)) to capture the screen the mouse is on.
+Launch the app, then use the Print Screen Key ([customizable in hdr-config.toml, requires relaunch](https://docs.rs/global-hotkey/latest/global_hotkey/hotkey/enum.Code.html)) to capture the screen the mouse is on.
 
-This will open the screenshot window where you can tweak the gamma and alpha values to get the desired result.
+This will open the screenshot window where you can tweak the contrast and brightness values to get the desired result.
 
-Gamma controls the image's contrast, and alpha controls the image's brightness.
-
-You can then select the area you want to capture, or press Enter or the Save and Close button to capture everything. You can press Esc to code without saving.
+You can then select the area you want to capture, or press Enter/Save and Close to capture everything. You can press Esc to close without saving.
 
 The screenshot is copied to your clipboard and saved as a png next to the executable.
 
@@ -26,7 +24,7 @@ The screenshot is copied to your clipboard and saved as a png next to the execut
 
 ## Limitations
 
-- Imperfect tone mapping: colours, contrast, and brightness will look different, even on SDR displays.
+- Imperfect tone mapping: colours, contrast, and brightness will look different, even of SDR context.
 - A single screenshot can only consist of one display.
 - Windows only.
 - No freeform mode or window mode.
