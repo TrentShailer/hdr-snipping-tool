@@ -39,7 +39,7 @@ pub fn create_window(
     let (window, cfg) = glutin_winit::DisplayBuilder::new()
         .with_window_builder(Some(window_builder))
         .build(event_loop, ConfigTemplateBuilder::new(), |mut configs| {
-            configs.next().log_none().unwrap()
+            configs.next().log_none().log_err().unwrap()
         })
         .track()?;
 
