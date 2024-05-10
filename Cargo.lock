@@ -1099,7 +1099,7 @@ dependencies = [
 
 [[package]]
 name = "hdr-snipping-tool"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "arboard",
  "chrono",
@@ -1116,7 +1116,6 @@ dependencies = [
  "imgui",
  "imgui-glow-renderer",
  "log",
- "owo-colors",
  "raw-window-handle 0.5.2",
  "serde",
  "toml",

@@ -21,9 +21,7 @@ use winit::event_loop::{EventLoop, EventLoopBuilder};
 fn main() {
     logger::init_fern().unwrap();
 
-    if let Err(e) = windows::run().track() {
-        log::error!("{}", e.to_string());
-    }
+    let _ = windows::run().log_err();
 }
 
 #[cfg(windows)]
@@ -108,7 +106,7 @@ where
 
     let (capture_sender, capture_receiver) = channel();
 
-    let hotkey_manager = GlobalHotKeyManager::new().unwrap();
+    let hotkey_manager = GlobalHotKeyManager::new().track()?;
     let hotkey = HotKey::new(None, settings.screenshot_key);
     hotkey_manager.register(hotkey).track()?;
 

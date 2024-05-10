@@ -51,9 +51,9 @@ fn create_dxgi_device(d3d_device: &ID3D11Device) -> Result<IDirect3DDevice, Erro
         })?
     };
 
-    Ok(inspectable.cast().context(WindowsApiSnafu {
+    inspectable.cast().context(WindowsApiSnafu {
         call: "inspectable.cast()",
-    })?)
+    })
 }
 
 fn create_d3d_device() -> Result<ID3D11Device, Error> {

@@ -187,11 +187,7 @@ impl<'a> GuiBackend<'a> {
                         event => {
                             // prevent input queuing when closed
                             if window.is_visible().track()? {
-                                winit_platform.handle_event(
-                                    imgui_context.io_mut(),
-                                    &window,
-                                    &event,
-                                );
+                                winit_platform.handle_event(imgui_context.io_mut(), &window, event);
                             }
                         }
                     }

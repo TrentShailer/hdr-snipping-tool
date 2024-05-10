@@ -1,6 +1,6 @@
 use error_trace::{ErrorTrace, ResultExt};
 use hdr_capture::{LogicalBounds, Selection, Tonemapper};
-use imgui::Ui;
+use imgui::{MouseButton, Ui};
 use winit::dpi::LogicalPosition;
 
 use super::{settings::ImguiSettings, App};
@@ -16,11 +16,20 @@ pub enum SelectionSate {
     Selecting,
 }
 
+#[derive(PartialEq, Debug)]
+enum MouseState {
+    Clicked,
+    Released,
+    Dragging,
+    None,
+}
+
 impl<T: Tonemapper + ImguiSettings> App<T> {
     pub fn draw_selection(&self, ui: &Ui) {
-        // draw border
+        let window = self.window.logical_bounds();
         let selection = self.capture.selection.logcal_bounds(self.window.scale);
 
+        // Draw selection outline
         ui.get_background_draw_list()
             .add_rect(
                 [selection.left, selection.top],
@@ -32,8 +41,6 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
             .build();
 
         // dim outside of selection
-        let window = self.window.logical_bounds();
-
         // top
         ui.get_background_draw_list()
             .add_rect(
@@ -79,6 +86,37 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
             .build();
     }
 
+    fn get_mouse_state(ui: &Ui, mouse_button: MouseButton) -> MouseState {
+        if ui.is_mouse_released(mouse_button) {
+            MouseState::Released
+        } else if ui.is_mouse_dragging(mouse_button) {
+            MouseState::Dragging
+        } else if ui.is_mouse_clicked(mouse_button) {
+            MouseState::Clicked
+        } else {
+            MouseState::None
+        }
+    }
+
+    fn can_start_selecting(
+        &self,
+        mouse_pos: &LogicalPosition<f32>,
+        settings_bounds: &LogicalBounds,
+        window_bounds: &LogicalBounds,
+    ) -> bool {
+        if self.selection_state != SelectionSate::None {
+            return false;
+        }
+        if settings_bounds.contains(mouse_pos) {
+            return false;
+        }
+        if !window_bounds.contains(mouse_pos) {
+            return false;
+        }
+
+        true
+    }
+
     pub fn handle_selection(
         &mut self,
         ui: &Ui,
@@ -86,55 +124,48 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
     ) -> Result<(), ErrorTrace> {
         let mouse_pos: LogicalPosition<f32> = ui.io().mouse_pos.into();
         let window = self.window.logical_bounds();
+        let mouse_state = Self::get_mouse_state(ui, MouseButton::Left);
 
-        if ui.is_mouse_released(imgui::MouseButton::Left)
-            && self.selection_state != SelectionSate::None
-        {
-            // prevent registering clicks as area selection
-            if self.selection_state == SelectionSate::Selecting {
-                self.save().track()?;
-                self.close().track()?;
-            }
-
-            self.selection_state = SelectionSate::None;
-            return Ok(());
-        }
-
-        if !window.contains(&mouse_pos) {
-            return Ok(());
-        }
-
-        if ui.is_mouse_clicked(imgui::MouseButton::Left)
-            && self.selection_state == SelectionSate::None
-            && !settings_bounds.contains(&mouse_pos)
-        {
-            self.selection_state = SelectionSate::StartedSelecting;
-            self.selection_start = mouse_pos;
-        }
-
-        if ui.is_mouse_dragging(imgui::MouseButton::Left)
-            && self.selection_state != SelectionSate::None
-        {
-            let mut selection =
-                Selection::from_points(self.selection_start, mouse_pos, self.window.scale);
-
-            // if we are starting selecting, accept initial valuye
-            // else if we are already selecting, make sure size is at least 1x1
-            if self.selection_state != SelectionSate::Selecting {
-                self.capture.selection = selection;
-            } else {
-                if selection.size.width == 0 {
-                    selection.size.width = self.capture.selection.size.width;
+        match mouse_state {
+            MouseState::Clicked => {
+                if self.can_start_selecting(&mouse_pos, &settings_bounds, &window) {
+                    self.selection_state = SelectionSate::StartedSelecting;
+                    self.selection_start = mouse_pos;
                 }
-
-                if selection.size.height == 0 {
-                    selection.size.height = self.capture.selection.size.height;
-                }
-
-                self.capture.selection = selection;
             }
+            MouseState::Dragging => {
+                if self.selection_state != SelectionSate::None {
+                    // clamp mouse pos to window
+                    let mouse_pos = LogicalPosition::new(
+                        mouse_pos.x.clamp(window.left, window.right),
+                        mouse_pos.y.clamp(window.top, window.bottom),
+                    );
 
-            self.selection_state = SelectionSate::Selecting;
+                    let selection =
+                        Selection::from_points(self.selection_start, mouse_pos, self.window.scale);
+
+                    self.capture.selection = selection;
+                    self.selection_state = SelectionSate::Selecting;
+                }
+            }
+            MouseState::Released => {
+                match self.selection_state {
+                    SelectionSate::Selecting => {
+                        // Save selection
+                        self.save().track()?;
+                        self.close().track()?;
+                        self.selection_state = SelectionSate::None;
+                        return Ok(());
+                    }
+                    SelectionSate::StartedSelecting => {
+                        //  Cancel selection
+                        self.selection_state = SelectionSate::None;
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
         }
 
         Ok(())

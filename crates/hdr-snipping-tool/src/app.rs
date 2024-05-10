@@ -161,7 +161,7 @@ where
             .set_image(ImageData {
                 width: self.capture.selection.size.width as usize,
                 height: self.capture.selection.size.height as usize,
-                bytes: std::borrow::Cow::Borrowed(&image.as_raw()),
+                bytes: std::borrow::Cow::Borrowed(image.as_raw()),
             })
             .track()?;
 
