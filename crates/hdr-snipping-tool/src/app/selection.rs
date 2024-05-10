@@ -107,14 +107,14 @@ impl<T: Tonemapper + ImguiSettings> App<T> {
         if self.selection_state != SelectionSate::None {
             return false;
         }
-        if settings_bounds.contains(&mouse_pos) {
+        if settings_bounds.contains(mouse_pos) {
             return false;
         }
-        if !window_bounds.contains(&mouse_pos) {
+        if !window_bounds.contains(mouse_pos) {
             return false;
         }
 
-        return true;
+        true
     }
 
     pub fn handle_selection(
