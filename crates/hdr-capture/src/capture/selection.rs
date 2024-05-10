@@ -45,9 +45,17 @@ impl Selection {
         let pos = LogicalPosition::new(bounds.left, bounds.top);
         let size = LogicalSize::new(bounds.right - bounds.left, bounds.bottom - bounds.top);
 
-        Self {
-            pos: pos.to_physical(scale_factor),
-            size: size.to_physical(scale_factor),
+        let pos = pos.to_physical(scale_factor);
+        let mut size = size.to_physical(scale_factor);
+
+        if size.width < 1 {
+            size.width = 1;
         }
+
+        if size.height < 1 {
+            size.height = 1;
+        }
+
+        Self { pos, size }
     }
 }
