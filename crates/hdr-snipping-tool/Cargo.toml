@@ -1,0 +1,37 @@
+[package]
+name = "hdr-snipping-tool"
+version = "0.1.0"
+edition = "2021"
+
+build = "build.rs"
+
+[dependencies]
+hdr-capture = { workspace = true }
+vulkan-backend = { workspace = true }
+windows-capture-provider = { workspace = true }
+
+half = { workspace = true }
+log = { workspace = true }
+thiserror = { workspace = true }
+winit = { workspace = true, features = ["rwh_05"] }
+windows = { workspace = true, features = [
+	"Foundation",
+	"Graphics_Capture",
+	"Win32_Foundation",
+	"Win32_Security",
+	"Win32_System_Threading",
+	"Win32_UI_WindowsAndMessaging",
+] }
+windows-result = { workspace = true }
+
+arboard = "3.4"
+chrono = { version = "0.4", features = ["clock"] }
+fern = "0.6"
+global-hotkey = "0.5"
+image = { version = "0.25", features = ["png"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+tray-icon = "0.14"
+
+[build-dependencies]
+embed-resource = "2.4"

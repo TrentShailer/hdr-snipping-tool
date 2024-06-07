@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.dependencies]
+bytemuck = { version = "1.16", features = ["derive"] }
+chrono = { version = "0.4", default-features = false }
+flume = { version = "0.11" }
+half = { version = "2.4", features = ["bytemuck"] }
+log = "0.4"
+thiserror = "1.0"
+vulkano = { version = "0.34" }
+vulkano-shaders = { version = "0.34" }
+windows = { version = "0.56" }
+windows-core = { version = "0.56" }
+windows-result = { version = "0.1" }
+winit = { version = "0.30", default-features = false }
+
+hdr-capture = { path = "crates/hdr-capture" }
+vulkan-backend = { path = "crates/vulkan-backend" }
+windows-capture-provider = { path = "crates/windows-capture-provider" }
