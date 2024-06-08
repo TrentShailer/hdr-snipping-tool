@@ -90,13 +90,13 @@ impl App {
         let tray_icon = init_tray_icon()?;
         tray_icon.set_visible(true)?;
 
-        let vulkan = VulkanInstance::new(Arc::clone(&window), event_loop)?;
-        let backend = VulkanBackend::new(&vulkan, Arc::clone(&window))?;
+        let vulkan_instance = VulkanInstance::new(Arc::clone(&window), event_loop)?;
+        let backend = VulkanBackend::new(&vulkan_instance, Arc::clone(&window))?;
 
         self.window_id = Some(window_id);
         self.window = Some(window);
         self.backend = Some(backend);
-        self.vulkan = Some(vulkan);
+        self.vulkan_instance = Some(vulkan_instance);
         self.tray_icon = Some(tray_icon);
 
         Ok(())

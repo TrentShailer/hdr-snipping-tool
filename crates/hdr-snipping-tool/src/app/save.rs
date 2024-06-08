@@ -68,7 +68,7 @@ impl App {
             Some(v) => v,
             None => return Ok(()),
         };
-        let vulkan = match self.vulkan.as_mut() {
+        let vulkan_instance = match self.vulkan_instance.as_mut() {
             Some(v) => v,
             None => return Ok(()),
         };
@@ -78,7 +78,7 @@ impl App {
             None => return Ok(()),
         };
 
-        let raw_capture = texture.copy_to_cpu(&vulkan)?;
+        let raw_capture = texture.copy_to_cpu(&vulkan_instance)?;
 
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
             ImageBuffer::from_raw(texture.size.width, texture.size.height, raw_capture).unwrap(); // Unwrap should be safe

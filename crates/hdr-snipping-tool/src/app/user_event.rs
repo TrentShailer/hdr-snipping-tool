@@ -21,7 +21,7 @@ impl App {
             None => return,
         };
 
-        let vulkan = match self.vulkan.as_ref() {
+        let vulkan_instance = match self.vulkan_instance.as_ref() {
             Some(v) => v,
             None => return,
         };
@@ -46,7 +46,7 @@ impl App {
         window.set_outer_position(display_info.position);
 
         if let Err(e) = backend.tonemapper.load_capture(
-            &vulkan,
+            &vulkan_instance,
             &raw_capture,
             f16::from_f32(1.0), // 1.0 alpha will always tonemap so there is no clipping
             f16::from_f32(self.settings.default_gamma),
@@ -60,7 +60,7 @@ impl App {
             std::process::exit(-1);
         };
 
-        let texture = match Texture::new(&vulkan, capture_info.size) {
+        let texture = match Texture::new(&vulkan_instance, capture_info.size) {
             Ok(v) => v,
             Err(e) => {
                 log::error!("{e}");
@@ -72,7 +72,10 @@ impl App {
             }
         };
 
-        if let Err(e) = backend.tonemapper.tonemap(&vulkan, texture.image.clone()) {
+        if let Err(e) = backend
+            .tonemapper
+            .tonemap(&vulkan_instance, texture.image.clone())
+        {
             log::error!("{e}");
             display_message(
                 "We encountered an error while tonemapping the capture.\nMore details are in the logs.",
@@ -84,7 +87,7 @@ impl App {
         if let Err(e) = backend
             .renderer
             .renderpass_capture
-            .load_image(&vulkan, texture)
+            .load_image(&vulkan_instance, texture)
         {
             log::error!("{e}");
             display_message(

@@ -48,7 +48,7 @@ fn transient_image(
 
 /// This function is called once during initialization, then again whenever the window is resized.
 pub fn window_size_dependent_setup(
-    vulkan: &VulkanInstance,
+    instance: &VulkanInstance,
     images: &[Arc<Image>],
     render_pass: Arc<RenderPass>,
     viewport: &mut Viewport,
@@ -56,10 +56,10 @@ pub fn window_size_dependent_setup(
     let extent = images[0].extent();
     viewport.extent = [extent[0] as f32, extent[1] as f32];
 
-    let (_capture_out, capture_view) = transient_image(&vulkan, extent)?;
-    let (_selection_out, selection_view) = transient_image(&vulkan, extent)?;
-    let (_border_out, border_view) = transient_image(&vulkan, extent)?;
-    let (_mouse_out, mouse_view) = transient_image(&vulkan, extent)?;
+    let (_capture_out, capture_view) = transient_image(&instance, extent)?;
+    let (_selection_out, selection_view) = transient_image(&instance, extent)?;
+    let (_border_out, border_view) = transient_image(&instance, extent)?;
+    let (_mouse_out, mouse_view) = transient_image(&instance, extent)?;
 
     let framebuffers = images
         .iter()

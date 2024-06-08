@@ -71,7 +71,7 @@ pub enum Error {
 impl Renderer {
     pub fn render(
         &mut self,
-        vulkan: &VulkanInstance,
+        instance: &VulkanInstance,
         window: Arc<Window>,
         mouse_position: PhysicalPosition<i32>,
         selection_ltrb: [u32; 4],
@@ -107,14 +107,14 @@ impl Renderer {
             // Because framebuffers contains a reference to the old swapchain, we need to
             // recreate framebuffers as well.
             let (framebuffers, attachments) = window_size_dependent_setup(
-                &vulkan,
+                &instance,
                 &new_images,
                 self.render_pass.clone(),
                 &mut self.viewport,
             )?;
 
             self.renderpass_final.attachment_set = RenderpassFinal::recreate_attachment_set(
-                &vulkan,
+                &instance,
                 self.renderpass_final.pipeline.clone(),
                 attachments.clone(),
             )?;
@@ -148,8 +148,8 @@ impl Renderer {
         }
 
         let mut builder = AutoCommandBufferBuilder::primary(
-            &vulkan.allocators.command,
-            vulkan.queue.queue_family_index(),
+            &instance.allocators.command,
+            instance.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
         .map_err(Error::CreateCommandBuffer)?;
@@ -193,11 +193,11 @@ impl Renderer {
         let future = self
             .previous_frame_end
             .take()
-            .unwrap_or_else(|| sync::now(vulkan.device.clone()).boxed())
+            .unwrap_or_else(|| sync::now(instance.device.clone()).boxed())
             .join(acquire_future)
-            .then_execute(vulkan.queue.clone(), command_buffer)?
+            .then_execute(instance.queue.clone(), command_buffer)?
             .then_swapchain_present(
-                vulkan.queue.clone(),
+                instance.queue.clone(),
                 SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_index),
             )
             .then_signal_fence_and_flush();
@@ -216,10 +216,10 @@ impl Renderer {
             }
             Err(VulkanError::OutOfDate) => {
                 self.recreate_swapchain = true;
-                self.previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
+                self.previous_frame_end = Some(sync::now(instance.device.clone()).boxed());
             }
             Err(e) => {
-                self.previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
+                self.previous_frame_end = Some(sync::now(instance.device.clone()).boxed());
                 return Err(Error::FailedToFlush(Validated::Error(e)));
             }
         };

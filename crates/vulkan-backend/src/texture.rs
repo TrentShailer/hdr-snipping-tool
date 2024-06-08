@@ -25,11 +25,11 @@ pub struct Texture {
 }
 
 impl Texture {
-    pub fn new(vulkan: &VulkanInstance, size: PhysicalSize<u32>) -> Result<Self, Error> {
+    pub fn new(instance: &VulkanInstance, size: PhysicalSize<u32>) -> Result<Self, Error> {
         let extent = [size.width, size.height, 1];
 
         let image = Image::new(
-            vulkan.allocators.memory.clone(),
+            instance.allocators.memory.clone(),
             ImageCreateInfo {
                 image_type: ImageType::Dim2d,
                 format: Format::R8G8B8A8_UNORM,
@@ -43,7 +43,7 @@ impl Texture {
         let image_view = ImageView::new_default(image.clone()).map_err(Error::ImageView)?;
 
         let sampler = Sampler::new(
-            vulkan.device.clone(),
+            instance.device.clone(),
             SamplerCreateInfo {
                 mag_filter: Filter::Linear,
                 min_filter: Filter::Linear,

@@ -51,7 +51,7 @@ pub enum Error {
 }
 
 impl MaximumReducer {
-    pub fn find_maximum(&self, vulkan: &VulkanInstance, bytes: &[u8]) -> Result<f16, Error> {
+    pub fn find_maximum(&self, instance: &VulkanInstance, bytes: &[u8]) -> Result<f16, Error> {
         // Basic data validity checks
         if bytes.len() as u64 > MAXIMUM_INPUT_BUFFER_SIZE {
             return Err(Error::InputOutOfBounds);
@@ -72,8 +72,8 @@ impl MaximumReducer {
             let workgroup_count = output_length;
 
             let mut builder = AutoCommandBufferBuilder::primary(
-                &vulkan.allocators.command,
-                vulkan.queue.queue_family_index(),
+                &instance.allocators.command,
+                instance.queue.queue_family_index(),
                 CommandBufferUsage::OneTimeSubmit,
             )
             .map_err(Error::NewCommandBuffer)?;
@@ -100,8 +100,8 @@ impl MaximumReducer {
                 .map_err(Error::Dispatch)?;
 
             let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
-            let future = sync::now(vulkan.device.clone())
-                .then_execute(vulkan.queue.clone(), command_buffer)?
+            let future = sync::now(instance.device.clone())
+                .then_execute(instance.queue.clone(), command_buffer)?
                 .then_signal_fence_and_flush()
                 .map_err(Error::SignalFence)?;
             future.wait(None).map_err(Error::AwaitFence)?;

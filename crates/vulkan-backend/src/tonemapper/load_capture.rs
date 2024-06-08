@@ -33,16 +33,16 @@ pub enum Error {
 impl Tonemapper {
     pub fn load_capture(
         &mut self,
-        vulkan: &VulkanInstance,
+        instance: &VulkanInstance,
         raw_capture: &[u8],
         default_alpha: f16,
         default_gamma: f16,
         size: PhysicalSize<u32>,
     ) -> Result<(), Error> {
-        let maximum = self.maximum_reducer.find_maximum(&vulkan, raw_capture)?;
+        let maximum = self.maximum_reducer.find_maximum(&instance, raw_capture)?;
 
         let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
-            vulkan.allocators.memory.clone(),
+            instance.allocators.memory.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER,
                 ..Default::default()
@@ -56,7 +56,7 @@ impl Tonemapper {
         )?;
 
         let output_buffer: Subbuffer<[u8]> = Buffer::new_slice(
-            vulkan.allocators.memory.clone(),
+            instance.allocators.memory.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_SRC,
                 ..Default::default()
@@ -69,7 +69,7 @@ impl Tonemapper {
         )?;
 
         let config_buffer: Subbuffer<shader::Config> = Buffer::new_sized(
-            vulkan.allocators.memory.clone(),
+            instance.allocators.memory.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::UNIFORM_BUFFER,
                 ..Default::default()
@@ -83,7 +83,7 @@ impl Tonemapper {
 
         let layout_0 = &self.pipeline.layout().set_layouts()[0];
         let descriptor_set_0 = PersistentDescriptorSet::new(
-            &vulkan.allocators.descriptor,
+            &instance.allocators.descriptor,
             layout_0.clone(),
             [
                 WriteDescriptorSet::buffer(0, input_buffer.clone()),
@@ -94,7 +94,7 @@ impl Tonemapper {
 
         let layout_1 = &self.pipeline.layout().set_layouts()[1];
         let descriptor_set_1 = PersistentDescriptorSet::new(
-            &vulkan.allocators.descriptor,
+            &instance.allocators.descriptor,
             layout_1.clone(),
             [WriteDescriptorSet::buffer(0, config_buffer.clone())],
             [],

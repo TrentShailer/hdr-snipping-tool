@@ -57,7 +57,7 @@ pub enum Error {
 impl Tonemapper {
     pub fn tonemap(
         &mut self,
-        vulkan: &VulkanInstance,
+        instance: &VulkanInstance,
         result_image: Arc<Image>,
     ) -> Result<(), Error> {
         let active_tonemapper = match self.active_tonemapper.as_mut() {
@@ -78,8 +78,8 @@ impl Tonemapper {
         let workgroup_y = active_tonemapper.capture_size.height.div_ceil(32);
 
         let mut builder = AutoCommandBufferBuilder::primary(
-            &vulkan.allocators.command,
-            vulkan.queue.queue_family_index(),
+            &instance.allocators.command,
+            instance.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
         .map_err(Error::NewCommandBuffer)?;
@@ -110,8 +110,8 @@ impl Tonemapper {
             .map_err(Error::CopyBuffer)?;
 
         let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
-        let future = sync::now(vulkan.device.clone())
-            .then_execute(vulkan.queue.clone(), command_buffer)?
+        let future = sync::now(instance.device.clone())
+            .then_execute(instance.queue.clone(), command_buffer)?
             .then_signal_fence_and_flush()
             .map_err(Error::SignalFence)?;
         future.wait(None).map_err(Error::AwaitFence)?;

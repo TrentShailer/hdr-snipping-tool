@@ -35,7 +35,7 @@ impl App {
             None => return,
         };
 
-        let vulkan = match self.vulkan.as_ref() {
+        let vulkan_instance = match self.vulkan_instance.as_ref() {
             Some(v) => v,
             None => return,
         };
@@ -47,7 +47,7 @@ impl App {
             }
             WindowEvent::CloseRequested => {
                 self.window = None;
-                self.vulkan = None;
+                self.vulkan_instance = None;
                 self.backend = None;
             }
             WindowEvent::RedrawRequested => {
@@ -56,7 +56,7 @@ impl App {
                 }
 
                 if let Err(e) = backend.renderer.render(
-                    &vulkan,
+                    &vulkan_instance,
                     window.clone(),
                     self.mouse_position,
                     self.selection.as_ltrb(),

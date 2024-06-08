@@ -10,11 +10,11 @@ use crate::{texture::Texture, VulkanInstance};
 use super::RenderpassCapture;
 
 impl RenderpassCapture {
-    pub fn load_image(&mut self, vulkan: &VulkanInstance, texture: Texture) -> Result<(), Error> {
+    pub fn load_image(&mut self, instance: &VulkanInstance, texture: Texture) -> Result<(), Error> {
         let ds_layout = self.pipeline.layout().set_layouts()[0].clone();
 
         let descriptor_set = PersistentDescriptorSet::new(
-            &vulkan.allocators.descriptor,
+            &instance.allocators.descriptor,
             ds_layout.clone(),
             [
                 WriteDescriptorSet::sampler(0, texture.sampler.clone()),
