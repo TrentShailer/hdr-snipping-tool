@@ -9,6 +9,8 @@ use vulkano::{
     Validated, ValidationError, VulkanError,
 };
 
+use crate::VulkanInstance;
+
 use super::Texture;
 
 #[derive(Debug, Error)]
@@ -39,9 +41,9 @@ pub enum Error {
 }
 
 impl Texture {
-    pub fn copy_to_cpu(&mut self) -> Result<Vec<u8>, Error> {
+    pub fn copy_to_cpu(&mut self, vulkan: &VulkanInstance) -> Result<Vec<u8>, Error> {
         let staging_buffer: Subbuffer<[u8]> = Buffer::new_slice(
-            self.mem_alloc.clone(),
+            vulkan.allocators.memory.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST,
                 ..Default::default()
@@ -55,8 +57,8 @@ impl Texture {
         )?;
 
         let mut builder = AutoCommandBufferBuilder::primary(
-            &self.cb_alloc,
-            self.queue.queue_family_index(),
+            &vulkan.allocators.command,
+            vulkan.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
         .map_err(Error::CreateCommandBuffer)?;
@@ -69,8 +71,8 @@ impl Texture {
             .map_err(Error::CopyImageToBuffer)?;
 
         let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
-        let future = sync::now(self.device.clone())
-            .then_execute(self.queue.clone(), command_buffer)?
+        let future = sync::now(vulkan.device.clone())
+            .then_execute(vulkan.queue.clone(), command_buffer)?
             .then_signal_fence_and_flush()
             .map_err(Error::SignalFence)?;
         future.wait(None).map_err(Error::WaitFuture)?;

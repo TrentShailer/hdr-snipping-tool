@@ -6,14 +6,22 @@ use vulkano::{
         AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage, RenderPassBeginInfo,
         SubpassBeginInfo, SubpassContents,
     },
-    pipeline::{Pipeline, PipelineBindPoint},
     swapchain::{acquire_next_image, SwapchainCreateInfo, SwapchainPresentInfo},
     sync::{self, GpuFuture},
     Validated, ValidationError, VulkanError,
 };
-use winit::{dpi::PhysicalPosition, window::Window};
+use winit::{
+    dpi::{PhysicalPosition, PhysicalSize},
+    window::Window,
+};
 
-use super::{fragment_shader::PushConstants, framebuffer, window_size_dependent_setup, Renderer};
+use crate::VulkanInstance;
+
+use super::{
+    framebuffer, renderpass_border, renderpass_capture,
+    renderpass_final::{self, RenderpassFinal},
+    renderpass_mouse, renderpass_selection, window_size_dependent_setup, Renderer,
+};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -40,31 +48,46 @@ pub enum Error {
 
     #[error("Failed to flush:\n{0:?}")]
     FailedToFlush(#[source] Validated<VulkanError>),
+
+    #[error("Failed to render capture pass:\n{0}")]
+    CapturePass(#[from] renderpass_capture::render::Error),
+
+    #[error("Failed to render selection pass:\n{0}")]
+    SelectionPass(#[from] renderpass_selection::render::Error),
+
+    #[error("Failed to render border pass:\n{0}")]
+    BorderPass(#[from] renderpass_border::render::Error),
+
+    #[error("Failed to render mouse pass:\n{0}")]
+    MousePass(#[from] renderpass_mouse::render::Error),
+
+    #[error("Failed to render final pass:\n{0}")]
+    FinalPass(#[from] renderpass_final::render::Error),
+
+    #[error("Failed to create final pass attachmet set:\n{0}")]
+    FinalAttachment(#[from] renderpass_final::attachment::Error),
 }
 
 impl Renderer {
     pub fn render(
         &mut self,
+        vulkan: &VulkanInstance,
         window: Arc<Window>,
         mouse_position: PhysicalPosition<i32>,
-        selection: [u32; 4],
+        selection_ltrb: [u32; 4],
+        capture_size: PhysicalSize<u32>,
     ) -> Result<(), Error> {
         let image_extent: [u32; 2] = window.inner_size().into();
-        // Don't try to render a surface that isn't visible
-        if image_extent.contains(&0) {
-            return Ok(());
-        }
-
-        // Don't try to render if we don't have a texture
-        let texture = match self.texture.as_ref() {
-            Some(v) => v,
-            None => return Ok(()),
-        };
 
         // Checks if the previous frame future has finished, if so, releases its resources
         // Non-blocking
         if let Some(prev_frame) = self.previous_frame_end.as_mut() {
             prev_frame.cleanup_finished();
+        }
+
+        // Don't try to render a surface that isn't visible
+        if image_extent.contains(&0) {
+            return Ok(());
         }
 
         // Handle recreatin the swapchain
@@ -83,11 +106,21 @@ impl Renderer {
 
             // Because framebuffers contains a reference to the old swapchain, we need to
             // recreate framebuffers as well.
-            self.framebuffers = window_size_dependent_setup(
+            let (framebuffers, attachments) = window_size_dependent_setup(
+                &vulkan,
                 &new_images,
                 self.render_pass.clone(),
                 &mut self.viewport,
             )?;
+
+            self.renderpass_final.attachment_set = RenderpassFinal::recreate_attachment_set(
+                &vulkan,
+                self.renderpass_final.pipeline.clone(),
+                attachments.clone(),
+            )?;
+
+            self.framebuffers = framebuffers;
+            self.attachments = attachments;
 
             self.recreate_swapchain = false;
         }
@@ -115,8 +148,8 @@ impl Renderer {
         }
 
         let mut builder = AutoCommandBufferBuilder::primary(
-            &self.cb_alloc,
-            self.queue.queue_family_index(),
+            &vulkan.allocators.command,
+            vulkan.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
         .map_err(Error::CreateCommandBuffer)?;
@@ -125,7 +158,13 @@ impl Renderer {
             // Before we can draw, we have to *enter a render pass*.
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.02, 0.02, 0.02, 1.0].into())],
+                    clear_values: vec![
+                        Some([0.05, 0.05, 0.05, 1.0].into()),
+                        None,
+                        None,
+                        None,
+                        None,
+                    ],
                     ..RenderPassBeginInfo::framebuffer(
                         self.framebuffers[image_index as usize].clone(),
                     )
@@ -135,25 +174,18 @@ impl Renderer {
                     ..Default::default()
                 },
             )?
-            .set_viewport(0, [self.viewport.clone()].into_iter().collect())?
-            .push_constants(
-                self.pipeline.layout().clone(),
-                0,
-                PushConstants {
-                    mouse_position: [mouse_position.x, mouse_position.y].into(),
-                    selection,
-                },
-            )?
-            .bind_pipeline_graphics(self.pipeline.clone())?
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                self.pipeline.layout().clone(),
-                0,
-                texture.descriptor_set.clone(),
-            )?
-            .bind_vertex_buffers(0, self.vertex_buffer.clone())?
-            .draw(self.vertex_buffer.len() as u32, 1, 0, 0)?
-            .end_render_pass(Default::default())?;
+            .set_viewport(0, [self.viewport.clone()].into_iter().collect())?;
+
+        self.renderpass_capture.render(&mut builder)?;
+        self.renderpass_selection
+            .render(&mut builder, selection_ltrb, capture_size)?;
+        self.renderpass_border
+            .render(&mut builder, selection_ltrb, capture_size)?;
+        self.renderpass_mouse
+            .render(&mut builder, mouse_position, capture_size)?;
+        self.renderpass_final.render(&mut builder)?;
+
+        builder.end_render_pass(Default::default())?;
 
         let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
 
@@ -161,11 +193,11 @@ impl Renderer {
         let future = self
             .previous_frame_end
             .take()
-            .unwrap_or_else(|| sync::now(self.device.clone()).boxed())
+            .unwrap_or_else(|| sync::now(vulkan.device.clone()).boxed())
             .join(acquire_future)
-            .then_execute(self.queue.clone(), command_buffer)?
+            .then_execute(vulkan.queue.clone(), command_buffer)?
             .then_swapchain_present(
-                self.queue.clone(),
+                vulkan.queue.clone(),
                 SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_index),
             )
             .then_signal_fence_and_flush();
@@ -184,10 +216,10 @@ impl Renderer {
             }
             Err(VulkanError::OutOfDate) => {
                 self.recreate_swapchain = true;
-                self.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
+                self.previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
             }
             Err(e) => {
-                self.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
+                self.previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
                 return Err(Error::FailedToFlush(Validated::Error(e)));
             }
         };

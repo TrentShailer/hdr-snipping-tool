@@ -1,113 +1,67 @@
 pub mod framebuffer;
 pub mod render;
+pub mod renderpass_border;
+pub mod renderpass_capture;
+pub mod renderpass_final;
+pub mod renderpass_mouse;
+pub mod renderpass_selection;
 pub mod vertex;
 
 use std::sync::Arc;
 
 use framebuffer::window_size_dependent_setup;
+use renderpass_border::RenderpassBorder;
+use renderpass_capture::RenderpassCapture;
+use renderpass_final::RenderpassFinal;
+use renderpass_mouse::RenderpassMouse;
+use renderpass_selection::RenderpassSelection;
 use thiserror::Error;
-use vertex::Vertex;
 use vulkano::{
-    buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
-    command_buffer::allocator::StandardCommandBufferAllocator,
-    device::{Device, Queue},
-    image::ImageUsage,
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
-    pipeline::{
-        graphics::{
-            color_blend::{ColorBlendAttachmentState, ColorBlendState},
-            input_assembly::InputAssemblyState,
-            multisample::MultisampleState,
-            rasterization::RasterizationState,
-            vertex_input::VertexDefinition,
-            viewport::{Viewport, ViewportState},
-            GraphicsPipelineCreateInfo,
-        },
-        layout::PipelineDescriptorSetLayoutCreateInfo,
-        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
-    },
+    buffer::AllocateBufferError,
+    format::Format,
+    image::{view::ImageView, ImageUsage},
+    ordered_passes_renderpass,
+    pipeline::graphics::viewport::Viewport,
     render_pass::{Framebuffer, RenderPass, Subpass},
-    single_pass_renderpass,
-    swapchain::{Surface, Swapchain, SwapchainCreateInfo},
-    sync::{self, future::FenceSignalFuture, GpuFuture},
+    swapchain::{Swapchain, SwapchainCreateInfo},
+    sync::{self, GpuFuture},
     Validated, ValidationError, VulkanError,
 };
 use winit::window::Window;
 
-use crate::texture::Texture;
-
-const IMAGE_VERTICIES: [Vertex; 6] = [
-    Vertex {
-        position: [-1.0, -1.0],
-    }, // TL
-    Vertex {
-        position: [-1.0, 1.0],
-    }, // BL
-    Vertex {
-        position: [1.0, 1.0],
-    }, // BR
-    Vertex {
-        position: [-1.0, -1.0],
-    }, // TL
-    Vertex {
-        position: [1.0, 1.0],
-    }, // BR
-    Vertex {
-        position: [1.0, -1.0],
-    }, // TR
-];
-
-mod vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        bytes: "src/shaders/vertex.spv"
-    }
-}
-
-mod fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        bytes: "src/shaders/fragment.spv"
-    }
-}
+use crate::VulkanInstance;
 
 pub struct Renderer {
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
     pub swapchain: Arc<Swapchain>,
     pub framebuffers: Vec<Arc<Framebuffer>>,
+    pub attachments: Arc<[Arc<ImageView>; 4]>,
     pub render_pass: Arc<RenderPass>,
     pub viewport: Viewport,
-    pub queue: Arc<Queue>,
-    pub device: Arc<Device>,
-    pub cb_alloc: Arc<StandardCommandBufferAllocator>,
-    pub mem_alloc: Arc<StandardMemoryAllocator>,
-    pub pipeline: Arc<GraphicsPipeline>,
-    pub vertex_buffer: Subbuffer<[Vertex]>,
-    pub texture: Option<Texture>,
+    pub renderpass_capture: RenderpassCapture,
+    pub renderpass_selection: RenderpassSelection,
+    pub renderpass_border: RenderpassBorder,
+    pub renderpass_mouse: RenderpassMouse,
+    pub renderpass_final: RenderpassFinal,
 }
 
 impl Renderer {
-    pub fn new(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        mem_alloc: Arc<StandardMemoryAllocator>,
-        cb_alloc: Arc<StandardCommandBufferAllocator>,
-        surface: Arc<Surface>,
-        window: Arc<Window>,
-    ) -> Result<Self, Error> {
+    pub fn new(instance: &VulkanInstance, window: Arc<Window>) -> Result<Self, Error> {
         let (swapchain, images) = {
             // Querying the capabilities of the surface. When we create the swapchain we can only pass
             // values that are allowed by the capabilities.
-            let surface_capabilities = device
+            let surface_capabilities = instance
+                .device
                 .physical_device()
-                .surface_capabilities(&surface, Default::default())
+                .surface_capabilities(&instance.surface, Default::default())
                 .map_err(Error::GetSurfaceCapabilites)?;
 
             // Choosing the internal format that the images will have.
-            let image_format = device
+            let image_format = instance
+                .device
                 .physical_device()
-                .surface_formats(&surface, Default::default())
+                .surface_formats(&instance.surface, Default::default())
                 .map_err(Error::GetSurfaceFormats)?[0]
                 .0;
 
@@ -118,8 +72,8 @@ impl Renderer {
                 .ok_or(Error::CompositeAlpha)?;
 
             Swapchain::new(
-                device.clone(),
-                surface,
+                instance.device.clone(),
+                instance.surface.clone(),
                 SwapchainCreateInfo {
                     min_image_count: surface_capabilities.min_image_count.max(2),
                     image_format,
@@ -132,87 +86,68 @@ impl Renderer {
             .map_err(Error::CreateSwapchain)?
         };
 
-        let vertex_buffer = Buffer::from_iter(
-            mem_alloc.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::VERTEX_BUFFER,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            IMAGE_VERTICIES,
-        )?;
-
-        let render_pass = single_pass_renderpass!(device.clone(), attachments: {
-                color: {
+        let render_pass = ordered_passes_renderpass!(instance.device.clone(),
+            attachments: {
+                final_color: {
                     format: swapchain.image_format(),
                     samples: 1,
                     load_op: Clear,
                     store_op: Store,
                 },
+                capture_out: {
+                    format: Format::R8G8B8A8_SRGB,
+                    samples: 1,
+                    load_op: DontCare,
+                    store_op: DontCare,
+                },
+                selection_out: {
+                    format: Format::R8G8B8A8_SRGB,
+                    samples: 1,
+                    load_op: DontCare,
+                    store_op: DontCare,
+                },
+                border_out: {
+                    format: Format::R8G8B8A8_SRGB,
+                    samples: 1,
+                    load_op: DontCare,
+                    store_op: DontCare,
+                },
+                mouse_out: {
+                    format: Format::R8G8B8A8_SRGB, // TODO this could be more efficent
+                    samples: 1,
+                    load_op: DontCare,
+                    store_op: DontCare,
+                },
             },
-            pass: {
-                color: [color],
-                depth_stencil: {},
-            }
+            passes: [
+                { // Capture Renderer Pass
+                    color: [capture_out], // output
+                    depth_stencil: {},
+                    input: []
+                },
+                { // Selection Renderer Pass
+                    color: [selection_out],
+                    depth_stencil: {},
+                    input: []
+                },
+                { // Border Renderer Pass
+                    color: [border_out],
+                    depth_stencil: {},
+                    input: []
+                },
+                { // Mouse guides renderer pass
+                    color: [mouse_out],
+                    depth_stencil: {},
+                    input: []
+                },
+                { // Final pass
+                    color: [final_color],
+                    depth_stencil: {},
+                    input: [capture_out, selection_out, mouse_out]
+                }
+            ]
         )
         .map_err(Error::CreateRenderpass)?;
-
-        let pipeline = {
-            let vs = vertex_shader::load(device.clone())
-                .map_err(Error::LoadShader)?
-                .entry_point("main")
-                .unwrap();
-            let fs = fragment_shader::load(device.clone())
-                .map_err(Error::LoadShader)?
-                .entry_point("main")
-                .unwrap();
-
-            let vertex_input_state =
-                <Vertex as vulkano::pipeline::graphics::vertex_input::Vertex>::per_vertex()
-                    .definition(&vs.info().input_interface)
-                    .map_err(Error::VertexDefinition)?;
-
-            let stages = [
-                PipelineShaderStageCreateInfo::new(vs),
-                PipelineShaderStageCreateInfo::new(fs),
-            ];
-
-            let layout = PipelineLayout::new(
-                device.clone(),
-                PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
-                    .into_pipeline_layout_create_info(device.clone())
-                    .map_err(|e| Error::CreatePipelineLayoutInfo {
-                        set_num: e.set_num,
-                        error: e.error,
-                    })?,
-            )
-            .map_err(Error::CreatePipelineLayout)?;
-
-            let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
-
-            let graphics_pipeline_create_info = GraphicsPipelineCreateInfo {
-                stages: stages.into_iter().collect(),
-                vertex_input_state: Some(vertex_input_state),
-                input_assembly_state: Some(InputAssemblyState::default()), // Triangle list
-                viewport_state: Some(ViewportState::default()),
-                rasterization_state: Some(RasterizationState::default()),
-                multisample_state: Some(MultisampleState::default()),
-                color_blend_state: Some(ColorBlendState::with_attachment_states(
-                    subpass.num_color_attachments(),
-                    ColorBlendAttachmentState::default(),
-                )),
-                dynamic_state: [DynamicState::Viewport].into_iter().collect(),
-                subpass: Some(subpass.into()),
-                ..GraphicsPipelineCreateInfo::layout(layout)
-            };
-
-            GraphicsPipeline::new(device.clone(), None, graphics_pipeline_create_info)
-                .map_err(Error::CreateGraphicsPipeline)?
-        };
 
         let mut viewport = Viewport {
             offset: [0.0, 0.0],
@@ -220,23 +155,37 @@ impl Renderer {
             depth_range: 0.0..=1.0,
         };
 
-        let framebuffers =
-            window_size_dependent_setup(&images, render_pass.clone(), &mut viewport)?;
+        let (framebuffers, attachments) =
+            window_size_dependent_setup(&instance, &images, render_pass.clone(), &mut viewport)?;
+
+        let capture_pass = Subpass::from(render_pass.clone(), 0).unwrap();
+        let renderpass_capture = RenderpassCapture::new(&instance, capture_pass)?;
+
+        let selection_pass = Subpass::from(render_pass.clone(), 1).unwrap();
+        let renderpass_selection = RenderpassSelection::new(&instance, selection_pass)?;
+
+        let border_pass = Subpass::from(render_pass.clone(), 2).unwrap();
+        let renderpass_border = RenderpassBorder::new(&instance, border_pass)?;
+
+        let mouse_pass = Subpass::from(render_pass.clone(), 3).unwrap();
+        let renderpass_mouse = RenderpassMouse::new(&instance, mouse_pass)?;
+
+        let final_pass = Subpass::from(render_pass.clone(), 4).unwrap();
+        let renderpass_final = RenderpassFinal::new(&instance, final_pass, attachments.clone())?;
 
         Ok(Self {
-            cb_alloc,
+            attachments,
             framebuffers,
-            mem_alloc,
-            pipeline,
-            queue,
             render_pass,
             swapchain,
-            vertex_buffer,
             viewport,
-            device: device.clone(),
-            previous_frame_end: Some(sync::now(device.clone()).boxed()),
+            renderpass_capture,
+            renderpass_selection,
+            renderpass_border,
+            renderpass_mouse,
+            renderpass_final,
+            previous_frame_end: Some(sync::now(instance.device.clone()).boxed()),
             recreate_swapchain: false,
-            texture: None,
         })
     }
 }
@@ -281,4 +230,19 @@ pub enum Error {
         set_num: u32,
         error: Validated<VulkanError>,
     },
+
+    #[error("Failed to create capture pass:\n{0}")]
+    CreateCapturePass(#[from] renderpass_capture::Error),
+
+    #[error("Failed to create selection pass:\n{0}")]
+    CreateSelectionPass(#[from] renderpass_selection::Error),
+
+    #[error("Failed to create border pass:\n{0}")]
+    CreateBorderPass(#[from] renderpass_border::Error),
+
+    #[error("Failed to create mouse pass:\n{0}")]
+    CreateMousePass(#[from] renderpass_mouse::Error),
+
+    #[error("Failed to create final pass:\n{0}")]
+    CreateFinalPass(#[from] renderpass_final::Error),
 }

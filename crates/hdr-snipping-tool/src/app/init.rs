@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use thiserror::Error;
-use vulkan_backend::VulkanInstance;
+use vulkan_backend::{VulkanBackend, VulkanInstance};
 use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use winit::{
     dpi::PhysicalSize,
@@ -34,6 +34,9 @@ pub enum Error {
 
     #[error("Failed to create vulkan instance:\n{0}")]
     VulkanInstance(#[from] vulkan_backend::create_instance::Error),
+
+    #[error("Failed to create vulkan backend:\n{0}")]
+    VulkanBackend(#[from] vulkan_backend::create_backend::Error),
 }
 
 impl App {
@@ -61,6 +64,10 @@ impl App {
                     "We encountered an error while creating the Vulkan instance.\nMore details are in the logs.",
                     MB_ICONERROR,
                 ),
+                Error::VulkanBackend(_) => display_message(
+                    "We encountered an error while creating the Vulkan backend.\nMore details are in the logs.",
+                    MB_ICONERROR,
+                ),
             }
             std::process::exit(-1);
         }
@@ -83,11 +90,13 @@ impl App {
         let tray_icon = init_tray_icon()?;
         tray_icon.set_visible(true)?;
 
-        let vulkan_instance = VulkanInstance::new(Arc::clone(&window), event_loop)?;
+        let vulkan = VulkanInstance::new(Arc::clone(&window), event_loop)?;
+        let backend = VulkanBackend::new(&vulkan, Arc::clone(&window))?;
 
         self.window_id = Some(window_id);
         self.window = Some(window);
-        self.vulkan_instance = Some(vulkan_instance);
+        self.backend = Some(backend);
+        self.vulkan = Some(vulkan);
         self.tray_icon = Some(tray_icon);
 
         Ok(())

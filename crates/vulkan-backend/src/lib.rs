@@ -1,3 +1,5 @@
+pub mod allocators;
+pub mod create_backend;
 pub mod create_instance;
 pub mod renderer;
 pub mod texture;
@@ -5,21 +7,22 @@ pub mod tonemapper;
 
 use std::sync::Arc;
 
+use allocators::Allocators;
 use renderer::Renderer;
 use tonemapper::Tonemapper;
 use vulkano::{
-    command_buffer::allocator::StandardCommandBufferAllocator,
-    descriptor_set::allocator::StandardDescriptorSetAllocator,
     device::{Device, Queue},
-    memory::allocator::StandardMemoryAllocator,
+    swapchain::Surface,
 };
 
-pub struct VulkanInstance {
-    device: Arc<Device>,
-    queue: Arc<Queue>,
-    mem_alloc: Arc<StandardMemoryAllocator>,
-    cb_alloc: Arc<StandardCommandBufferAllocator>,
-    ds_alloc: Arc<StandardDescriptorSetAllocator>,
+pub struct VulkanBackend {
     pub tonemapper: Tonemapper,
     pub renderer: Renderer,
+}
+
+pub struct VulkanInstance {
+    pub device: Arc<Device>,
+    pub queue: Arc<Queue>,
+    pub surface: Arc<Surface>,
+    pub allocators: Arc<Allocators>,
 }

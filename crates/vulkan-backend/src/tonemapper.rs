@@ -10,10 +10,6 @@ use active_tonemapper::ActiveTonemapper;
 use maximum_reducer::MaximumReducer;
 use thiserror::Error;
 use vulkano::{
-    command_buffer::allocator::StandardCommandBufferAllocator,
-    descriptor_set::allocator::StandardDescriptorSetAllocator,
-    device::{Device, Queue},
-    memory::allocator::StandardMemoryAllocator,
     pipeline::{
         compute::ComputePipelineCreateInfo, layout::PipelineDescriptorSetLayoutCreateInfo,
         ComputePipeline, PipelineLayout, PipelineShaderStageCreateInfo,
@@ -21,39 +17,25 @@ use vulkano::{
     Validated, VulkanError,
 };
 
+use crate::VulkanInstance;
+
 pub mod shader {
-    vulkano_shaders::shader! {ty: "compute", bytes: "src/shaders/tonemap.spv"}
+    vulkano_shaders::shader! {ty: "compute", bytes: "shaders/compute/tonemap.spv"}
 }
 
 pub struct Tonemapper {
     maximum_reducer: MaximumReducer,
     active_tonemapper: Option<ActiveTonemapper>,
-    device: Arc<Device>,
-    queue: Arc<Queue>,
-    mem_alloc: Arc<StandardMemoryAllocator>,
-    ds_alloc: Arc<StandardDescriptorSetAllocator>,
-    cb_alloc: Arc<StandardCommandBufferAllocator>,
     pipeline: Arc<ComputePipeline>,
 }
 
 impl Tonemapper {
-    pub fn new(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        mem_alloc: Arc<StandardMemoryAllocator>,
-        ds_alloc: Arc<StandardDescriptorSetAllocator>,
-        cb_alloc: Arc<StandardCommandBufferAllocator>,
-    ) -> Result<Self, Error> {
-        let maximum_reducer = MaximumReducer::new(
-            device.clone(),
-            queue.clone(),
-            mem_alloc.clone(),
-            ds_alloc.clone(),
-            cb_alloc.clone(),
-        )?;
+    pub fn new(instance: &VulkanInstance) -> Result<Self, Error> {
+        let maximum_reducer =
+            MaximumReducer::new(instance.device.clone(), instance.allocators.clone())?;
 
         let pipeline = {
-            let compute_shader = shader::load(device.clone())
+            let compute_shader = shader::load(instance.device.clone())
                 .map_err(Error::LoadShader)?
                 .entry_point("main")
                 .unwrap(); // Only none if 'main' doesn't exist
@@ -61,9 +43,9 @@ impl Tonemapper {
             let stage = PipelineShaderStageCreateInfo::new(compute_shader);
 
             let layout = PipelineLayout::new(
-                device.clone(),
+                instance.device.clone(),
                 PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
-                    .into_pipeline_layout_create_info(device.clone())
+                    .into_pipeline_layout_create_info(instance.device.clone())
                     .map_err(|e| Error::CreatePipelineLayoutInfo {
                         set_num: e.set_num,
                         error: e.error,
@@ -72,7 +54,7 @@ impl Tonemapper {
             .map_err(Error::CreatePipelineLayout)?;
 
             ComputePipeline::new(
-                device.clone(),
+                instance.device.clone(),
                 None,
                 ComputePipelineCreateInfo::stage_layout(stage, layout),
             )
@@ -82,11 +64,6 @@ impl Tonemapper {
         Ok(Self {
             maximum_reducer,
             active_tonemapper: None,
-            device,
-            queue,
-            mem_alloc,
-            ds_alloc,
-            cb_alloc,
             pipeline,
         })
     }

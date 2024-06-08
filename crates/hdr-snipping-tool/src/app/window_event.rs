@@ -30,29 +30,37 @@ impl App {
             None => return,
         };
 
-        let vulkan = match self.vulkan_instance.as_mut() {
+        let backend = match self.backend.as_mut() {
+            Some(v) => v,
+            None => return,
+        };
+
+        let vulkan = match self.vulkan.as_ref() {
             Some(v) => v,
             None => return,
         };
 
         match event {
             WindowEvent::Resized(_new_size) => {
-                vulkan.renderer.recreate_swapchain = true;
+                backend.renderer.recreate_swapchain = true;
                 window.request_redraw();
             }
             WindowEvent::CloseRequested => {
                 self.window = None;
-                self.vulkan_instance = None;
+                self.vulkan = None;
+                self.backend = None;
             }
             WindowEvent::RedrawRequested => {
                 if !Self::is_visible(&self.window) {
                     return;
                 }
 
-                if let Err(e) = vulkan.renderer.render(
+                if let Err(e) = backend.renderer.render(
+                    &vulkan,
                     window.clone(),
                     self.mouse_position,
                     self.selection.as_ltrb(),
+                    window.inner_size(),
                 ) {
                     log::error!("{e}");
                     display_message(
@@ -74,9 +82,10 @@ impl App {
                 }
 
                 match state {
-                    winit::event::ElementState::Pressed => self
-                        .selection
-                        .mouse_pressed(self.mouse_position, window.inner_size()),
+                    winit::event::ElementState::Pressed => {
+                        self.selection
+                            .mouse_pressed(self.mouse_position, window.inner_size());
+                    }
                     winit::event::ElementState::Released => {
                         let should_save = self.selection.mouse_released();
                         if should_save {
@@ -93,8 +102,9 @@ impl App {
                 if Self::is_visible(&self.window) {
                     if event.physical_key == KeyCode::Escape {
                         window.set_visible(false);
-                        vulkan.renderer.texture = None;
-                        vulkan.tonemapper.clear();
+                        backend.renderer.renderpass_capture.capture = None;
+                        backend.renderer.renderpass_capture.capture_ds = None;
+                        backend.tonemapper.clear();
                     } else if event.physical_key == KeyCode::Enter {
                         self.save_capture();
                     }

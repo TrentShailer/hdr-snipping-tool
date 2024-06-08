@@ -47,13 +47,14 @@ impl App {
             std::process::exit(-1);
         }
 
-        let vulkan = match self.vulkan_instance.as_mut() {
+        let backend = match self.backend.as_mut() {
             Some(v) => v,
             None => return,
         };
 
-        vulkan.renderer.texture = None;
-        vulkan.tonemapper.clear();
+        backend.renderer.renderpass_capture.capture = None;
+        backend.renderer.renderpass_capture.capture_ds = None;
+        backend.tonemapper.clear();
 
         let window = match self.window.as_ref() {
             Some(v) => v,
@@ -63,17 +64,21 @@ impl App {
     }
 
     fn save_capture_inner(&mut self) -> Result<(), Error> {
-        let vulkan = match self.vulkan_instance.as_mut() {
+        let backend = match self.backend.as_mut() {
+            Some(v) => v,
+            None => return Ok(()),
+        };
+        let vulkan = match self.vulkan.as_mut() {
             Some(v) => v,
             None => return Ok(()),
         };
 
-        let texture = match vulkan.renderer.texture.as_mut() {
+        let mut texture = match backend.renderer.renderpass_capture.capture.take() {
             Some(v) => v,
             None => return Ok(()),
         };
 
-        let raw_capture = texture.copy_to_cpu()?;
+        let raw_capture = texture.copy_to_cpu(&vulkan)?;
 
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
             ImageBuffer::from_raw(texture.size.width, texture.size.height, raw_capture).unwrap(); // Unwrap should be safe

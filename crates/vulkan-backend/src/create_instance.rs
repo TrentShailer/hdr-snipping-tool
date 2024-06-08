@@ -8,16 +8,13 @@ use std::sync::Arc;
 use logical_device::get_logical_device;
 use physical_device::get_physical_device;
 use thiserror::Error;
-use vulkano::{
-    command_buffer::allocator::StandardCommandBufferAllocator,
-    descriptor_set::allocator::StandardDescriptorSetAllocator,
-    memory::allocator::StandardMemoryAllocator, swapchain::Surface, Validated, VulkanError,
-};
+use vulkano::{swapchain::Surface, Validated, VulkanError};
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
 use crate::{
-    renderer::{self, Renderer},
-    tonemapper::{self, Tonemapper},
+    allocators::Allocators,
+    renderer::{self},
+    tonemapper::{self},
     VulkanInstance,
 };
 
@@ -62,43 +59,15 @@ impl VulkanInstance {
             .map_err(Error::LogicalDevice)?;
 
         // Create memory allocators
-        let mem_alloc = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
-        let ds_alloc = Arc::new(StandardDescriptorSetAllocator::new(
-            device.clone(),
-            Default::default(),
-        ));
-        let cb_alloc = Arc::new(StandardCommandBufferAllocator::new(
-            device.clone(),
-            Default::default(),
-        ));
+        let allocators = Arc::new(Allocators::new(device.clone()));
 
-        let queue = queues.next().unwrap(); // Unwrap is safe as long as queue count is correct
-
-        let tonemapper = Tonemapper::new(
-            device.clone(),
-            queue.clone(),
-            mem_alloc.clone(),
-            ds_alloc.clone(),
-            cb_alloc.clone(),
-        )?;
-
-        let renderer = Renderer::new(
-            device.clone(),
-            queue.clone(),
-            mem_alloc.clone(),
-            cb_alloc.clone(),
-            surface.clone(),
-            window.clone(),
-        )?;
+        let queue = queues.next().unwrap();
 
         Ok(Self {
+            allocators,
             device,
             queue,
-            mem_alloc,
-            cb_alloc,
-            ds_alloc,
-            tonemapper,
-            renderer,
+            surface,
         })
     }
 }

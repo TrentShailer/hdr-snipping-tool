@@ -5,12 +5,9 @@ use std::sync::Arc;
 use thiserror::Error;
 use vulkano::{
     buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
-    command_buffer::allocator::StandardCommandBufferAllocator,
-    descriptor_set::{
-        allocator::StandardDescriptorSetAllocator, PersistentDescriptorSet, WriteDescriptorSet,
-    },
-    device::{Device, Queue},
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
+    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
+    device::Device,
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::{
         compute::ComputePipelineCreateInfo, layout::PipelineDescriptorSetLayoutCreateInfo,
         ComputePipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
@@ -18,8 +15,10 @@ use vulkano::{
     Validated, VulkanError,
 };
 
+use crate::allocators::Allocators;
+
 pub mod shader {
-    vulkano_shaders::shader! {ty: "compute", bytes: "src/shaders/maximum_reduction.spv"}
+    vulkano_shaders::shader! {ty: "compute", bytes: "shaders/compute/maximum_reduction.spv"}
 }
 
 /// Because allocating a buffer takes up processing time
@@ -30,25 +29,16 @@ pub mod shader {
 pub const MAXIMUM_INPUT_BUFFER_SIZE: u64 = u64::pow(2, 26);
 
 pub struct MaximumReducer {
-    cb_alloc: Arc<StandardCommandBufferAllocator>,
     inverse_descriptor_set: Arc<PersistentDescriptorSet>,
     descriptor_set: Arc<PersistentDescriptorSet>,
     pipeline: Arc<ComputePipeline>,
-    device: Arc<Device>,
-    queue: Arc<Queue>,
     compute_blocksize: u32,
     output_buffer: Subbuffer<[u8]>,
     input_buffer: Subbuffer<[u8]>,
 }
 
 impl MaximumReducer {
-    pub fn new(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        mem_alloc: Arc<StandardMemoryAllocator>,
-        ds_alloc: Arc<StandardDescriptorSetAllocator>,
-        cb_alloc: Arc<StandardCommandBufferAllocator>,
-    ) -> Result<Self, Error> {
+    pub fn new(device: Arc<Device>, allocators: Arc<Allocators>) -> Result<Self, Error> {
         let subgroup_size = device
             .physical_device()
             .properties()
@@ -86,7 +76,7 @@ impl MaximumReducer {
         };
 
         let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
-            mem_alloc.clone(),
+            allocators.memory.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER,
                 ..Default::default()
@@ -100,7 +90,7 @@ impl MaximumReducer {
         )?;
 
         let output_buffer: Subbuffer<[u8]> = Buffer::new_slice(
-            mem_alloc.clone(),
+            allocators.memory.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER,
                 ..Default::default()
@@ -118,7 +108,7 @@ impl MaximumReducer {
         // to swap input and output buffer around
         let layout = &pipeline.layout().set_layouts()[0];
         let descriptor_set = PersistentDescriptorSet::new(
-            &ds_alloc,
+            &allocators.descriptor,
             layout.clone(),
             [
                 WriteDescriptorSet::buffer(0, input_buffer.clone()),
@@ -129,7 +119,7 @@ impl MaximumReducer {
         .map_err(Error::CreateDescriptorSet)?;
 
         let inverse_descriptor_set = PersistentDescriptorSet::new(
-            &ds_alloc,
+            &allocators.descriptor,
             layout.clone(),
             [
                 WriteDescriptorSet::buffer(0, output_buffer.clone()),
@@ -140,12 +130,9 @@ impl MaximumReducer {
         .map_err(Error::CreateDescriptorSet)?;
 
         Ok(Self {
-            cb_alloc,
             inverse_descriptor_set,
             descriptor_set,
             pipeline,
-            device,
-            queue,
             compute_blocksize,
             output_buffer,
             input_buffer,

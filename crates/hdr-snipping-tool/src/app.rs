@@ -8,7 +8,7 @@ mod window_event;
 use std::{sync::Arc, time::Instant};
 
 use ::tray_icon::TrayIcon;
-use vulkan_backend::VulkanInstance;
+use vulkan_backend::{VulkanBackend, VulkanInstance};
 use windows_capture_provider::WindowsCaptureProvider;
 use winit::{
     application::ApplicationHandler,
@@ -26,7 +26,8 @@ pub struct App {
     pub window_id: Option<WindowId>,
     pub window: Option<Arc<Window>>,
     pub tray_icon: Option<TrayIcon>,
-    pub vulkan_instance: Option<VulkanInstance>,
+    pub backend: Option<VulkanBackend>,
+    pub vulkan: Option<VulkanInstance>,
     pub mouse_position: PhysicalPosition<i32>,
     pub selection: Selection,
     pub last_frame: Instant,
@@ -40,7 +41,8 @@ impl App {
             window_id: None,
             window: None,
             tray_icon: None,
-            vulkan_instance: None,
+            backend: None,
+            vulkan: None,
             mouse_position: PhysicalPosition::default(),
             selection: Selection::default(),
             last_frame: Instant::now(),
