@@ -1,0 +1,13 @@
+[package]
+name = "vulkan-renderer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vulkan-instance = { workspace = true }
+
+log = { workspace = true }
+thiserror = { workspace = true }
+vulkano = { workspace = true }
+vulkano-shaders = { workspace = true }
+winit = { workspace = true }

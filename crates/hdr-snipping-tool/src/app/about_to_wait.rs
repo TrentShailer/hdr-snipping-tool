@@ -7,8 +7,8 @@ use super::App;
 
 impl App {
     pub(super) fn handle_about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        let window = match self.window.as_ref() {
-            Some(window) => window,
+        let app = match self.app.as_ref() {
+            Some(app) => app,
             None => return,
         };
 
@@ -23,6 +23,6 @@ impl App {
             return;
         }
 
-        window.request_redraw();
+        app.window.request_redraw();
     }
 }

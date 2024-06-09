@@ -16,6 +16,8 @@ windows-core = { version = "0.56" }
 windows-result = { version = "0.1" }
 winit = { version = "0.30", default-features = false }
 
+vulkan-instance = { path = "crates/vulkan-instance" }
+vulkan-tonemapper = { path = "crates/vulkan-tonemapper" }
+vulkan-renderer = { path = "crates/vulkan-renderer" }
 hdr-capture = { path = "crates/hdr-capture" }
-vulkan-backend = { path = "crates/vulkan-backend" }
 windows-capture-provider = { path = "crates/windows-capture-provider" }

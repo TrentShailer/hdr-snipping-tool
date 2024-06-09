@@ -13,12 +13,12 @@ use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 
 use crate::message_box::display_message;
 
-use super::App;
+use super::{ActiveCapture, App};
 
 #[derive(Debug, Error)]
 enum Error {
     #[error("Failed to copy texture to CPU:\n{0}")]
-    CpuCopy(#[from] vulkan_backend::texture::copy_to_cpu::Error),
+    VecCopy(#[from] vulkan_instance::texture::copy_to_vec::Error),
 
     #[error("Failed to create file for capture:\n{0}")]
     CreateFile(#[source] io::Error),
@@ -40,48 +40,29 @@ impl App {
             match e {
                 Error::ClipboardInstance(_) => display_message("We encountered an error while getting a clipboard instance.\nMore details are in the logs.", MB_ICONERROR),
                 Error::ClipboardSave(_) => display_message("We encountered an error while saving the capture to your clipboard.\nMore details are inthe logs.", MB_ICONERROR),
-                Error::CpuCopy(_) => display_message("We encountered an error while copying the capture to your CPU.\nMore details are in the logs.", MB_ICONERROR),
+                Error::VecCopy(_) => display_message("We encountered an error while copying the capture to your CPU.\nMore details are in the logs.", MB_ICONERROR),
                 Error::CreateFile(_) => display_message("We encountered an error while creating the file to save the capture in.\nMore details are in the logs.", MB_ICONERROR),
                 Error::WriteFile(_) => display_message("We encountered an error while writing the capture to its file.\nMore details are in the logs", MB_ICONERROR)
             }
             std::process::exit(-1);
         }
-
-        let backend = match self.backend.as_mut() {
-            Some(v) => v,
-            None => return,
-        };
-
-        backend.renderer.renderpass_capture.capture = None;
-        backend.renderer.renderpass_capture.capture_ds = None;
-        backend.tonemapper.clear();
-
-        let window = match self.window.as_ref() {
-            Some(v) => v,
-            None => return,
-        };
-        window.set_visible(false);
     }
 
     fn save_capture_inner(&mut self) -> Result<(), Error> {
-        let backend = match self.backend.as_mut() {
-            Some(v) => v,
-            None => return Ok(()),
-        };
-        let vulkan_instance = match self.vulkan_instance.as_mut() {
+        let app = match self.app.as_mut() {
             Some(v) => v,
             None => return Ok(()),
         };
 
-        let mut texture = match backend.renderer.renderpass_capture.capture.take() {
+        let ActiveCapture { texture, .. } = match self.capture.as_mut() {
             Some(v) => v,
             None => return Ok(()),
         };
 
-        let raw_capture = texture.copy_to_cpu(&vulkan_instance)?;
+        let raw_capture = texture.copy_to_vec(&app.vulkan_instance)?;
 
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-            ImageBuffer::from_raw(texture.size.width, texture.size.height, raw_capture).unwrap(); // Unwrap should be safe
+            ImageBuffer::from_raw(texture.size.width, texture.size.height, raw_capture).unwrap();
 
         let (selection_pos, selection_size) = self.selection.as_pos_size();
 
@@ -112,6 +93,12 @@ impl App {
                 bytes: Cow::Borrowed(img.as_raw()),
             })
             .map_err(Error::ClipboardSave)?;
+
+        app.renderer.texture = None;
+        app.renderer.texture_ds = None;
+        self.capture = None;
+        app.window.set_visible(false);
+
         Ok(())
     }
 }

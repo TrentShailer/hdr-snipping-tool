@@ -1079,7 +1079,9 @@ dependencies = [
  "thiserror",
  "toml",
  "tray-icon",
- "vulkan-backend",
+ "vulkan-instance",
+ "vulkan-renderer",
+ "vulkan-tonemapper",
  "windows",
  "windows-capture-provider",
  "windows-result",
@@ -2502,13 +2504,35 @@ dependencies = [
 ]
 
 [[package]]
-name = "vulkan-backend"
+name = "vulkan-instance"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "thiserror",
+ "vulkano",
+ "winit",
+]
+
+[[package]]
+name = "vulkan-renderer"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "thiserror",
+ "vulkan-instance",
+ "vulkano",
+ "vulkano-shaders",
+ "winit",
+]
+
+[[package]]
+name = "vulkan-tonemapper"
 version = "0.1.0"
 dependencies = [
  "half",
- "hdr-capture",
  "log",
  "thiserror",
+ "vulkan-instance",
  "vulkano",
  "vulkano-shaders",
  "winit",

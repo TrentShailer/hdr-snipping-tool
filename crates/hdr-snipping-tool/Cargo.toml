@@ -7,7 +7,9 @@ build = "build.rs"
 
 [dependencies]
 hdr-capture = { workspace = true }
-vulkan-backend = { workspace = true }
+vulkan-instance = { workspace = true }
+vulkan-tonemapper = { workspace = true }
+vulkan-renderer = { workspace = true }
 windows-capture-provider = { workspace = true }
 
 half = { workspace = true }

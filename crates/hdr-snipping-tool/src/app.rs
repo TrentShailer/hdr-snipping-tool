@@ -8,7 +8,9 @@ mod window_event;
 use std::{sync::Arc, time::Instant};
 
 use ::tray_icon::TrayIcon;
-use vulkan_backend::{VulkanBackend, VulkanInstance};
+use vulkan_instance::{texture::Texture, VulkanInstance};
+use vulkan_renderer::Renderer;
+use vulkan_tonemapper::Tonemapper;
 use windows_capture_provider::WindowsCaptureProvider;
 use winit::{
     application::ApplicationHandler,
@@ -18,16 +20,26 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use crate::{init::settings::Settings, selection::Selection};
+use crate::{selection::Selection, settings::Settings};
+
+pub struct ActiveApp {
+    pub window_id: WindowId,
+    pub window: Arc<Window>,
+    pub tray_icon: TrayIcon,
+    pub vulkan_instance: VulkanInstance,
+    pub renderer: Renderer,
+}
+
+pub struct ActiveCapture {
+    pub tonemapper: Tonemapper,
+    pub texture: Arc<Texture>,
+}
 
 pub struct App {
+    pub app: Option<ActiveApp>,
+    pub capture: Option<ActiveCapture>,
     pub capture_provider: WindowsCaptureProvider,
     pub settings: Settings,
-    pub window_id: Option<WindowId>,
-    pub window: Option<Arc<Window>>,
-    pub tray_icon: Option<TrayIcon>,
-    pub backend: Option<VulkanBackend>,
-    pub vulkan_instance: Option<VulkanInstance>,
     pub mouse_position: PhysicalPosition<i32>,
     pub selection: Selection,
     pub last_frame: Instant,
@@ -38,24 +50,12 @@ impl App {
         Self {
             capture_provider,
             settings,
-            window_id: None,
-            window: None,
-            tray_icon: None,
-            backend: None,
-            vulkan_instance: None,
+            app: None,
+            capture: None,
             mouse_position: PhysicalPosition::default(),
             selection: Selection::default(),
             last_frame: Instant::now(),
         }
-    }
-
-    fn is_visible(window: &Option<Arc<Window>>) -> bool {
-        let window = match window.as_ref() {
-            Some(v) => v,
-            None => return false,
-        };
-
-        window.is_visible().unwrap_or(true)
     }
 }
 

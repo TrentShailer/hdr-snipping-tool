@@ -19,48 +19,35 @@ impl App {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        if event == WindowEvent::Destroyed && self.window_id == Some(window_id) {
-            self.window_id = None;
+        let app = match self.app.as_mut() {
+            Some(v) => v,
+            None => return,
+        };
+
+        if event == WindowEvent::Destroyed && app.window_id == window_id {
+            self.app = None;
             event_loop.exit();
             return;
         }
 
-        let window = match self.window.as_ref() {
-            Some(v) => v,
-            None => return,
-        };
-
-        let backend = match self.backend.as_mut() {
-            Some(v) => v,
-            None => return,
-        };
-
-        let vulkan_instance = match self.vulkan_instance.as_ref() {
-            Some(v) => v,
-            None => return,
-        };
-
         match event {
             WindowEvent::Resized(_new_size) => {
-                backend.renderer.recreate_swapchain = true;
-                window.request_redraw();
+                app.renderer.recreate_swapchain = true;
+                app.window.request_redraw();
             }
             WindowEvent::CloseRequested => {
-                self.window = None;
-                self.vulkan_instance = None;
-                self.backend = None;
+                self.app = None;
             }
             WindowEvent::RedrawRequested => {
-                if !Self::is_visible(&self.window) {
+                if !app.window.is_visible().unwrap_or(true) {
                     return;
                 }
 
-                if let Err(e) = backend.renderer.render(
-                    &vulkan_instance,
-                    window.clone(),
-                    self.mouse_position,
+                if let Err(e) = app.renderer.render(
+                    &app.vulkan_instance,
+                    app.window.clone(),
                     self.selection.as_ltrb(),
-                    window.inner_size(),
+                    self.mouse_position,
                 ) {
                     log::error!("{e}");
                     display_message(
@@ -68,7 +55,7 @@ impl App {
                         MB_ICONERROR,
                     );
                     std::process::exit(-1);
-                };
+                }
 
                 self.last_frame = Instant::now();
             }
@@ -84,7 +71,7 @@ impl App {
                 match state {
                     winit::event::ElementState::Pressed => {
                         self.selection
-                            .mouse_pressed(self.mouse_position, window.inner_size());
+                            .mouse_pressed(self.mouse_position, app.window.inner_size());
                     }
                     winit::event::ElementState::Released => {
                         let should_save = self.selection.mouse_released();
@@ -99,12 +86,12 @@ impl App {
                 event,
                 is_synthetic: _,
             } => {
-                if Self::is_visible(&self.window) {
+                if app.window.is_visible().unwrap_or(true) {
                     if event.physical_key == KeyCode::Escape {
-                        window.set_visible(false);
-                        backend.renderer.renderpass_capture.capture = None;
-                        backend.renderer.renderpass_capture.capture_ds = None;
-                        backend.tonemapper.clear();
+                        app.window.set_visible(false);
+                        self.capture = None;
+                        app.renderer.texture = None;
+                        app.renderer.texture_ds = None;
                     } else if event.physical_key == KeyCode::Enter {
                         self.save_capture();
                     }
@@ -116,7 +103,7 @@ impl App {
             } => {
                 self.mouse_position = position.cast();
                 self.selection
-                    .mouse_moved(self.mouse_position, window.inner_size());
+                    .mouse_moved(self.mouse_position, app.window.inner_size());
             }
             _ => (),
         }

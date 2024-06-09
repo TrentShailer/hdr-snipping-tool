@@ -1,15 +1,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 mod app;
-mod init;
+mod logger;
 mod message_box;
+mod only_instance;
 mod selection;
+mod settings;
 
 use app::App;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
-use init::only_instance::ensure_only_instance;
-use init::settings::Settings;
+use logger::init_fern;
 use message_box::display_message;
+use only_instance::ensure_only_instance;
+use settings::Settings;
 use thiserror::Error;
 use windows::{
     Graphics::Capture::GraphicsCaptureSession,
@@ -21,7 +24,7 @@ use winit::{
 };
 
 fn main() {
-    init::logger::init_fern().unwrap();
+    init_fern().unwrap();
 
     if let Err(e) = init() {
         log::error!("{e}");
@@ -66,7 +69,7 @@ fn main() {
 #[derive(Debug, Error)]
 enum AppError {
     #[error("Failed to ensure only one instance:\n{0}")]
-    OnlyInstance(#[from] init::only_instance::Error),
+    OnlyInstance(#[from] only_instance::Error),
 
     #[error("Failed to check if graphics capture is supported:\n{0}")]
     GraphicsCaptureSupport(#[source] windows_result::Error),
@@ -75,10 +78,10 @@ enum AppError {
     NoCaptureSupport,
 
     #[error("Failed to load settings:\n{0}")]
-    LoadSettings(#[from] init::settings::LoadError),
+    LoadSettings(#[from] settings::LoadError),
 
     #[error("Failed to save settings:\n{0}")]
-    SaveSettings(#[from] init::settings::SaveError),
+    SaveSettings(#[from] settings::SaveError),
 
     #[error("Failed to build event loop:\n{0}")]
     EventLoop(#[from] EventLoopError),
@@ -109,7 +112,7 @@ fn init() -> Result<(), AppError> {
         Err(e) => match e {
             // If the settings file is invalid then tell the user and replace
             // it with a default one
-            init::settings::LoadError::Deserialize(e) => {
+            settings::LoadError::Deserialize(e) => {
                 log::warn!("{e}");
                 display_message(
                     "Invalid settings file, it will be replaced with a new one.",
