@@ -1,8 +1,9 @@
 use std::time::Instant;
 
+use half::f16;
 use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use winit::{
-    event::{MouseButton, WindowEvent},
+    event::{ElementState, MouseButton, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::KeyCode,
     window::WindowId,
@@ -20,6 +21,11 @@ impl App {
         event: WindowEvent,
     ) {
         let app = match self.app.as_mut() {
+            Some(v) => v,
+            None => return,
+        };
+
+        let capture = match self.capture.as_mut() {
             Some(v) => v,
             None => return,
         };
@@ -87,6 +93,33 @@ impl App {
                 is_synthetic: _,
             } => {
                 if app.window.is_visible().unwrap_or(true) {
+                    if event.repeat == false && event.state == ElementState::Pressed {
+                        if event.physical_key == KeyCode::ArrowRight {
+                            capture
+                                .tonemapper
+                                .set_gamma(capture.tonemapper.config.gamma + f16::from_f32(0.025));
+                            capture.tonemapper.tonemap(&app.vulkan_instance).unwrap();
+                        }
+                        if event.physical_key == KeyCode::ArrowLeft {
+                            capture
+                                .tonemapper
+                                .set_gamma(capture.tonemapper.config.gamma - f16::from_f32(0.025));
+                            capture.tonemapper.tonemap(&app.vulkan_instance).unwrap();
+                        }
+                        if event.physical_key == KeyCode::ArrowUp {
+                            capture
+                                .tonemapper
+                                .set_alpha(capture.tonemapper.config.alpha + f16::from_f32(0.1));
+                            capture.tonemapper.tonemap(&app.vulkan_instance).unwrap();
+                        }
+                        if event.physical_key == KeyCode::ArrowDown {
+                            capture
+                                .tonemapper
+                                .set_alpha(capture.tonemapper.config.alpha - f16::from_f32(0.1));
+                            capture.tonemapper.tonemap(&app.vulkan_instance).unwrap();
+                        }
+                    }
+
                     if event.physical_key == KeyCode::Escape {
                         app.window.set_visible(false);
                         self.capture = None;

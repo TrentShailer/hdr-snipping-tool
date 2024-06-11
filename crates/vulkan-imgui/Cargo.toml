@@ -1,0 +1,10 @@
+[package]
+name = "vulkan-imgui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vulkano = { workspace = true }
+vulkano-shaders = { workspace = true }
+imgui = { workspace = true }
+winit = { workspace = true }

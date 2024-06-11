@@ -1,3 +1,4 @@
+pub mod config;
 pub mod tonemap;
 
 use std::sync::Arc;
