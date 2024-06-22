@@ -46,6 +46,9 @@ impl CaptureProvider for WindowsCaptureProvider {
         let capture_info = CaptureInfo::new(capture_size, display.position);
         let display_info = DisplayInfo::new(display.size, display.position);
 
+        unsafe { self.d3d_context.ClearState() };
+        self.dxgi_device.Trim().map_err(Error::Trim)?;
+
         Ok((raw_capture, display_info, capture_info))
     }
 }
@@ -75,4 +78,7 @@ pub enum Error {
 
     #[error("Failed to close the capture session:\n{0}")]
     CloseSession(#[source] windows_result::Error),
+
+    #[error("Failed to trim graphics memory:\n{0}")]
+    Trim(#[source] windows_result::Error),
 }
