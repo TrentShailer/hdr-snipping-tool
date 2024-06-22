@@ -1,0 +1,13 @@
+[package]
+name = "memory-test"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+winit = { workspace = true, features = ["rwh_05"] }
+log = { workspace = true }
+simplelog = "0.12"
+vulkan-instance = { workspace = true }
+vulkan-renderer = { workspace = true }

@@ -1,7 +1,7 @@
 pub mod config;
 pub mod tonemap;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use half::f16;
 use shader::Config;
@@ -65,7 +65,10 @@ impl Tonemapper {
             .map_err(Error::CreatePipeline)?
         };
 
+        let s = Instant::now();
         let maximum = find_maximum(&vk, bytes)?;
+        let e = Instant::now();
+        log::info!("{}ms", e.duration_since(s).as_millis());
 
         let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
             vk.allocators.memory.clone(),

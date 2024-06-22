@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use half::f16;
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
@@ -113,7 +115,10 @@ pub fn find_maximum(vk: &VulkanInstance, bytes: &[u8]) -> Result<f16, Error> {
     let mut input_length = bytes.len() as u32 / 2;
     let mut output_length = (bytes.len() as u32 / 2).div_ceil(compute_blocksize);
 
+    let s = Instant::now();
     input_buffer.write()?.copy_from_slice(bytes);
+    let e = Instant::now();
+    log::info!("a {}ms", e.duration_since(s).as_millis());
 
     // While there is multiple candidates, do a pass
     // and swap the input and output buffer

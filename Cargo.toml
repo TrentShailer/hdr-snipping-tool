@@ -15,7 +15,6 @@ windows = { version = "0.57" }
 windows-core = { version = "0.57" }
 windows-result = { version = "0.1" }
 winit = { version = "0.30", default-features = false }
-imgui = { version = "0.12.0" }
 
 vulkan-instance = { path = "crates/vulkan-instance" }
 vulkan-tonemapper = { path = "crates/vulkan-tonemapper" }

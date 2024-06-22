@@ -12,5 +12,7 @@ pub const FEATURES: Features = Features {
     shader_float16: true,
     storage_buffer16_bit_access: true,
     uniform_and_storage_buffer16_bit_access: true,
+    shader_subgroup_extended_types: true,
+    pageable_device_local_memory: true,
     ..Features::empty()
 };
