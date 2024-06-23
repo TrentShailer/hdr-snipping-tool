@@ -1,4 +1,5 @@
 pub mod allocators;
+pub mod copy_buffer;
 pub mod texture;
 pub mod vulkan_instance;
 

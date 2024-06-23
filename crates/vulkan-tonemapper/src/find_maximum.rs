@@ -1,8 +1,9 @@
-use std::time::Instant;
-
 use half::f16;
 use thiserror::Error;
-use vulkan_instance::VulkanInstance;
+use vulkan_instance::{
+    copy_buffer::{self, copy_buffer_and_wait},
+    VulkanInstance,
+};
 use vulkano::{
     buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage},
@@ -20,7 +21,16 @@ pub mod shader {
     vulkano_shaders::shader! {ty: "compute", bytes: "src/shaders/maximum.spv"}
 }
 
-pub fn find_maximum(vk: &VulkanInstance, bytes: &[u8]) -> Result<f16, Error> {
+/// Performs a GPU reduction to find the largest value in the image
+///
+/// Staging buffer is a Transfer Source buffer that contains the f16 bytes to be reduced, it is unmodifed.
+///
+/// Bytecount is the number of bytes in the staging buffer
+pub fn find_maximum(
+    vk: &VulkanInstance,
+    staging_buffer: Subbuffer<[u8]>,
+    byte_count: u32,
+) -> Result<f16, Error> {
     let pipeline = {
         let shader = shader::load(vk.device.clone())
             .map_err(Error::LoadShader)?
@@ -56,34 +66,35 @@ pub fn find_maximum(vk: &VulkanInstance, bytes: &[u8]) -> Result<f16, Error> {
         .unwrap_or(1);
 
     // 1024 threads * two values per thread * sugroup_size
+    // This is how much the input gets reduced by on a single pass
     let compute_blocksize = 1024 * 2 * subgroup_size;
 
     let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
         vk.allocators.memory.clone(),
         BufferCreateInfo {
-            usage: BufferUsage::STORAGE_BUFFER,
+            usage: BufferUsage::STORAGE_BUFFER
+                | BufferUsage::TRANSFER_DST
+                | BufferUsage::TRANSFER_SRC,
             ..Default::default()
         },
         AllocationCreateInfo {
-            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
             ..Default::default()
         },
-        bytes.len() as u64,
+        byte_count as u64,
     )?;
 
     let output_buffer: Subbuffer<[u8]> = Buffer::new_slice(
         vk.allocators.memory.clone(),
         BufferCreateInfo {
-            usage: BufferUsage::STORAGE_BUFFER,
+            usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_SRC,
             ..Default::default()
         },
         AllocationCreateInfo {
-            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
             ..Default::default()
         },
-        (bytes.len() as u64).div_ceil(compute_blocksize.into()),
+        (byte_count as u64).div_ceil(compute_blocksize.into()),
     )?;
 
     // Because one pass gets us input_length / compute_blocksize values
@@ -112,15 +123,18 @@ pub fn find_maximum(vk: &VulkanInstance, bytes: &[u8]) -> Result<f16, Error> {
     )
     .map_err(Error::CreateDescriptorSet)?;
 
-    let mut input_length = bytes.len() as u32 / 2;
-    let mut output_length = (bytes.len() as u32 / 2).div_ceil(compute_blocksize);
+    let mut input_length = byte_count / 2;
+    let mut output_length = (byte_count / 2).div_ceil(compute_blocksize);
 
-    let s = Instant::now();
-    input_buffer.write()?.copy_from_slice(bytes);
-    let e = Instant::now();
-    log::info!("a {}ms", e.duration_since(s).as_millis());
+    // copy data to input buffer
+    copy_buffer_and_wait(
+        &vk,
+        staging_buffer.clone(),
+        input_buffer.clone(),
+        copy_buffer::Region::SmallestBuffer,
+    )?;
 
-    // While there is multiple candidates, do a pass
+    // While there is multiple remaining candidates, do a pass
     // and swap the input and output buffer
     let mut use_inverse_set = false;
     while input_length > 1 {
@@ -168,7 +182,29 @@ pub fn find_maximum(vk: &VulkanInstance, bytes: &[u8]) -> Result<f16, Error> {
         input_buffer.clone()
     };
 
-    let reader = &result_buffer.read()?;
+    let output_staging_buffer = Buffer::new_slice(
+        vk.allocators.memory.clone(),
+        BufferCreateInfo {
+            usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST,
+            ..Default::default()
+        },
+        AllocationCreateInfo {
+            memory_type_filter: MemoryTypeFilter::PREFER_HOST
+                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+            ..Default::default()
+        },
+        4,
+    )?;
+
+    // Copy from result to staging
+    copy_buffer_and_wait(
+        &vk,
+        result_buffer,
+        output_staging_buffer.clone(),
+        copy_buffer::Region::SmallestBuffer,
+    )?;
+
+    let reader = &output_staging_buffer.read()?;
     let maximum = f16::from_le_bytes([reader[0], reader[1]]);
 
     log::info!("maximum: {:.2}", maximum);
@@ -219,4 +255,7 @@ pub enum Error {
 
     #[error("Failed to await fence:\n{0:?}")]
     AwaitFence(#[source] Validated<VulkanError>),
+
+    #[error("Failed to copy buffer:\n{0}")]
+    CopyBuffer(#[from] copy_buffer::Error),
 }

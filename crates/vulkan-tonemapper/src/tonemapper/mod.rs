@@ -1,12 +1,16 @@
 pub mod config;
 pub mod tonemap;
 
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
 
 use half::f16;
 use shader::Config;
 use thiserror::Error;
-use vulkan_instance::{texture::Texture, VulkanInstance};
+use vulkan_instance::{
+    copy_buffer::{self, copy_buffer_and_wait},
+    texture::Texture,
+    VulkanInstance,
+};
 use vulkano::{
     buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
@@ -65,23 +69,41 @@ impl Tonemapper {
             .map_err(Error::CreatePipeline)?
         };
 
-        let s = Instant::now();
-        let maximum = find_maximum(&vk, bytes)?;
-        let e = Instant::now();
-        log::info!("{}ms", e.duration_since(s).as_millis());
-
-        let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
+        let staging_buffer: Subbuffer<[u8]> = Buffer::new_slice(
             vk.allocators.memory.clone(),
             BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER,
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_SRC,
                 ..Default::default()
             },
             AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST
                     | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
             bytes.len() as u64,
+        )?;
+        staging_buffer.write()?.copy_from_slice(bytes);
+
+        let maximum = find_maximum(&vk, staging_buffer.clone(), bytes.len() as u32)?;
+
+        let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
+            vk.allocators.memory.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+                ..Default::default()
+            },
+            bytes.len() as u64,
+        )?;
+
+        copy_buffer_and_wait(
+            &vk,
+            staging_buffer.clone(),
+            input_buffer.clone(),
+            vulkan_instance::copy_buffer::Region::SmallestBuffer,
         )?;
 
         let config = Config {
@@ -127,8 +149,6 @@ impl Tonemapper {
         )
         .map_err(Error::Descriptor)?;
 
-        input_buffer.write()?.copy_from_slice(bytes);
-
         Ok(Self {
             pipeline,
             config,
@@ -168,4 +188,7 @@ pub enum Error {
 
     #[error("Failed to access buffer:\n{0:?}")]
     BufferAccess(#[from] HostAccessError),
+
+    #[error("Failed to copy buffer:\n{0}")]
+    CopyBuffer(#[from] copy_buffer::Error),
 }

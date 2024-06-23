@@ -29,14 +29,13 @@ impl Allocators {
         // overall reduced memory consumption at idle
         let block_sizes = vec![1024 * 1024 * 1; memory_types.len()];
 
-        /* let memory = Arc::new(StandardMemoryAllocator::new(
+        let memory = Arc::new(StandardMemoryAllocator::new(
             device.clone(),
             GenericMemoryAllocatorCreateInfo {
                 block_sizes: &block_sizes,
                 ..Default::default()
             },
-        )); */
-        let memory = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+        ));
 
         let descriptor = Arc::new(StandardDescriptorSetAllocator::new(
             device.clone(),

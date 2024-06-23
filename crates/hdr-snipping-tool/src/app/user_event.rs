@@ -25,6 +25,8 @@ impl App {
             return;
         }
 
+        log::info!("\n\n\n\n\n");
+
         let start = Instant::now();
 
         let s = Instant::now();
