@@ -71,6 +71,7 @@ impl Renderer {
                     image_extent: window.inner_size().into(),
                     image_usage: ImageUsage::COLOR_ATTACHMENT,
                     composite_alpha,
+                    present_mode: vulkano::swapchain::PresentMode::Mailbox,
                     ..Default::default()
                 },
             )

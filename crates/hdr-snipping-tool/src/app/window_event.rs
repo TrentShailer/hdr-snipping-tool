@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use half::f16;
 use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use winit::{
@@ -62,8 +60,6 @@ impl App {
                     );
                     std::process::exit(-1);
                 }
-
-                self.last_frame = Instant::now();
             }
             WindowEvent::MouseInput {
                 device_id: _,

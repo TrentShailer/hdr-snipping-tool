@@ -5,7 +5,7 @@ mod tray_icon;
 mod user_event;
 mod window_event;
 
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
 
 use ::tray_icon::TrayIcon;
 use vulkan_instance::{texture::Texture, VulkanInstance};
@@ -42,7 +42,6 @@ pub struct App {
     pub settings: Settings,
     pub mouse_position: PhysicalPosition<i32>,
     pub selection: Selection,
-    pub last_frame: Instant,
 }
 
 impl App {
@@ -54,7 +53,6 @@ impl App {
             capture: None,
             mouse_position: PhysicalPosition::default(),
             selection: Selection::default(),
-            last_frame: Instant::now(),
         }
     }
 }

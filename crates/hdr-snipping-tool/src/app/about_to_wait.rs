@@ -1,5 +1,3 @@
-use std::time::{Duration, Instant};
-
 use tray_icon::menu::MenuEvent;
 use winit::event_loop::ActiveEventLoop;
 
@@ -16,11 +14,6 @@ impl App {
             if tray_event.id.0.as_str() == "0" {
                 event_loop.exit()
             }
-        }
-
-        // Request a redraw if it has been more than x ms since last frame
-        if Instant::now().duration_since(self.last_frame) < Duration::from_millis(8) {
-            return;
         }
 
         app.window.request_redraw();
