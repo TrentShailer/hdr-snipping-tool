@@ -1,56 +1,40 @@
-pub mod load_texture;
 pub mod render;
 pub mod window_size_dependent_setup;
 
 use std::sync::Arc;
 
-use window_size_dependent_setup::window_size_dependent_setup;
-
+use crate::{
+    border_pipeline::{self, border::Border},
+    capture_pipeline::{self, capture::CaptureObject},
+    mouse_pipeline::{self, mouse::Mouse},
+    selection_pipeline::{self, selection::Selection},
+};
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
 use vulkano::{
-    buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage},
     image::ImageUsage,
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
-    pipeline::{
-        graphics::{
-            color_blend::{ColorBlendAttachmentState, ColorBlendState},
-            input_assembly::InputAssemblyState,
-            multisample::MultisampleState,
-            rasterization::RasterizationState,
-            vertex_input::VertexDefinition,
-            viewport::{Viewport, ViewportState},
-            GraphicsPipelineCreateInfo,
-        },
-        layout::PipelineDescriptorSetLayoutCreateInfo,
-        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
-    },
-    render_pass::Subpass,
+    pipeline::graphics::viewport::Viewport,
+    render_pass::{Framebuffer, RenderPass, Subpass},
     single_pass_renderpass,
     swapchain::{Swapchain, SwapchainCreateInfo},
     sync::{self, GpuFuture},
-    Validated, ValidationError, VulkanError,
+    Validated, VulkanError,
 };
+use window_size_dependent_setup::window_size_dependent_setup;
 use winit::window::Window;
 
-use crate::{
-    plane::{PLANE_INDICIES, PLANE_VERTICIES},
-    vertex::Vertex,
-    Renderer,
-};
-
-mod vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        bytes: "src/shaders/vertex.spv"
-    }
-}
-
-pub mod fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        bytes: "src/shaders/fragment.spv"
-    }
+pub struct Renderer {
+    pub recreate_swapchain: bool,
+    pub previous_frame_end: Option<Box<dyn GpuFuture>>,
+    pub swapchain: Arc<Swapchain>,
+    pub framebuffers: Vec<Arc<Framebuffer>>,
+    pub render_pass: Arc<RenderPass>,
+    pub viewport: Viewport,
+    //
+    pub capture: CaptureObject,
+    pub selection: Selection,
+    pub selection_border: Border,
+    pub mouse: Mouse,
 }
 
 impl Renderer {
@@ -118,97 +102,30 @@ impl Renderer {
         let framebuffers =
             window_size_dependent_setup(&images, render_pass.clone(), &mut viewport)?;
 
-        let pipeline = {
-            let vs = vertex_shader::load(vk.device.clone())
-                .map_err(Error::LoadShader)?
-                .entry_point("main")
-                .unwrap();
-            let fs = fragment_shader::load(vk.device.clone())
-                .map_err(Error::LoadShader)?
-                .entry_point("main")
-                .unwrap();
+        let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
 
-            let vertex_input_state =
-                <Vertex as vulkano::pipeline::graphics::vertex_input::Vertex>::per_vertex()
-                    .definition(&vs.info().input_interface)
-                    .map_err(Error::VertexDefinition)?;
+        let capture_pipeline = capture_pipeline::create_pipeline(&vk, subpass.clone())?;
+        let capture = CaptureObject::new(&vk, capture_pipeline)?;
 
-            let stages = [
-                PipelineShaderStageCreateInfo::new(vs),
-                PipelineShaderStageCreateInfo::new(fs),
-            ];
+        let selection_pipeline = selection_pipeline::create_pipeline(&vk, subpass.clone())?;
+        let selection = Selection::new(&vk, selection_pipeline)?;
 
-            let layout = PipelineLayout::new(
-                vk.device.clone(),
-                PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
-                    .into_pipeline_layout_create_info(vk.device.clone())
-                    .map_err(|e| Error::CreatePipelineLayoutInfo {
-                        set_num: e.set_num,
-                        error: e.error,
-                    })?,
-            )
-            .map_err(Error::CreatePipelineLayout)?;
+        let border_pipeline = border_pipeline::create_pipeline(&vk, subpass.clone())?;
+        let selection_border =
+            Border::new(&vk, border_pipeline.clone(), [255, 255, 255, 255], 2.0)?;
 
-            let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
-
-            let graphics_pipeline_create_info = GraphicsPipelineCreateInfo {
-                stages: stages.into_iter().collect(),
-                vertex_input_state: Some(vertex_input_state),
-                input_assembly_state: Some(InputAssemblyState::default()), // Triangle list
-                viewport_state: Some(ViewportState::default()),
-                rasterization_state: Some(RasterizationState::default()),
-                multisample_state: Some(MultisampleState::default()),
-                color_blend_state: Some(ColorBlendState::with_attachment_states(
-                    subpass.num_color_attachments(),
-                    ColorBlendAttachmentState::default(),
-                )),
-                dynamic_state: [DynamicState::Viewport].into_iter().collect(),
-                subpass: Some(subpass.into()),
-                ..GraphicsPipelineCreateInfo::layout(layout)
-            };
-
-            GraphicsPipeline::new(vk.device.clone(), None, graphics_pipeline_create_info)
-                .map_err(Error::CreateGraphicsPipeline)?
-        };
-
-        let vertex_buffer = Buffer::from_iter(
-            vk.allocators.memory.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::VERTEX_BUFFER,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            PLANE_VERTICIES,
-        )?;
-
-        let index_buffer = Buffer::from_iter(
-            vk.allocators.memory.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::INDEX_BUFFER,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            PLANE_INDICIES,
-        )?;
+        let mouse_pipeline = mouse_pipeline::create_pipeline(&vk, subpass.clone())?;
+        let mouse = Mouse::new(&vk, mouse_pipeline, 1.0)?;
 
         Ok(Self {
             framebuffers,
             viewport,
             swapchain,
-            vertex_buffer,
-            index_buffer,
-            pipeline,
             render_pass,
-            texture: None,
-            texture_ds: None,
+            capture,
+            selection,
+            selection_border,
+            mouse,
             previous_frame_end: Some(sync::now(vk.device.clone()).boxed()),
             recreate_swapchain: false,
         })
@@ -229,17 +146,8 @@ pub enum Error {
     #[error("Failed to create swapchain:\n{0:?}")]
     CreateSwapchain(#[source] Validated<VulkanError>),
 
-    #[error("Failed to allocate buffer:\n{0:?}")]
-    BufferAllocation(#[from] Validated<AllocateBufferError>),
-
     #[error("Failed to create renderpass:\n{0:?}")]
     CreateRenderpass(#[source] Validated<VulkanError>),
-
-    #[error("Failed to load shader:\n{0:?}")]
-    LoadShader(#[source] Validated<VulkanError>),
-
-    #[error("Failed to get vertex definition:\n{0}")]
-    VertexDefinition(#[source] Box<ValidationError>),
 
     #[error("Failed to create pipline layout:\n{0:?}")]
     CreatePipelineLayout(#[source] Validated<VulkanError>),
@@ -247,15 +155,30 @@ pub enum Error {
     #[error("Failed to create descriptor set:\n{0:?}")]
     CreateDescriptorSet(#[source] Validated<VulkanError>),
 
-    #[error("Failed to create graphics pipeline:\n{0:?}")]
-    CreateGraphicsPipeline(#[source] Validated<VulkanError>),
-
     #[error("Failed to perform Window Size Dependent Setup:\n{0}")]
     WindowSizeDependentSetup(#[from] window_size_dependent_setup::Error),
 
-    #[error("Into Pipeline Layout Info Error:\nSet {set_num}\n{error:?}")]
-    CreatePipelineLayoutInfo {
-        set_num: u32,
-        error: Validated<VulkanError>,
-    },
+    #[error("Failed to create capture pipeline")]
+    CapturePipeline(#[from] capture_pipeline::Error),
+
+    #[error("Failed to create capture object")]
+    CaptureObject(#[from] capture_pipeline::capture::Error),
+
+    #[error("Failed to create selection shading pipeline")]
+    SelectionShadingPipeline(#[from] selection_pipeline::Error),
+
+    #[error("Failed to create selection shading object")]
+    SelectionShadingObject(#[from] selection_pipeline::selection::Error),
+
+    #[error("Failed to create border pipeline")]
+    BorderPipeline(#[from] border_pipeline::Error),
+
+    #[error("Failed to create border object")]
+    BorderObject(#[from] border_pipeline::border::Error),
+
+    #[error("Failed to create mouse pipeline")]
+    MousePipeline(#[from] mouse_pipeline::Error),
+
+    #[error("Failed to create mouse object")]
+    MouseObject(#[from] mouse_pipeline::mouse::Error),
 }

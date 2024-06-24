@@ -94,8 +94,7 @@ impl App {
             })
             .map_err(Error::ClipboardSave)?;
 
-        app.renderer.texture = None;
-        app.renderer.texture_ds = None;
+        app.renderer.capture.unload_capture();
         self.capture = None;
         app.window.set_visible(false);
 

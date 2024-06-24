@@ -104,7 +104,8 @@ impl App {
 
         if let Err(e) = app
             .renderer
-            .load_texture(&app.vulkan_instance, texture.clone())
+            .capture
+            .load_capture(&app.vulkan_instance, texture.clone())
         {
             log::error!("{e}");
             display_message(

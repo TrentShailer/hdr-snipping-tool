@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
-use vulkan_renderer::{renderer, Renderer};
+use vulkan_renderer::renderer::{self, Renderer};
 use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use winit::{
     dpi::PhysicalSize,

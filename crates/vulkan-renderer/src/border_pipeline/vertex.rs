@@ -5,6 +5,10 @@ use vulkano::{buffer::BufferContents, pipeline::graphics::vertex_input::Vertex a
 pub struct Vertex {
     #[format(R32G32_SFLOAT)]
     pub position: [f32; 2],
-    #[format(R32G32_SFLOAT)]
-    pub uv: [f32; 2],
+
+    #[format(R8G8B8A8_UNORM)]
+    pub color: [u8; 4],
+
+    #[format(R32_UINT)]
+    pub flags: u32,
 }

@@ -16,6 +16,7 @@ windows-core = { version = "0.57" }
 windows-result = { version = "0.1" }
 winit = { version = "0.30", default-features = false }
 smallvec = "1.13"
+fontdue = "0.9"
 
 vulkan-instance = { path = "crates/vulkan-instance" }
 vulkan-tonemapper = { path = "crates/vulkan-tonemapper" }

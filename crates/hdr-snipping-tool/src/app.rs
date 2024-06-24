@@ -9,7 +9,7 @@ use std::{sync::Arc, time::Instant};
 
 use ::tray_icon::TrayIcon;
 use vulkan_instance::{texture::Texture, VulkanInstance};
-use vulkan_renderer::Renderer;
+use vulkan_renderer::renderer::Renderer;
 use vulkan_tonemapper::Tonemapper;
 use windows_capture_provider::WindowsCaptureProvider;
 use winit::{

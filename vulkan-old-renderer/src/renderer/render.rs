@@ -7,13 +7,16 @@ use vulkano::{
         AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage, RenderPassBeginInfo,
         SubpassBeginInfo, SubpassContents,
     },
+    pipeline::{Pipeline, PipelineBindPoint},
     swapchain::{acquire_next_image, SwapchainCreateInfo, SwapchainPresentInfo},
     sync::{self, GpuFuture},
     Validated, ValidationError, VulkanError,
 };
-use winit::window::Window;
+use winit::{dpi::PhysicalPosition, window::Window};
 
-use super::{window_size_dependent_setup, Renderer};
+use crate::Renderer;
+
+use super::{fragment_shader::PushConstants, window_size_dependent_setup};
 
 impl Renderer {
     pub fn render(
@@ -21,7 +24,7 @@ impl Renderer {
         vk: &VulkanInstance,
         window: Arc<Window>,
         selection: [u32; 4],
-        mouse_position: [u32; 2],
+        mouse_position: PhysicalPosition<i32>,
     ) -> Result<(), Error> {
         let image_extent: [u32; 2] = window.inner_size().into();
 
@@ -36,9 +39,15 @@ impl Renderer {
             return Ok(());
         }
 
-        if self.capture.capture.is_none() {
-            return Ok(());
-        }
+        let texture_ds = match self.texture_ds.as_ref() {
+            Some(v) => v,
+            None => return Ok(()),
+        };
+
+        /* let texture = match self.texture.as_ref() {
+            Some(v) => v,
+            None => return Ok(()),
+        }; */
 
         // Handle recreatin the swapchain
         if self.recreate_swapchain {
@@ -110,17 +119,32 @@ impl Renderer {
                     ..Default::default()
                 },
             )?
-            .set_viewport(0, [self.viewport.clone()].into_iter().collect())?;
-
-        self.capture.render(&mut builder)?;
-        self.selection
-            .render(&mut builder, selection, window.inner_size())?;
-        self.mouse
-            .render(&mut builder, mouse_position, window.inner_size())?;
-        self.selection_border
-            .render(&mut builder, selection, window.inner_size())?;
-
-        builder.end_render_pass(Default::default())?;
+            .set_viewport(0, [self.viewport.clone()].into_iter().collect())?
+            .bind_pipeline_graphics(self.pipeline.clone())?
+            .bind_vertex_buffers(0, self.vertex_buffer.clone())?
+            .bind_index_buffer(self.index_buffer.clone())?
+            .bind_descriptor_sets(
+                PipelineBindPoint::Graphics,
+                self.pipeline.layout().clone(),
+                0,
+                texture_ds.clone(),
+            )?
+            .push_constants(
+                self.pipeline.layout().clone(),
+                0,
+                PushConstants {
+                    line_width: 0,
+                    mouse_position: mouse_position.into(),
+                    selection: [
+                        selection[0] as i32,
+                        selection[1] as i32,
+                        selection[2] as i32,
+                        selection[3] as i32,
+                    ],
+                },
+            )?
+            .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?
+            .end_render_pass(Default::default())?;
 
         let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
 

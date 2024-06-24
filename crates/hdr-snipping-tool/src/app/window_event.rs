@@ -53,7 +53,7 @@ impl App {
                     &app.vulkan_instance,
                     app.window.clone(),
                     self.selection.as_ltrb(),
-                    self.mouse_position,
+                    self.mouse_position.into(),
                 ) {
                     log::error!("{e}");
                     display_message(
@@ -123,8 +123,7 @@ impl App {
                     if event.physical_key == KeyCode::Escape {
                         app.window.set_visible(false);
                         self.capture = None;
-                        app.renderer.texture = None;
-                        app.renderer.texture_ds = None;
+                        app.renderer.capture.unload_capture();
                     } else if event.physical_key == KeyCode::Enter {
                         self.save_capture();
                     }
