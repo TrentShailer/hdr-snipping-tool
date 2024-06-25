@@ -11,4 +11,4 @@ thiserror = { workspace = true }
 vulkano = { workspace = true }
 vulkano-shaders = { workspace = true }
 winit = { workspace = true }
-# fontdue = { workspace = true }
+fontdue = { workspace = true }

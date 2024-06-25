@@ -13,7 +13,10 @@ use vulkano::{
 };
 use winit::window::Window;
 
-use super::{window_size_dependent_setup, Renderer};
+use super::{
+    units::{LogicalPosition, LogicalScale},
+    window_size_dependent_setup, Renderer,
+};
 
 impl Renderer {
     pub fn render(
@@ -112,13 +115,45 @@ impl Renderer {
             )?
             .set_viewport(0, [self.viewport.clone()].into_iter().collect())?;
 
+        let window_size: [u32; 2] = window.inner_size().into();
+
         self.capture.render(&mut builder)?;
+
+        let selection_position =
+            LogicalPosition::from_u32x2([selection[0], selection[1]], window_size);
+        let selection_scale = LogicalScale::from_u32x2(
+            [selection[2] - selection[0], selection[3] - selection[1]],
+            window_size,
+        );
+
         self.selection
-            .render(&mut builder, selection, window.inner_size())?;
-        self.mouse
-            .render(&mut builder, mouse_position, window.inner_size())?;
-        self.selection_border
-            .render(&mut builder, selection, window.inner_size())?;
+            .render(&mut builder, selection_position, selection_scale)?;
+        self.mouse.render(
+            &mut builder,
+            LogicalPosition::from_u32x2(mouse_position, window_size),
+            window_size,
+        )?;
+        self.selection_border.render(
+            &mut builder,
+            selection_position,
+            selection_scale,
+            window_size,
+        )?;
+
+        // Text rendering
+        let (text_position, text_size) = self
+            .parameters
+            .get_position_size(mouse_position, window_size);
+
+        let rect_position = text_position.add_f32x2([-10.0, -5.0], window_size);
+        let rect_scale = text_size.add_f32x2([20.0, 10.0], window_size);
+
+        self.text_rect
+            .render(&mut builder, rect_position, rect_scale)?;
+        self.text_border
+            .render(&mut builder, rect_position, rect_scale, window_size)?;
+        self.parameters
+            .render(&mut builder, text_position, window_size)?;
 
         builder.end_render_pass(Default::default())?;
 

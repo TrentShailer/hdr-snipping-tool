@@ -1,13 +1,20 @@
+pub mod render;
+pub mod set_text;
+pub mod text_renderer;
+
 use std::sync::Arc;
 
+use fontdue::layout::Layout;
+use render::TEXT_OFFSET;
+use text_renderer::{TextRenderer, FONT_SIZE};
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
 use vulkano::{
     buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::{
-        allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder,
-        CommandBufferExecError, CommandBufferUsage, CopyBufferInfo, PrimaryAutoCommandBuffer,
+        AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage, CopyBufferInfo,
     },
+    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::{GraphicsPipeline, Pipeline},
     sync::{self, GpuFuture},
@@ -16,89 +23,55 @@ use vulkano::{
 
 use crate::renderer::units::{LogicalPosition, LogicalScale};
 
-use super::{vertex::Vertex, vertex_shader::PushConstants};
+use super::vertex::{InstanceData, Vertex};
 
-const OUTER_FLAG: u32 = 0b00000000_00000000_00000000_00000100;
-const TOP_FLAG: u32 = 0b00000000_00000000_00000000_00000010;
-const LEFT_FLAG: u32 = 0b00000000_00000000_00000000_00000001;
-const NO_FLAGS: u32 = 0b00000000_00000000_00000000_00000000;
+pub const INDICIES: [u32; 6] = [0, 1, 2, 2, 3, 0];
 
-/* Vertex indicies
-    .0				.2
-        .1		.3
-
-        .7		.5
-    .6				.4
-*/
-
-pub const VERTICIES: [Vertex; 8] = [
-    Vertex {
-        position: [-1.0, -1.0],
-        color: [255, 255, 255, 255],
-        flags: OUTER_FLAG | TOP_FLAG | LEFT_FLAG,
-    }, // TL
-    Vertex {
-        position: [-1.0, -1.0],
-        color: [255, 255, 255, 255],
-        flags: TOP_FLAG | LEFT_FLAG,
-    }, // CTL
-    Vertex {
-        position: [1.0, -1.0],
-        color: [255, 255, 255, 255],
-        flags: OUTER_FLAG | TOP_FLAG,
-    }, // TR
-    Vertex {
-        position: [1.0, -1.0],
-        color: [255, 255, 255, 255],
-        flags: TOP_FLAG,
-    }, // CTR
-    Vertex {
-        position: [1.0, 1.0],
-        color: [255, 255, 255, 255],
-        flags: OUTER_FLAG,
-    }, // BR
-    Vertex {
-        position: [1.0, 1.0],
-        color: [255, 255, 255, 255],
-        flags: NO_FLAGS,
-    }, // CBR
-    Vertex {
-        position: [-1.0, 1.0],
-        color: [255, 255, 255, 255],
-        flags: OUTER_FLAG | LEFT_FLAG,
-    }, // BL
-    Vertex {
-        position: [-1.0, 1.0],
-        color: [255, 255, 255, 255],
-        flags: LEFT_FLAG,
-    }, // CBL
-];
-
-pub const INDICIES: [u32; 24] = [
-    0, 2, 1, 1, 2, 3, //
-    3, 2, 5, 4, 5, 2, //
-    7, 5, 4, 6, 7, 4, //
-    1, 7, 6, 0, 1, 6, //
-];
-
-pub struct Border {
+pub struct Parameters {
     pub vertex_buffer: Subbuffer<[Vertex]>,
     pub index_buffer: Subbuffer<[u32]>,
+    pub instance_buffer: Subbuffer<[InstanceData]>,
     pub pipeline: Arc<GraphicsPipeline>,
-    pub line_size: f32,
+    pub instances: u32,
+    //
+    pub text_renderer: TextRenderer,
+    pub layout: Layout,
+    pub atlas_ds: Arc<PersistentDescriptorSet>,
+    pub text_right: f32,
 }
 
-impl Border {
+impl Parameters {
     pub fn new(
         vk: &VulkanInstance,
         pipeline: Arc<GraphicsPipeline>,
-        color: [u8; 4],
-        line_size: f32,
+        instance_capacity: u32,
     ) -> Result<Self, Error> {
-        // Give each vertex it's color
-        let verticies = VERTICIES.into_iter().map(|v| Vertex { color, ..v });
+        let mut layout = Layout::new(fontdue::layout::CoordinateSystem::PositiveYDown);
+        let text_renderer = TextRenderer::new(&vk, &mut layout)?;
+
+        let uv_x = FONT_SIZE / text_renderer.atlas.extent()[1] as f32;
+        let uv_y = FONT_SIZE / text_renderer.atlas.extent()[0] as f32;
 
         // verticies
+        let verticies: [Vertex; 4] = [
+            Vertex {
+                position: [-1.0, -1.0],
+                uv: [0.0, 0.0],
+            }, // TL
+            Vertex {
+                position: [1.0, -1.0],
+                uv: [uv_x, 0.0],
+            }, // TR
+            Vertex {
+                position: [1.0, 1.0],
+                uv: [uv_x, uv_y],
+            }, // BR
+            Vertex {
+                position: [-1.0, 1.0],
+                uv: [0.0, uv_y],
+            }, // BL
+        ];
+
         let vertex_staging = Buffer::from_iter(
             vk.allocators.memory.clone(),
             BufferCreateInfo {
@@ -124,7 +97,7 @@ impl Border {
                     | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
-            VERTICIES.len() as u64,
+            verticies.len() as u64,
         )?;
 
         // indicies
@@ -179,48 +152,74 @@ impl Border {
             .map_err(Error::SignalFence)?;
         future.wait(None).map_err(Error::AwaitFence)?;
 
+        let instance_buffer: Subbuffer<[InstanceData]> = Buffer::new_slice(
+            vk.allocators.memory.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::VERTEX_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            instance_capacity as u64,
+        )?;
+
+        let atlas_ds_layout = pipeline.layout().set_layouts()[0].clone();
+
+        let atlas_ds = PersistentDescriptorSet::new(
+            &vk.allocators.descriptor,
+            atlas_ds_layout.clone(),
+            [
+                WriteDescriptorSet::sampler(0, text_renderer.atlas_sampler.clone()),
+                WriteDescriptorSet::image_view(1, text_renderer.atlas_view.clone()),
+            ],
+            [],
+        )
+        .map_err(Error::DescriptorSet)?;
+
         Ok(Self {
             vertex_buffer,
             index_buffer,
+            instance_buffer,
             pipeline,
-            line_size,
+            instances: 0,
+            //
+            text_renderer,
+            layout,
+            atlas_ds,
+            text_right: 0.0,
         })
     }
 
-    pub fn render(
+    pub fn get_position_size(
         &self,
-        command_buffer: &mut AutoCommandBufferBuilder<
-            PrimaryAutoCommandBuffer<Arc<StandardCommandBufferAllocator>>,
-            Arc<StandardCommandBufferAllocator>,
-        >,
-        position: LogicalPosition,
-        scale: LogicalScale,
+        mouse_position: [u32; 2],
         window_size: [u32; 2],
-    ) -> Result<(), Box<ValidationError>> {
-        let line_size = LogicalScale::from_f32x2([self.line_size, self.line_size], window_size);
+    ) -> (LogicalPosition, LogicalScale) {
+        let text_offset = LogicalScale::from_f32x2([TEXT_OFFSET, TEXT_OFFSET], window_size);
 
-        command_buffer
-            .bind_pipeline_graphics(self.pipeline.clone())?
-            .bind_vertex_buffers(0, self.vertex_buffer.clone())?
-            .bind_index_buffer(self.index_buffer.clone())?
-            .push_constants(
-                self.pipeline.layout().clone(),
-                0,
-                PushConstants {
-                    border_position: position.into(),
-                    border_scale: scale.into(),
-                    line_size: line_size.into(),
-                },
-            )?
-            .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?;
+        let text_scale =
+            LogicalScale::from_f32x2([self.text_right, self.layout.height()], window_size);
 
-        Ok(())
+        let obscured =
+            mouse_position[0] > 2 * window_size[0] / 3 && mouse_position[1] < window_size[1] / 3;
+
+        let text_position = if obscured {
+            LogicalPosition::new(-1.0 + text_offset.x, -1.0 + text_offset.y)
+        } else {
+            let r = 1.0 - text_scale.x * 2.0;
+            LogicalPosition::new(r - text_offset.x, -1.0 + text_offset.y)
+        };
+
+        (text_position, text_scale)
     }
 }
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to create buffers:\n{0:?}")]
+    #[error("Failed to create buffer:\n{0:?}")]
     CreateBuffers(#[from] Validated<AllocateBufferError>),
 
     #[error("Failed to create command buffer:\n{0:?}")]
@@ -243,4 +242,7 @@ pub enum Error {
 
     #[error("Failed to create descriptor set:\n{0:?}")]
     DescriptorSet(#[source] Validated<VulkanError>),
+
+    #[error("Failed to create atlas:\n{0}")]
+    Atlas(#[from] text_renderer::Error),
 }

@@ -18,82 +18,38 @@ use crate::renderer::units::{LogicalPosition, LogicalScale};
 
 use super::{vertex::Vertex, vertex_shader::PushConstants};
 
-const OUTER_FLAG: u32 = 0b00000000_00000000_00000000_00000100;
-const TOP_FLAG: u32 = 0b00000000_00000000_00000000_00000010;
-const LEFT_FLAG: u32 = 0b00000000_00000000_00000000_00000001;
-const NO_FLAGS: u32 = 0b00000000_00000000_00000000_00000000;
-
-/* Vertex indicies
-    .0				.2
-        .1		.3
-
-        .7		.5
-    .6				.4
-*/
-
-pub const VERTICIES: [Vertex; 8] = [
+pub const VERTICIES: [Vertex; 4] = [
     Vertex {
         position: [-1.0, -1.0],
         color: [255, 255, 255, 255],
-        flags: OUTER_FLAG | TOP_FLAG | LEFT_FLAG,
     }, // TL
     Vertex {
-        position: [-1.0, -1.0],
-        color: [255, 255, 255, 255],
-        flags: TOP_FLAG | LEFT_FLAG,
-    }, // CTL
-    Vertex {
         position: [1.0, -1.0],
         color: [255, 255, 255, 255],
-        flags: OUTER_FLAG | TOP_FLAG,
     }, // TR
     Vertex {
-        position: [1.0, -1.0],
-        color: [255, 255, 255, 255],
-        flags: TOP_FLAG,
-    }, // CTR
-    Vertex {
         position: [1.0, 1.0],
         color: [255, 255, 255, 255],
-        flags: OUTER_FLAG,
     }, // BR
     Vertex {
-        position: [1.0, 1.0],
-        color: [255, 255, 255, 255],
-        flags: NO_FLAGS,
-    }, // CBR
-    Vertex {
         position: [-1.0, 1.0],
         color: [255, 255, 255, 255],
-        flags: OUTER_FLAG | LEFT_FLAG,
     }, // BL
-    Vertex {
-        position: [-1.0, 1.0],
-        color: [255, 255, 255, 255],
-        flags: LEFT_FLAG,
-    }, // CBL
 ];
 
-pub const INDICIES: [u32; 24] = [
-    0, 2, 1, 1, 2, 3, //
-    3, 2, 5, 4, 5, 2, //
-    7, 5, 4, 6, 7, 4, //
-    1, 7, 6, 0, 1, 6, //
-];
+pub const INDICIES: [u32; 6] = [0, 1, 2, 2, 3, 0];
 
-pub struct Border {
+pub struct Rect {
     pub vertex_buffer: Subbuffer<[Vertex]>,
     pub index_buffer: Subbuffer<[u32]>,
     pub pipeline: Arc<GraphicsPipeline>,
-    pub line_size: f32,
 }
 
-impl Border {
+impl Rect {
     pub fn new(
         vk: &VulkanInstance,
         pipeline: Arc<GraphicsPipeline>,
         color: [u8; 4],
-        line_size: f32,
     ) -> Result<Self, Error> {
         // Give each vertex it's color
         let verticies = VERTICIES.into_iter().map(|v| Vertex { color, ..v });
@@ -183,7 +139,6 @@ impl Border {
             vertex_buffer,
             index_buffer,
             pipeline,
-            line_size,
         })
     }
 
@@ -195,10 +150,7 @@ impl Border {
         >,
         position: LogicalPosition,
         scale: LogicalScale,
-        window_size: [u32; 2],
     ) -> Result<(), Box<ValidationError>> {
-        let line_size = LogicalScale::from_f32x2([self.line_size, self.line_size], window_size);
-
         command_buffer
             .bind_pipeline_graphics(self.pipeline.clone())?
             .bind_vertex_buffers(0, self.vertex_buffer.clone())?
@@ -207,9 +159,8 @@ impl Border {
                 self.pipeline.layout().clone(),
                 0,
                 PushConstants {
-                    border_position: position.into(),
-                    border_scale: scale.into(),
-                    line_size: line_size.into(),
+                    rect_position: position.into(),
+                    rect_scale: scale.into(),
                 },
             )?
             .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?;

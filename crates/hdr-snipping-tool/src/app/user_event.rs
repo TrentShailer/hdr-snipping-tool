@@ -47,7 +47,6 @@ impl App {
         let _physical_size = app.window.request_inner_size(capture_info.size);
         app.window.set_outer_position(display_info.position);
 
-        let s = Instant::now();
         let texture = match Texture::new(&app.vulkan_instance, capture_info.size) {
             Ok(v) => Arc::new(v),
             Err(e) => {
@@ -59,8 +58,6 @@ impl App {
                 std::process::exit(-1);
             }
         };
-        let e = Instant::now();
-        log::info!("Created texture in {}ms", e.duration_since(s).as_millis());
 
         let s = Instant::now();
         let mut tonemapper = match Tonemapper::new(
@@ -87,7 +84,20 @@ impl App {
             e.duration_since(s).as_millis()
         );
 
-        let s = Instant::now();
+        if let Err(e) = app.renderer.parameters.update_parameters(
+            &app.vulkan_instance,
+            tonemapper.config.alpha,
+            tonemapper.config.gamma,
+            tonemapper.config.maximum,
+        ) {
+            log::error!("{e}");
+            display_message(
+                "We encountered an error while updating the text.\nMore details are in the logs.",
+                MB_ICONERROR,
+            );
+            std::process::exit(-1);
+        };
+
         if let Err(e) = tonemapper.tonemap(&app.vulkan_instance) {
             log::error!("{e}");
             display_message(
@@ -96,9 +106,6 @@ impl App {
                 );
             std::process::exit(-1);
         }
-        let e = Instant::now();
-        log::info!("Tonemapped in {}ms", e.duration_since(s).as_millis());
-
         let end = Instant::now();
         log::info!("Total {}ms", end.duration_since(start).as_millis());
 

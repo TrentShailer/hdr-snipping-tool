@@ -13,13 +13,12 @@ use vulkano::{
     sync::{self, GpuFuture},
     Validated, ValidationError, VulkanError,
 };
-use winit::dpi::PhysicalSize;
+
+use crate::renderer::units::{LogicalPosition, LogicalScale};
 
 use super::{vertex::Vertex, vertex_shader::PushConstants};
 
-const LOCKED_FLAG: u32 = 0b00000000_00000000_00000000_00000100;
-const TOP_FLAG: u32 = 0b00000000_00000000_00000000_00000010;
-const LEFT_FLAG: u32 = 0b00000000_00000000_00000000_00000001;
+const LOCKED_FLAG: u32 = 0b00000000_00000000_00000000_00000001;
 const NO_FLAGS: u32 = 0b00000000_00000000_00000000_00000000;
 
 /* Vertex indicies
@@ -34,22 +33,22 @@ pub const VERTICIES: [Vertex; 8] = [
     Vertex {
         position: [-1.0, -1.0],
         color: [0, 0, 0, 128],
-        flags: LOCKED_FLAG | TOP_FLAG | LEFT_FLAG,
+        flags: LOCKED_FLAG,
     }, // TL
     Vertex {
-        position: [0.0, 0.0],
+        position: [-1.0, -1.0],
         color: [0, 0, 0, 128],
-        flags: TOP_FLAG | LEFT_FLAG,
+        flags: NO_FLAGS,
     }, // CTL
     Vertex {
         position: [1.0, -1.0],
         color: [0, 0, 0, 128],
-        flags: LOCKED_FLAG | TOP_FLAG,
+        flags: LOCKED_FLAG,
     }, // TR
     Vertex {
-        position: [0.0, 0.0],
+        position: [1.0, -1.0],
         color: [0, 0, 0, 128],
-        flags: TOP_FLAG,
+        flags: NO_FLAGS,
     }, // CTR
     Vertex {
         position: [1.0, 1.0],
@@ -57,19 +56,19 @@ pub const VERTICIES: [Vertex; 8] = [
         flags: LOCKED_FLAG,
     }, // BR
     Vertex {
-        position: [0.0, 0.0],
+        position: [1.0, 1.0],
         color: [0, 0, 0, 128],
         flags: NO_FLAGS,
     }, // CBR
     Vertex {
         position: [-1.0, 1.0],
         color: [0, 0, 0, 128],
-        flags: LOCKED_FLAG | LEFT_FLAG,
+        flags: LOCKED_FLAG,
     }, // BL
     Vertex {
-        position: [0.0, 0.0],
+        position: [-1.0, 1.0],
         color: [0, 0, 0, 128],
-        flags: LEFT_FLAG,
+        flags: NO_FLAGS,
     }, // CBL
 ];
 
@@ -182,16 +181,9 @@ impl Selection {
             PrimaryAutoCommandBuffer<Arc<StandardCommandBufferAllocator>>,
             Arc<StandardCommandBufferAllocator>,
         >,
-        selection: [u32; 4], // ltrb
-        window_size: PhysicalSize<u32>,
+        position: LogicalPosition,
+        scale: LogicalScale,
     ) -> Result<(), Box<ValidationError>> {
-        // Convert seleciton to -1.0, 1.0
-        let l = (selection[0] as f32 / window_size.width as f32) * 2.0 - 1.0;
-        let t = (selection[1] as f32 / window_size.height as f32) * 2.0 - 1.0;
-        let r = (selection[2] as f32 / window_size.width as f32) * 2.0 - 1.0;
-        let b = (selection[3] as f32 / window_size.height as f32) * 2.0 - 1.0;
-        let selection = [l, t, r, b];
-
         command_buffer
             .bind_pipeline_graphics(self.pipeline.clone())?
             .bind_vertex_buffers(0, self.vertex_buffer.clone())?
@@ -199,7 +191,10 @@ impl Selection {
             .push_constants(
                 self.pipeline.layout().clone(),
                 0,
-                PushConstants { selection },
+                PushConstants {
+                    selection_position: position.into(),
+                    selection_scale: scale.into(),
+                },
             )?
             .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?;
 
@@ -209,7 +204,7 @@ impl Selection {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to create buffers:\n{0}")]
+    #[error("Failed to create buffers:\n{0:?}")]
     CreateBuffers(#[from] Validated<AllocateBufferError>),
 
     #[error("Failed to create command buffer:\n{0:?}")]

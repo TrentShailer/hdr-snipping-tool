@@ -1,10 +1,10 @@
-pub mod border;
+pub mod parameters;
 pub mod vertex;
 
 use std::sync::Arc;
 
 use thiserror::Error;
-use vertex::Vertex;
+use vertex::{InstanceData, Vertex};
 use vulkan_instance::VulkanInstance;
 use vulkano::{
     pipeline::{
@@ -21,14 +21,14 @@ use vulkano::{
 pub mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
-        bytes: "src/border_pipeline/shaders/vertex.spv"
+        bytes: "src/parameters_pipeline/shaders/vertex.spv"
     }
 }
 
 pub mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
-        bytes: "src/border_pipeline/shaders/fragment.spv"
+        bytes: "src/parameters_pipeline/shaders/fragment.spv"
     }
 }
 
@@ -46,7 +46,7 @@ pub fn create_pipeline(
         .entry_point("main")
         .unwrap();
 
-    let vertex_input_state = Vertex::per_vertex()
+    let vertex_input_state = [Vertex::per_vertex(), InstanceData::per_instance()]
         .definition(&vs.info().input_interface)
         .map_err(Error::VertexDefinition)?;
 

@@ -13,7 +13,8 @@ use vulkano::{
     sync::{self, GpuFuture},
     Validated, ValidationError, VulkanError,
 };
-use winit::dpi::PhysicalSize;
+
+use crate::renderer::units::{LogicalPosition, LogicalScale};
 
 use super::{vertex::Vertex, vertex_shader::PushConstants};
 
@@ -188,19 +189,10 @@ impl Mouse {
             PrimaryAutoCommandBuffer<Arc<StandardCommandBufferAllocator>>,
             Arc<StandardCommandBufferAllocator>,
         >,
-        mouse_position: [u32; 2], // xy
-        window_size: PhysicalSize<u32>,
+        mouse_position: LogicalPosition,
+        window_size: [u32; 2],
     ) -> Result<(), Box<ValidationError>> {
-        // Convert position to -1.0, 1.0
-        let x = (mouse_position[0] as f32 / window_size.width as f32) * 2.0 - 1.0;
-        let y = (mouse_position[1] as f32 / window_size.height as f32) * 2.0 - 1.0;
-        let mouse_position = [x, y];
-
-        // Calcualte line size
-        let line_size_x = self.line_size / window_size.width as f32;
-        let line_size_y = self.line_size / window_size.height as f32;
-
-        let line_size = [line_size_x, line_size_y];
+        let line_size = LogicalScale::from_f32x2([self.line_size, self.line_size], window_size);
 
         command_buffer
             .bind_pipeline_graphics(self.pipeline.clone())?
@@ -210,8 +202,8 @@ impl Mouse {
                 self.pipeline.layout().clone(),
                 0,
                 PushConstants {
-                    mouse_position,
-                    line_size,
+                    mouse_position: mouse_position.into(),
+                    line_size: line_size.into(),
                 },
             )?
             .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?;
@@ -222,7 +214,7 @@ impl Mouse {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to create buffers:\n{0}")]
+    #[error("Failed to create buffers:\n{0:?}")]
     CreateBuffers(#[from] Validated<AllocateBufferError>),
 
     #[error("Failed to create command buffer:\n{0:?}")]

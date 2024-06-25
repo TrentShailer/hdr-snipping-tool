@@ -1,4 +1,5 @@
 pub mod render;
+pub mod units;
 pub mod window_size_dependent_setup;
 
 use std::sync::Arc;
@@ -7,6 +8,8 @@ use crate::{
     border_pipeline::{self, border::Border},
     capture_pipeline::{self, capture::CaptureObject},
     mouse_pipeline::{self, mouse::Mouse},
+    parameters_pipeline::{self, parameters::Parameters},
+    rect_pipeline::{self, rect::Rect},
     selection_pipeline::{self, selection::Selection},
 };
 use thiserror::Error;
@@ -35,6 +38,9 @@ pub struct Renderer {
     pub selection: Selection,
     pub selection_border: Border,
     pub mouse: Mouse,
+    pub parameters: Parameters,
+    pub text_rect: Rect,
+    pub text_border: Border,
 }
 
 impl Renderer {
@@ -118,6 +124,14 @@ impl Renderer {
         let mouse_pipeline = mouse_pipeline::create_pipeline(&vk, subpass.clone())?;
         let mouse = Mouse::new(&vk, mouse_pipeline, 1.0)?;
 
+        let text_pipeline = parameters_pipeline::create_pipeline(&vk, subpass.clone())?;
+        let parameters = Parameters::new(&vk, text_pipeline, 64)?;
+
+        let rect_pipeline = rect_pipeline::create_pipeline(&vk, subpass.clone())?;
+        let text_rect = Rect::new(&vk, rect_pipeline, [45, 55, 72, 255])?;
+
+        let text_border = Border::new(&vk, border_pipeline.clone(), [23, 25, 35, 255], 1.0)?;
+
         Ok(Self {
             framebuffers,
             viewport,
@@ -127,6 +141,9 @@ impl Renderer {
             selection,
             selection_border,
             mouse,
+            parameters,
+            text_rect,
+            text_border,
             previous_frame_end: Some(sync::now(vk.device.clone()).boxed()),
             recreate_swapchain: false,
         })
@@ -159,27 +176,39 @@ pub enum Error {
     #[error("Failed to perform Window Size Dependent Setup:\n{0}")]
     WindowSizeDependentSetup(#[from] window_size_dependent_setup::Error),
 
-    #[error("Failed to create capture pipeline")]
+    #[error("Failed to create capture pipeline:\n{0}")]
     CapturePipeline(#[from] capture_pipeline::Error),
 
-    #[error("Failed to create capture object")]
+    #[error("Failed to create capture object:\n{0}")]
     CaptureObject(#[from] capture_pipeline::capture::Error),
 
-    #[error("Failed to create selection shading pipeline")]
+    #[error("Failed to create selection shading pipeline:\n{0}")]
     SelectionShadingPipeline(#[from] selection_pipeline::Error),
 
-    #[error("Failed to create selection shading object")]
+    #[error("Failed to create selection shading object:\n{0}")]
     SelectionShadingObject(#[from] selection_pipeline::selection::Error),
 
-    #[error("Failed to create border pipeline")]
+    #[error("Failed to create border pipeline:\n{0}")]
     BorderPipeline(#[from] border_pipeline::Error),
 
-    #[error("Failed to create border object")]
+    #[error("Failed to create border object:\n{0}")]
     BorderObject(#[from] border_pipeline::border::Error),
 
-    #[error("Failed to create mouse pipeline")]
+    #[error("Failed to create mouse pipeline:\n{0}")]
     MousePipeline(#[from] mouse_pipeline::Error),
 
-    #[error("Failed to create mouse object")]
+    #[error("Failed to create mouse object:\n{0}")]
     MouseObject(#[from] mouse_pipeline::mouse::Error),
+
+    #[error("Failed to create text pipeline:\n{0}")]
+    TextPipeline(#[from] parameters_pipeline::Error),
+
+    #[error("Failed to create text renderer:\n{0}")]
+    TextRenderer(#[from] parameters_pipeline::parameters::Error),
+
+    #[error("Failed to create rect pipeline:\n{0}")]
+    RectPipeline(#[from] rect_pipeline::Error),
+
+    #[error("Failed to create rect:\n{0}")]
+    Rect(#[from] rect_pipeline::rect::Error),
 }

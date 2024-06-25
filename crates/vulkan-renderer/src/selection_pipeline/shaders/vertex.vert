@@ -8,13 +8,12 @@ layout(location = 2) in uint flags;
 layout(location = 0) out vec4 out_color;
 
 layout(push_constant) uniform PushConstants {
-    vec4 selection; // ltrb, scaled to be in vulkan coordinates
+    vec2 selection_position;
+	vec2 selection_scale;
 };
 
 void main() {
-	bool locked = (flags & 1 << 2) >> 2 == 1;
-	bool top 	= (flags & 1 << 1) >> 1 == 1;
-	bool left 	= (flags & 1 << 0) >> 0 == 1;
+	bool locked = (flags & 1 << 0) >> 0 == 1;
 
     out_color = color;
 
@@ -22,26 +21,10 @@ void main() {
     	gl_Position = vec4(position, 0.0, 1.0);
 	}
 	else {
-		// set position = selection position
-		float x = 0.0f;
-		float y = 0.0f;
+		vec2 scaled = position * selection_scale;
+		vec2 out_position = scaled + vec2(selection_scale) + selection_position;
 
-		if (top) {
-			y = selection[1];
-		}
-		else {
-			y = selection[3];
-		}
-
-		if (left) {
-			x = selection[0];
-		}
-		else {
-			x = selection[2];
-		}
-
-
-		gl_Position = vec4(x, y, 0.0, 1.0);
+		gl_Position = vec4(out_position, 0.0, 1.0);
 	}
 
 }

@@ -10,7 +10,7 @@ use vulkano::{
     pipeline::{
         graphics::{
             color_blend::{AttachmentBlend, BlendFactor, BlendOp},
-            vertex_input::VertexDefinition,
+            vertex_input::{Vertex as VkVertex, VertexDefinition},
         },
         GraphicsPipeline, PipelineShaderStageCreateInfo,
     },
@@ -46,10 +46,9 @@ pub fn create_pipeline(
         .entry_point("main")
         .unwrap();
 
-    let vertex_input_state =
-        <Vertex as vulkano::pipeline::graphics::vertex_input::Vertex>::per_vertex()
-            .definition(&vs.info().input_interface)
-            .map_err(Error::VertexDefinition)?;
+    let vertex_input_state = Vertex::per_vertex()
+        .definition(&vs.info().input_interface)
+        .map_err(Error::VertexDefinition)?;
 
     let stages = vec![
         PipelineShaderStageCreateInfo::new(vs),

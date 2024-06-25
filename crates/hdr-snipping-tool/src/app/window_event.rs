@@ -89,30 +89,69 @@ impl App {
                 is_synthetic: _,
             } => {
                 if app.window.is_visible().unwrap_or(true) {
-                    if event.repeat == false && event.state == ElementState::Pressed {
+                    if
+                    /* event.repeat == false && */
+                    event.state == ElementState::Pressed {
                         if event.physical_key == KeyCode::ArrowRight {
+                            // TODO handle errors
                             capture
                                 .tonemapper
-                                .set_gamma(capture.tonemapper.config.gamma + f16::from_f32(0.025));
+                                .set_gamma(capture.tonemapper.config.gamma + f16::from_f32(0.02));
                             capture.tonemapper.tonemap(&app.vulkan_instance).unwrap();
+                            app.renderer
+                                .parameters
+                                .update_parameters(
+                                    &app.vulkan_instance,
+                                    capture.tonemapper.config.alpha,
+                                    capture.tonemapper.config.gamma,
+                                    capture.tonemapper.config.maximum,
+                                )
+                                .unwrap();
                         }
                         if event.physical_key == KeyCode::ArrowLeft {
                             capture
                                 .tonemapper
-                                .set_gamma(capture.tonemapper.config.gamma - f16::from_f32(0.025));
+                                .set_gamma(capture.tonemapper.config.gamma - f16::from_f32(0.02));
                             capture.tonemapper.tonemap(&app.vulkan_instance).unwrap();
+                            app.renderer
+                                .parameters
+                                .update_parameters(
+                                    &app.vulkan_instance,
+                                    capture.tonemapper.config.alpha,
+                                    capture.tonemapper.config.gamma,
+                                    capture.tonemapper.config.maximum,
+                                )
+                                .unwrap();
                         }
                         if event.physical_key == KeyCode::ArrowUp {
                             capture
                                 .tonemapper
                                 .set_alpha(capture.tonemapper.config.alpha + f16::from_f32(0.1));
                             capture.tonemapper.tonemap(&app.vulkan_instance).unwrap();
+                            app.renderer
+                                .parameters
+                                .update_parameters(
+                                    &app.vulkan_instance,
+                                    capture.tonemapper.config.alpha,
+                                    capture.tonemapper.config.gamma,
+                                    capture.tonemapper.config.maximum,
+                                )
+                                .unwrap();
                         }
                         if event.physical_key == KeyCode::ArrowDown {
                             capture
                                 .tonemapper
                                 .set_alpha(capture.tonemapper.config.alpha - f16::from_f32(0.1));
                             capture.tonemapper.tonemap(&app.vulkan_instance).unwrap();
+                            app.renderer
+                                .parameters
+                                .update_parameters(
+                                    &app.vulkan_instance,
+                                    capture.tonemapper.config.alpha,
+                                    capture.tonemapper.config.gamma,
+                                    capture.tonemapper.config.maximum,
+                                )
+                                .unwrap();
                         }
                     }
 

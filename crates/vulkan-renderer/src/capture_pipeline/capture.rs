@@ -197,7 +197,7 @@ impl CaptureObject {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to create buffers:\n{0}")]
+    #[error("Failed to create buffers:\n{0:?}")]
     CreateBuffers(#[from] Validated<AllocateBufferError>),
 
     #[error("Failed to create command buffer:\n{0:?}")]

@@ -1,4 +1,4 @@
-pub mod border;
+pub mod rect;
 pub mod vertex;
 
 use std::sync::Arc;
@@ -21,14 +21,14 @@ use vulkano::{
 pub mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
-        bytes: "src/border_pipeline/shaders/vertex.spv"
+        bytes: "src/rect_pipeline/shaders/vertex.spv"
     }
 }
 
 pub mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
-        bytes: "src/border_pipeline/shaders/fragment.spv"
+        bytes: "src/rect_pipeline/shaders/fragment.spv"
     }
 }
 

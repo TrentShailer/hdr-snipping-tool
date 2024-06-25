@@ -5,13 +5,7 @@ use vulkano::{buffer::BufferContents, pipeline::graphics::vertex_input::Vertex a
 pub struct Vertex {
     #[format(R32G32_SFLOAT)]
     pub position: [f32; 2],
-}
 
-#[derive(BufferContents, VertexDerive)]
-#[repr(C)]
-pub struct InstanceData {
-    #[format(R32G32_SFLOAT)]
-    position_offset: [f32; 2],
-    #[format(R32_SFLOAT)]
-    scale: f32,
+    #[format(R8G8B8A8_UNORM)]
+    pub color: [u8; 4],
 }
