@@ -1077,14 +1077,14 @@ dependencies = [
 
 [[package]]
 name = "hdr-capture"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "winit",
 ]
 
 [[package]]
 name = "hdr-snipping-tool"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "arboard",
  "chrono",
@@ -2531,7 +2531,7 @@ dependencies = [
 
 [[package]]
 name = "vulkan-instance"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "log",
  "smallvec",
@@ -2542,7 +2542,7 @@ dependencies = [
 
 [[package]]
 name = "vulkan-renderer"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "fontdue",
  "log",
@@ -2555,7 +2555,7 @@ dependencies = [
 
 [[package]]
 name = "vulkan-tonemapper"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "half",
  "log",
@@ -2774,7 +2774,7 @@ dependencies = [
 
 [[package]]
 name = "windows-capture-provider"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "hdr-capture",
  "log",
