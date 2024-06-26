@@ -1,12 +1,14 @@
 [package]
 name = "windows-capture-provider"
-version = "1.0.0"
+version = "2.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 hdr-capture = { workspace = true }
+log = { workspace = true }
+thiserror = { workspace = true }
 windows = { workspace = true, features = [
 	"Foundation",
 	"Graphics_Capture",
@@ -25,5 +27,3 @@ windows = { workspace = true, features = [
 windows-core = { workspace = true }
 windows-result = { workspace = true }
 winit = { workspace = true }
-thiserror = { workspace = true }
-log = { workspace = true }

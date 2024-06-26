@@ -6,8 +6,10 @@ members = ["crates/*"]
 bytemuck = { version = "1.16", features = ["derive"] }
 chrono = { version = "0.4", default-features = false }
 flume = { version = "0.11" }
+fontdue = "0.9"
 half = { version = "2.4", features = ["bytemuck"] }
 log = "0.4"
+smallvec = "1.13"
 thiserror = "1.0"
 vulkano = { version = "0.34" }
 vulkano-shaders = { version = "0.34" }
@@ -15,11 +17,9 @@ windows = { version = "0.57" }
 windows-core = { version = "0.57" }
 windows-result = { version = "0.1" }
 winit = { version = "0.30", default-features = false }
-smallvec = "1.13"
-fontdue = "0.9"
 
-vulkan-instance = { path = "crates/vulkan-instance" }
-vulkan-tonemapper = { path = "crates/vulkan-tonemapper" }
-vulkan-renderer = { path = "crates/vulkan-renderer" }
 hdr-capture = { path = "crates/hdr-capture" }
+vulkan-instance = { path = "crates/vulkan-instance" }
+vulkan-renderer = { path = "crates/vulkan-renderer" }
+vulkan-tonemapper = { path = "crates/vulkan-tonemapper" }
 windows-capture-provider = { path = "crates/windows-capture-provider" }
