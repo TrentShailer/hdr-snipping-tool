@@ -128,7 +128,7 @@ pub fn find_maximum(
 
     // copy data to input buffer
     copy_buffer_and_wait(
-        &vk,
+        vk,
         staging_buffer.clone(),
         input_buffer.clone(),
         copy_buffer::Region::SmallestBuffer,
@@ -198,7 +198,7 @@ pub fn find_maximum(
 
     // Copy from result to staging
     copy_buffer_and_wait(
-        &vk,
+        vk,
         result_buffer,
         output_staging_buffer.clone(),
         copy_buffer::Region::SmallestBuffer,
@@ -206,8 +206,6 @@ pub fn find_maximum(
 
     let reader = &output_staging_buffer.read()?;
     let maximum = f16::from_le_bytes([reader[0], reader[1]]);
-
-    log::info!("maximum: {:.2}", maximum);
 
     Ok(maximum)
 }

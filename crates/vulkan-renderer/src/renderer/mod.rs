@@ -111,26 +111,25 @@ impl Renderer {
 
         let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
 
-        let capture_pipeline = capture_pipeline::create_pipeline(&vk, subpass.clone())?;
-        let capture = CaptureObject::new(&vk, capture_pipeline)?;
+        let capture_pipeline = capture_pipeline::create_pipeline(vk, subpass.clone())?;
+        let capture = CaptureObject::new(vk, capture_pipeline)?;
 
-        let selection_pipeline = selection_pipeline::create_pipeline(&vk, subpass.clone())?;
-        let selection = Selection::new(&vk, selection_pipeline)?;
+        let selection_pipeline = selection_pipeline::create_pipeline(vk, subpass.clone())?;
+        let selection = Selection::new(vk, selection_pipeline)?;
 
-        let border_pipeline = border_pipeline::create_pipeline(&vk, subpass.clone())?;
-        let selection_border =
-            Border::new(&vk, border_pipeline.clone(), [255, 255, 255, 255], 2.0)?;
+        let border_pipeline = border_pipeline::create_pipeline(vk, subpass.clone())?;
+        let selection_border = Border::new(vk, border_pipeline.clone(), [255, 255, 255, 255], 2.0)?;
 
-        let mouse_pipeline = mouse_pipeline::create_pipeline(&vk, subpass.clone())?;
-        let mouse = Mouse::new(&vk, mouse_pipeline, 1.0)?;
+        let mouse_pipeline = mouse_pipeline::create_pipeline(vk, subpass.clone())?;
+        let mouse = Mouse::new(vk, mouse_pipeline, 1.0)?;
 
-        let text_pipeline = parameters_pipeline::create_pipeline(&vk, subpass.clone())?;
-        let parameters = Parameters::new(&vk, text_pipeline, 64)?;
+        let text_pipeline = parameters_pipeline::create_pipeline(vk, subpass.clone())?;
+        let parameters = Parameters::new(vk, text_pipeline, 64)?;
 
-        let rect_pipeline = rect_pipeline::create_pipeline(&vk, subpass.clone())?;
-        let text_rect = Rect::new(&vk, rect_pipeline, [45, 55, 72, 255])?;
+        let rect_pipeline = rect_pipeline::create_pipeline(vk, subpass.clone())?;
+        let text_rect = Rect::new(vk, rect_pipeline, [45, 55, 72, 255])?;
 
-        let text_border = Border::new(&vk, border_pipeline.clone(), [23, 25, 35, 255], 1.0)?;
+        let text_border = Border::new(vk, border_pipeline.clone(), [23, 25, 35, 255], 1.0)?;
 
         Ok(Self {
             framebuffers,

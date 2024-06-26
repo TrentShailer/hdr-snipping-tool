@@ -12,7 +12,7 @@ use windows::{
 use windows_core::Interface;
 use winit::dpi::PhysicalSize;
 
-pub(crate) fn fetch_capture<'a>(
+pub(crate) fn fetch_capture(
     frame: Direct3D11CaptureFrame,
     d3d_device: &ID3D11Device,
     d3d_context: &ID3D11DeviceContext,

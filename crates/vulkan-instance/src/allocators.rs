@@ -27,7 +27,7 @@ impl Allocators {
         // 1MiB block size means that most allocations for captures/images
         // will be dedicated allocations, this is slower but results in
         // overall reduced memory consumption at idle
-        let block_sizes = vec![1024 * 1024 * 1; memory_types.len()];
+        let block_sizes = vec![1024 * 1024; memory_types.len()];
 
         let memory = Arc::new(StandardMemoryAllocator::new(
             device.clone(),

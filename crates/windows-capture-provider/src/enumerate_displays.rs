@@ -7,7 +7,7 @@ use winit::dpi::{PhysicalPosition, PhysicalSize};
 use crate::display::Display;
 
 pub fn refresh_displays(
-    old_displays: &mut Vec<Display>,
+    old_displays: &mut [Display],
 ) -> Result<Vec<Display>, windows_result::Error> {
     let mut current_displays = get_all_displays()?;
 

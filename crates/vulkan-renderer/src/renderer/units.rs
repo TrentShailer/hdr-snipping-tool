@@ -45,6 +45,7 @@ impl LogicalPosition {
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<[f32; 2]> for LogicalPosition {
     fn into(self) -> [f32; 2] {
         [self.x, self.y]
@@ -82,6 +83,7 @@ impl LogicalScale {
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<[f32; 2]> for LogicalScale {
     fn into(self) -> [f32; 2] {
         [self.x, self.y]

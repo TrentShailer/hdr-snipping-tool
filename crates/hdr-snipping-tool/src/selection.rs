@@ -75,8 +75,8 @@ impl Selection {
         // Ensure mouse is in bounds
         if position.x < 0
             || position.y < 0
-            || position.x > window_size.width as i32
-            || position.y > window_size.height as i32
+            || position.x as u32 > window_size.width
+            || position.y as u32 > window_size.height
         {
             return;
         }

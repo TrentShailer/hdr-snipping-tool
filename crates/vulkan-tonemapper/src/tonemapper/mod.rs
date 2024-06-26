@@ -84,7 +84,7 @@ impl Tonemapper {
         )?;
         staging_buffer.write()?.copy_from_slice(bytes);
 
-        let maximum = find_maximum(&vk, staging_buffer.clone(), bytes.len() as u32)?;
+        let maximum = find_maximum(vk, staging_buffer.clone(), bytes.len() as u32)?;
 
         let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
             vk.allocators.memory.clone(),
@@ -100,7 +100,7 @@ impl Tonemapper {
         )?;
 
         copy_buffer_and_wait(
-            &vk,
+            vk,
             staging_buffer.clone(),
             input_buffer.clone(),
             vulkan_instance::copy_buffer::Region::SmallestBuffer,

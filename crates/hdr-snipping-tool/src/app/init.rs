@@ -3,7 +3,6 @@ use std::sync::Arc;
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
 use vulkan_renderer::renderer::{self, Renderer};
-use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use winit::{
     dpi::PhysicalSize,
     error::OsError,
@@ -11,8 +10,6 @@ use winit::{
     platform::windows::IconExtWindows,
     window::{BadIcon, Icon, Window},
 };
-
-use crate::message_box::display_message;
 
 use super::{
     tray_icon::{self, init_tray_icon},
@@ -41,41 +38,7 @@ pub enum Error {
 }
 
 impl App {
-    pub fn init(&mut self, event_loop: &ActiveEventLoop) {
-        if let Err(e) = self.init_inner(event_loop) {
-            log::error!("{e}");
-            match e {
-                Error::CreateWindow(_) => display_message(
-                    "We encountered an error while creating the window.\nMore details are in the logs.",
-                    MB_ICONERROR,
-                ),
-                Error::Icon(_) => display_message(
-                    "We encountered an error while getting the app icon.\nMore details are in the logs.",
-                    MB_ICONERROR,
-                ),
-                Error::TrayIcon(_) => display_message(
-                    "We encountered an error while creating the tray icon.\nMore details are in the logs.",
-                    MB_ICONERROR,
-                ),
-                Error::TrayIconVisible(_) => display_message(
-                    "We encountered an error while changing the tray icon visibility.\nMore details are in the logs.",
-                    MB_ICONERROR,
-                ),
-                Error::VulkanInstance(_) => display_message(
-                    "We encountered an error while creating the Vulkan instance.\nMore details are in the logs.",
-                    MB_ICONERROR,
-                ),
-                Error::Renderer(_) => display_message(
-                    "We encountered an error while creating the renderer.\nMore details are in the logs.",
-                    MB_ICONERROR,
-                ),
-
-            }
-            std::process::exit(-1);
-        }
-    }
-
-    fn init_inner(&mut self, event_loop: &ActiveEventLoop) -> Result<(), Error> {
+    pub fn init(&mut self, event_loop: &ActiveEventLoop) -> Result<(), Error> {
         let window_icon = Icon::from_resource(1, Some(PhysicalSize::new(64, 64)))?;
         // create window
         let window_attributes = Window::default_attributes()

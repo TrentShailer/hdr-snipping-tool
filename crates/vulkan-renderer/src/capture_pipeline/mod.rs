@@ -53,7 +53,7 @@ pub fn create_pipeline(
     ];
 
     let pipeline =
-        crate::graphics_pipeline::create_pipeline(&vk, subpass, vertex_input_state, stages, None)?;
+        crate::graphics_pipeline::create_pipeline(vk, subpass, vertex_input_state, stages, None)?;
 
     Ok(pipeline)
 }

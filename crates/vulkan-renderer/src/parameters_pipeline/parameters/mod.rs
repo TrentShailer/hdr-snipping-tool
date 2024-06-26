@@ -47,7 +47,7 @@ impl Parameters {
         instance_capacity: u32,
     ) -> Result<Self, Error> {
         let mut layout = Layout::new(fontdue::layout::CoordinateSystem::PositiveYDown);
-        let text_renderer = TextRenderer::new(&vk, &mut layout)?;
+        let text_renderer = TextRenderer::new(vk, &mut layout)?;
 
         let uv_x = FONT_SIZE / text_renderer.atlas.extent()[1] as f32;
         let uv_y = FONT_SIZE / text_renderer.atlas.extent()[0] as f32;

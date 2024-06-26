@@ -26,7 +26,7 @@ impl WindowsCaptureProvider {
     pub fn new() -> Result<Self, Error> {
         let (dxgi_device, d3d_device, d3d_context) = d3d_devices::create_d3d_devices()?;
 
-        let displays = refresh_displays(&mut vec![]).map_err(Error::EnumerateDisplays)?;
+        let displays = refresh_displays(&mut []).map_err(Error::EnumerateDisplays)?;
 
         Ok(Self {
             dxgi_device,
