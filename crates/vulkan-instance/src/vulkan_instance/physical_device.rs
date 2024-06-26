@@ -44,7 +44,7 @@ pub fn get_physical_device(
             .enumerate()
             .position(|(family_index, family_properties)| {
                 family_properties.queue_flags.contains(QUEUE_FLAGS)
-                    && family_properties.queue_count >= QUEUE_COUNT as u32
+                    && family_properties.queue_count >= QUEUE_COUNT
                     && d.surface_support(family_index as u32, &surface)
                         .unwrap_or(false)
             })

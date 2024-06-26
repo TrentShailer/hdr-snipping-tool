@@ -1,7 +1,7 @@
 use vulkano::device::{DeviceExtensions, Features, QueueFlags};
 
 pub const QUEUE_FLAGS: QueueFlags = QueueFlags::union(QueueFlags::COMPUTE, QueueFlags::GRAPHICS);
-pub const QUEUE_COUNT: usize = 1;
+pub const QUEUE_COUNT: u32 = 1;
 
 pub const DEVICE_EXTENSIONS: DeviceExtensions = DeviceExtensions {
     khr_swapchain: true,

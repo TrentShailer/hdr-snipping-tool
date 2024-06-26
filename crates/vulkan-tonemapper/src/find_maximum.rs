@@ -94,7 +94,7 @@ pub fn find_maximum(
             memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
             ..Default::default()
         },
-        (byte_count as u64).div_ceil(compute_blocksize.into()),
+        (byte_count as u64).div_ceil(compute_blocksize as u64),
     )?;
 
     // Because one pass gets us input_length / compute_blocksize values

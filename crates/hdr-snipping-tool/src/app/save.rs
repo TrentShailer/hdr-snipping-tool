@@ -17,6 +17,9 @@ pub enum Error {
     #[error("Failed to copy texture to CPU:\n{0}")]
     VecCopy(#[from] vulkan_instance::texture::copy_to_vec::Error),
 
+    #[error("Failed to create image buffer:\nTexture Size: {0}, {1}\nCapture Data: {2}")]
+    ImageBuffer(u32, u32, usize),
+
     #[error("Failed to create file for capture:\n{0}")]
     CreateFile(#[source] io::Error),
 
@@ -44,8 +47,18 @@ impl App {
 
         // Create image buffer
         let raw_capture = texture.copy_to_vec(&app.vulkan_instance)?;
+        let raw_capture_len = raw_capture.len();
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-            ImageBuffer::from_raw(texture.size.width, texture.size.height, raw_capture).unwrap(); // Unwrap is safe as long as width and height are correct
+            match ImageBuffer::from_raw(texture.size.width, texture.size.height, raw_capture) {
+                Some(v) => v,
+                None => {
+                    return Err(Error::ImageBuffer(
+                        texture.size.width,
+                        texture.size.height,
+                        raw_capture_len,
+                    ))
+                }
+            };
 
         // Get selection view
         let (selection_pos, selection_size) = self.selection.as_pos_size();

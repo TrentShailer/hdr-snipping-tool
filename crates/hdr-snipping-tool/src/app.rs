@@ -44,7 +44,7 @@ pub struct App {
     pub capture: Option<ActiveCapture>,
     pub capture_provider: WindowsCaptureProvider,
     pub settings: Settings,
-    pub mouse_position: PhysicalPosition<i32>,
+    pub mouse_position: PhysicalPosition<u32>,
     pub selection: Selection,
     pub scroll: f32,
 }

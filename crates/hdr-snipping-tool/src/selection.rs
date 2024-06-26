@@ -42,7 +42,7 @@ impl Selection {
         (position, size)
     }
 
-    pub fn mouse_moved(&mut self, position: PhysicalPosition<i32>, window_size: PhysicalSize<u32>) {
+    pub fn mouse_moved(&mut self, position: PhysicalPosition<u32>, window_size: PhysicalSize<u32>) {
         // We only care if we are selecting
         if self.state == SelectionState::None {
             return;
@@ -69,15 +69,11 @@ impl Selection {
 
     pub fn mouse_pressed(
         &mut self,
-        position: PhysicalPosition<i32>,
+        position: PhysicalPosition<u32>,
         window_size: PhysicalSize<u32>,
     ) {
         // Ensure mouse is in bounds
-        if position.x < 0
-            || position.y < 0
-            || position.x as u32 > window_size.width
-            || position.y as u32 > window_size.height
-        {
+        if position.x > window_size.width || position.y > window_size.height {
             return;
         }
 
@@ -85,7 +81,7 @@ impl Selection {
             self.state = SelectionState::Clicked;
         }
 
-        self.preemptive_start = position.cast();
+        self.preemptive_start = position;
     }
 
     pub fn mouse_released(&mut self) -> bool {
@@ -97,15 +93,12 @@ impl Selection {
 }
 
 fn clamp_position(
-    position: PhysicalPosition<i32>,
+    position: PhysicalPosition<u32>,
     min: PhysicalPosition<u32>,
     max: PhysicalPosition<u32>,
 ) -> PhysicalPosition<u32> {
-    let min: PhysicalPosition<i32> = min.cast();
-    let max: PhysicalPosition<i32> = max.cast();
-
     PhysicalPosition::new(
-        position.x.clamp(min.x, max.x) as u32,
-        position.y.clamp(min.y, max.y) as u32,
+        position.x.clamp(min.x, max.x),
+        position.y.clamp(min.y, max.y),
     )
 }

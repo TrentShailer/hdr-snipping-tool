@@ -16,7 +16,7 @@ pub fn get_logical_device(
         enabled_features: FEATURES,
         queue_create_infos: vec![QueueCreateInfo {
             queue_family_index,
-            queues: vec![0.5; QUEUE_COUNT],
+            queues: vec![0.5; QUEUE_COUNT as usize],
             ..Default::default()
         }],
         ..Default::default()
