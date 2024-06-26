@@ -1,3 +1,5 @@
+use crate::project_directory;
+
 pub fn init_fern() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
         .format(move |out, message, record| {
@@ -10,7 +12,7 @@ pub fn init_fern() -> Result<(), fern::InitError> {
         })
         .level(log::LevelFilter::Info)
         .chain(std::io::stdout())
-        .chain(fern::log_file("log.txt")?)
+        .chain(fern::log_file(project_directory().join("log.txt"))?)
         .apply()?;
     Ok(())
 }

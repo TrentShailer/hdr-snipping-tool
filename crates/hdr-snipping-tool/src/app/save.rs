@@ -2,13 +2,14 @@ use std::{
     borrow::Cow,
     fs::File,
     io::{self, BufWriter},
-    path::PathBuf,
 };
 
 use arboard::{Clipboard, ImageData};
 use chrono::Local;
 use image::{codecs::png::PngEncoder, GenericImageView, ImageBuffer, ImageError, Rgba};
 use thiserror::Error;
+
+use crate::project_directory;
 
 use super::{ActiveCapture, App};
 
@@ -73,7 +74,7 @@ impl App {
 
         // Write image to file
         let name = format!("screenshot {}.png", Local::now().format("%F %H-%M-%S"));
-        let path = PathBuf::from(name);
+        let path = project_directory().join(name);
         let file = File::create(path).map_err(Error::CreateFile)?;
         let mut buffer = BufWriter::new(file);
         let encoder = PngEncoder::new(&mut buffer);

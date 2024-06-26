@@ -7,7 +7,10 @@ mod only_instance;
 mod selection;
 mod settings;
 
+use std::{fs, path::PathBuf};
+
 use app::App;
+use directories::ProjectDirs;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use logger::init_fern;
 use message_box::display_message;
@@ -23,8 +26,24 @@ use winit::{
     error::EventLoopError, event_loop::EventLoop, platform::run_on_demand::EventLoopExtRunOnDemand,
 };
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn main() {
-    init_fern().unwrap();
+    if let Err(e) = fs::create_dir_all(project_directory()) {
+        display_message(
+            &format!("We encountered an error while creating necessary files.\n{e}"),
+            MB_ICONERROR,
+        );
+        return;
+    };
+
+    if let Err(e) = init_fern() {
+        display_message(
+            &format!("We encountered an error while setting up the logger.\n{e}"),
+            MB_ICONERROR,
+        );
+        return;
+    };
 
     if let Err(e) = init() {
         log::error!("{e}");
@@ -156,4 +175,16 @@ fn init() -> Result<(), AppError> {
     // run the app
     event_loop.run_app_on_demand(&mut app)?;
     Ok(())
+}
+
+pub fn project_directory() -> PathBuf {
+    let dir = match ProjectDirs::from("com", "trentshailer", "hdr-snipping-tool") {
+        Some(v) => v,
+        None => {
+            display_message("We were unable to get the app directory.", MB_ICONERROR);
+            std::process::exit(-1);
+        }
+    };
+
+    dir.data_dir().to_path_buf()
 }

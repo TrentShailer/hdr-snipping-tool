@@ -8,7 +8,7 @@ mod take_capture;
 mod tray_icon;
 mod update_tonemapper_settings;
 
-use std::sync::Arc;
+use std::{process::Command, sync::Arc};
 
 use ::tray_icon::{menu::MenuEvent, TrayIcon};
 use vulkan_instance::{texture::Texture, VulkanInstance};
@@ -24,7 +24,9 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use crate::{message_box::display_message, selection::Selection, settings::Settings};
+use crate::{
+    message_box::display_message, project_directory, selection::Selection, settings::Settings,
+};
 
 pub struct ActiveApp {
     pub window_id: WindowId,
@@ -113,8 +115,16 @@ impl ApplicationHandler<()> for App {
         };
 
         if let Ok(tray_event) = MenuEvent::receiver().try_recv() {
-            if tray_event.id.0.as_str() == "0" {
-                event_loop.exit()
+            match tray_event.id.0.as_str() {
+                "0" => {
+                    if let Err(e) = Command::new("explorer").arg(project_directory()).spawn() {
+                        log::error!("{e}");
+                        display_message("We encountered an error while opening file explor\nMore details are in the logs.", MB_ICONERROR);
+                        event_loop.exit();
+                    }
+                }
+                "1" => event_loop.exit(),
+                _ => {}
             }
         }
 

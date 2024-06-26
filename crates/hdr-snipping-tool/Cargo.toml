@@ -1,6 +1,6 @@
 [package]
 name = "hdr-snipping-tool"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 
 build = "build.rs"
@@ -34,6 +34,7 @@ image = { version = "0.25", features = ["png"] }
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 tray-icon = "0.14"
+directories = "5.0"
 
 [build-dependencies]
 embed-resource = "2.4"

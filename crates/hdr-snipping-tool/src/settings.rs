@@ -1,13 +1,16 @@
 use std::{
     fs,
     io::{self, Read},
+    path::PathBuf,
 };
 
 use global_hotkey::hotkey::Code;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-const SETTINGS_FILE_PATH: &str = "./hdr-config.toml";
+use crate::project_directory;
+
+const SETTINGS_FILE: &str = "hdr-config.toml";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
@@ -41,7 +44,7 @@ pub enum SaveError {
 
 impl Settings {
     pub fn load_or_create() -> Result<Self, LoadError> {
-        let file = fs::File::open(SETTINGS_FILE_PATH);
+        let file = fs::File::open(Self::file_path());
 
         if file
             .as_ref()
@@ -66,8 +69,12 @@ impl Settings {
     pub fn save(&self) -> Result<(), SaveError> {
         let toml_string = toml::to_string_pretty(self)?;
 
-        fs::write(SETTINGS_FILE_PATH, toml_string.as_bytes())?;
+        fs::write(Self::file_path(), toml_string.as_bytes())?;
         Ok(())
+    }
+
+    pub fn file_path() -> PathBuf {
+        project_directory().join(SETTINGS_FILE)
     }
 }
 

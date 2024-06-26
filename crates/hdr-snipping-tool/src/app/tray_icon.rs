@@ -4,6 +4,8 @@ use tray_icon::{
     BadIcon, Icon, TrayIcon, TrayIconBuilder,
 };
 
+use crate::VERSION;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Invalid Icon:\n{0}")]
@@ -18,12 +20,17 @@ pub enum Error {
 
 pub fn init_tray_icon() -> Result<TrayIcon, Error> {
     let icon = Icon::from_resource(1, Some((24, 24)))?;
-    let quit_item = MenuItem::with_id(0, "Quit HDR Snipping Tool", true, None);
-    let tray_menu = Menu::with_items(&[&quit_item])?;
+
+    let directory_item = MenuItem::with_id(0, "Open Storage Directory", true, None);
+    let quit_item = MenuItem::with_id(1, "Quit HDR Snipping Tool", true, None);
+
+    let tray_menu = Menu::with_items(&[&directory_item, &quit_item])?;
+
     let tray_icon = TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
-        .with_tooltip("HDR Snipping Tool")
+        .with_tooltip(format!("HDR Snipping Tool v{}", VERSION))
         .with_icon(icon)
         .build()?;
+
     Ok(tray_icon)
 }
