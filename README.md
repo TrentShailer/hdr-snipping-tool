@@ -39,9 +39,9 @@ The screenshot is copied to your clipboard and saved as a png next to the execut
 
 ![HDR example 1][hdr-example-1]
 
-[win-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/main/media/window-snipping-tool-example-1.png?raw=true "Windows snipping tool example showing a screenshot from Death Standing with blown out highlights"
+[win-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/version-1/media/window-snipping-tool-example-1.png "Windows snipping tool example showing a screenshot from Death Standing with blown out highlights"
 
-[hdr-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/main/media/hdr-snipping-tool-example-1.png?raw=true "HDR snipping tool example showing the same screenshot from Death Stranding without the blown out highlights"
+[hdr-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/version-1/media/hdr-snipping-tool-example-1.png "HDR snipping tool example showing the same screenshot from Death Stranding without the blown out highlights"
 
 ## Acknowledgments
 
