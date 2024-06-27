@@ -68,16 +68,42 @@ impl Renderer {
                 .next()
                 .ok_or(Error::CompositeAlpha)?;
 
+            let present_modes = vk
+                .device
+                .physical_device()
+                .surface_present_modes(&vk.surface, Default::default())
+                .map_err(Error::GetSurfaceCapabilites)?;
+
+            let swapchain_image_count = surface_capabilities.min_image_count + 1;
+
+            let mailbox_score = if swapchain_image_count > 2 { 0 } else { 1 };
+            let immediate_score = if swapchain_image_count <= 2 { 0 } else { 1 };
+
+            // FIFO modes end up lagging behind to mailbox or immediate are preferred
+            // As mailbox acts like FIFO with 2 or fewer images, in that case we should use immediate
+            // Mailbox with > 2 images is preferred over immediate as it has less tearing
+            let present_mode = present_modes
+                .min_by_key(|mode| match mode {
+                    vulkano::swapchain::PresentMode::Mailbox => mailbox_score,
+                    vulkano::swapchain::PresentMode::Immediate => immediate_score,
+                    vulkano::swapchain::PresentMode::FifoRelaxed => 2,
+                    vulkano::swapchain::PresentMode::Fifo => 3,
+                    _ => 4,
+                })
+                .expect("Device has no present modes");
+
+            log::info!("Present mode: {:?}", present_mode);
+
             Swapchain::new(
                 vk.device.clone(),
                 vk.surface.clone(),
                 SwapchainCreateInfo {
-                    min_image_count: surface_capabilities.min_image_count + 1,
+                    min_image_count: swapchain_image_count,
                     image_format,
                     image_extent: window.inner_size().into(),
                     image_usage: ImageUsage::COLOR_ATTACHMENT,
                     composite_alpha,
-                    present_mode: vulkano::swapchain::PresentMode::Mailbox,
+                    present_mode,
                     ..Default::default()
                 },
             )
