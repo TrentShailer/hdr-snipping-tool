@@ -14,10 +14,10 @@ pub struct Vertex {
 #[repr(C)]
 pub struct InstanceData {
     #[format(R32G32_SFLOAT)]
-    pub position_offset: [f32; 2],
+    pub glyph_position: [f32; 2],
 
     #[format(R32G32_SFLOAT)]
-    pub size: [f32; 2],
+    pub glyph_size: [f32; 2],
 
     #[format(R32G32_SFLOAT)]
     pub bitmap_size: [f32; 2],

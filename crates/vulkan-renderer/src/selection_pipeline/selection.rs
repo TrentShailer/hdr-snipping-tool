@@ -14,7 +14,7 @@ use vulkano::{
     Validated, ValidationError, VulkanError,
 };
 
-use crate::renderer::units::{LogicalPosition, LogicalScale};
+use crate::renderer::units::{VkPosition, VkSize};
 
 use super::{vertex::Vertex, vertex_shader::PushConstants};
 
@@ -36,7 +36,7 @@ pub const VERTICIES: [Vertex; 8] = [
         flags: LOCKED_FLAG,
     }, // TL
     Vertex {
-        position: [-1.0, -1.0],
+        position: [-0.5, -0.5],
         color: [0, 0, 0, 128],
         flags: NO_FLAGS,
     }, // CTL
@@ -46,7 +46,7 @@ pub const VERTICIES: [Vertex; 8] = [
         flags: LOCKED_FLAG,
     }, // TR
     Vertex {
-        position: [1.0, -1.0],
+        position: [0.5, -0.5],
         color: [0, 0, 0, 128],
         flags: NO_FLAGS,
     }, // CTR
@@ -56,7 +56,7 @@ pub const VERTICIES: [Vertex; 8] = [
         flags: LOCKED_FLAG,
     }, // BR
     Vertex {
-        position: [1.0, 1.0],
+        position: [0.5, 0.5],
         color: [0, 0, 0, 128],
         flags: NO_FLAGS,
     }, // CBR
@@ -66,7 +66,7 @@ pub const VERTICIES: [Vertex; 8] = [
         flags: LOCKED_FLAG,
     }, // BL
     Vertex {
-        position: [-1.0, 1.0],
+        position: [-0.5, 0.5],
         color: [0, 0, 0, 128],
         flags: NO_FLAGS,
     }, // CBL
@@ -181,8 +181,8 @@ impl Selection {
             PrimaryAutoCommandBuffer<Arc<StandardCommandBufferAllocator>>,
             Arc<StandardCommandBufferAllocator>,
         >,
-        position: LogicalPosition,
-        scale: LogicalScale,
+        position: VkPosition,
+        size: VkSize,
     ) -> Result<(), Box<ValidationError>> {
         command_buffer
             .bind_pipeline_graphics(self.pipeline.clone())?
@@ -192,8 +192,10 @@ impl Selection {
                 self.pipeline.layout().clone(),
                 0,
                 PushConstants {
-                    selection_position: position.into(),
-                    selection_scale: scale.into(),
+                    base_position: [0.0, 0.0],
+                    base_size: [1.0, 1.0],
+                    target_position: position.into(),
+                    target_size: size.into(),
                 },
             )?
             .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?;

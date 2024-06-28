@@ -8,8 +8,11 @@ layout(location = 2) in uint flags;
 layout(location = 0) out vec4 out_color;
 
 layout(push_constant) uniform PushConstants {
-    vec2 border_position;
-    vec2 border_scale;
+    vec2 base_position;
+    vec2 base_size;
+
+    vec2 target_position;
+    vec2 target_size;
 	vec2 line_size;
 };
 
@@ -20,26 +23,32 @@ void main() {
 
     out_color = color;
 
-	vec2 scaled = position * border_scale;
-	vec2 out_position = scaled + vec2(border_scale) + border_position;
+	// calcuate the scale that should be applied to the rect
+	vec2 scale = target_size / base_size;
+	vec2 scaled_position = position * scale;
+
+	// Work out the position offset to move the rect to the target position
+	vec2 position_offset = target_position - base_position;
+
+	vec2 out_position = scaled_position + position_offset;
 
 	// offset border_ltrb position based on position and line size
 	if ((left && outer) || (!left && !outer)) {
 		// shift points left
-		out_position.x -= line_size.x;
+		out_position.x -= line_size.x / 2.0;
 	}
 	else {
 		// shift points right
-		out_position.x += line_size.x;
+		out_position.x += line_size.x / 2.0;
 	}
 
 	if ((top && outer) || (!top && !outer)) {
 		// shift points up
-		out_position.y -= line_size.y;
+		out_position.y -= line_size.y / 2.0;
 	}
 	else {
 		// shift poitns down
-		out_position.y += line_size.y;
+		out_position.y += line_size.y / 2.0;
 	}
 
 

@@ -10,7 +10,10 @@ use vulkano::{
     ValidationError,
 };
 
-use crate::{parameters_pipeline::vertex_shader::PushConstants, renderer::units::LogicalPosition};
+use crate::{
+    parameters_pipeline::vertex_shader::PushConstants,
+    renderer::units::{VkPosition, VkSize},
+};
 
 use super::{text_renderer::FONT_SIZE, Parameters};
 
@@ -23,7 +26,8 @@ impl Parameters {
             PrimaryAutoCommandBuffer<Arc<StandardCommandBufferAllocator>>,
             Arc<StandardCommandBufferAllocator>,
         >,
-        position: LogicalPosition,
+        position: VkPosition,
+        size: VkSize,
         window_size: [u32; 2],
     ) -> Result<(), Box<ValidationError>> {
         command_buffer
@@ -43,9 +47,13 @@ impl Parameters {
                 self.pipeline.layout().clone(),
                 0,
                 PushConstants {
+                    base_position: [0.0, 0.0],
+                    base_size: [2.0, 2.0],
+
                     font_size: FONT_SIZE,
                     window_size: [window_size[0] as f32, window_size[1] as f32],
                     text_position: position.into(),
+                    text_size: size.into(),
                 },
             )?
             .draw_indexed(self.index_buffer.len() as u32, self.instances, 0, 0, 0)?;

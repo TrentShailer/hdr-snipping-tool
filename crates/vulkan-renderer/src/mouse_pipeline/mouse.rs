@@ -14,7 +14,7 @@ use vulkano::{
     Validated, ValidationError, VulkanError,
 };
 
-use crate::renderer::units::{LogicalPosition, LogicalScale};
+use crate::renderer::units::{FromPhysical, VkPosition, VkSize};
 
 use super::{vertex::Vertex, vertex_shader::PushConstants};
 
@@ -189,10 +189,10 @@ impl Mouse {
             PrimaryAutoCommandBuffer<Arc<StandardCommandBufferAllocator>>,
             Arc<StandardCommandBufferAllocator>,
         >,
-        mouse_position: LogicalPosition,
+        mouse_position: VkPosition,
         window_size: [u32; 2],
     ) -> Result<(), Box<ValidationError>> {
-        let line_size = LogicalScale::from_f32x2([self.line_size, self.line_size], window_size);
+        let line_size = VkSize::from_physical([self.line_size, self.line_size], window_size);
 
         command_buffer
             .bind_pipeline_graphics(self.pipeline.clone())?
