@@ -14,7 +14,7 @@ use vulkano::{
     Validated, ValidationError, VulkanError,
 };
 
-use crate::renderer::units::{LogicalPosition, LogicalScale};
+use crate::renderer::units::{VkPosition, VkSize};
 
 use super::{vertex::Vertex, vertex_shader::PushConstants};
 
@@ -148,8 +148,8 @@ impl Rect {
             PrimaryAutoCommandBuffer<Arc<StandardCommandBufferAllocator>>,
             Arc<StandardCommandBufferAllocator>,
         >,
-        position: LogicalPosition,
-        scale: LogicalScale,
+        position: VkPosition,
+        size: VkSize,
     ) -> Result<(), Box<ValidationError>> {
         command_buffer
             .bind_pipeline_graphics(self.pipeline.clone())?
@@ -159,8 +159,11 @@ impl Rect {
                 self.pipeline.layout().clone(),
                 0,
                 PushConstants {
-                    rect_position: position.into(),
-                    rect_scale: scale.into(),
+                    base_position: [0.0, 0.0],
+                    base_size: [2.0, 2.0],
+
+                    target_position: position.into(),
+                    target_size: size.into(),
                 },
             )?
             .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?;

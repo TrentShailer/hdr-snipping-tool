@@ -21,7 +21,7 @@ use vulkano::{
     Validated, ValidationError, VulkanError,
 };
 
-use crate::renderer::units::{LogicalPosition, LogicalScale};
+use crate::renderer::units::{AddPhysical, FromPhysical, VkPosition, VkSize};
 
 use super::vertex::{InstanceData, Vertex};
 
@@ -197,23 +197,37 @@ impl Parameters {
         &self,
         mouse_position: [u32; 2],
         window_size: [u32; 2],
-    ) -> (LogicalPosition, LogicalScale) {
-        let text_offset = LogicalScale::from_f32x2([TEXT_OFFSET, TEXT_OFFSET], window_size);
+    ) -> (VkPosition, VkSize) {
+        let text_offset = VkSize::from_physical([TEXT_OFFSET, TEXT_OFFSET], window_size);
 
-        let text_scale =
-            LogicalScale::from_f32x2([self.text_right, self.layout.height()], window_size);
+        let text_size = VkSize::from_physical([self.text_right, self.layout.height()], window_size);
+
+        let text_position = VkPosition::from([
+            1.0 - text_size.x / 2.0 - text_offset.x,
+            -1.0 + text_size.y / 2.0 + text_offset.y,
+        ]);
+
+        let mouse_position = VkPosition::from_physical(mouse_position, window_size);
+
+        let text_bottom_left = VkPosition::from([
+            text_position.x - text_size.x / 2.0,
+            text_position.y + text_size.y / 2.0,
+        ]);
+        let obscured_bottom_left = text_bottom_left.add_physical([-128.0, 128.0], window_size);
 
         let obscured =
-            mouse_position[0] > 2 * window_size[0] / 3 && mouse_position[1] < window_size[1] / 3;
+            mouse_position.x > obscured_bottom_left.x && mouse_position.y < obscured_bottom_left.y;
 
         let text_position = if obscured {
-            LogicalPosition::new(-1.0 + text_offset.x, -1.0 + text_offset.y)
+            VkPosition::from([
+                -1.0 + text_size.x / 2.0 + text_offset.x,
+                -1.0 + text_size.y / 2.0 + text_offset.y,
+            ])
         } else {
-            let r = 1.0 - text_scale.x * 2.0;
-            LogicalPosition::new(r - text_offset.x, -1.0 + text_offset.y)
+            text_position
         };
 
-        (text_position, text_scale)
+        (text_position, text_size)
     }
 }
 

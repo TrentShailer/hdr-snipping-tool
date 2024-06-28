@@ -14,7 +14,7 @@ use vulkano::{
     Validated, ValidationError, VulkanError,
 };
 
-use crate::renderer::units::{LogicalPosition, LogicalScale};
+use crate::renderer::units::{FromPhysical, VkPosition, VkSize};
 
 use super::{vertex::Vertex, vertex_shader::PushConstants};
 
@@ -193,11 +193,11 @@ impl Border {
             PrimaryAutoCommandBuffer<Arc<StandardCommandBufferAllocator>>,
             Arc<StandardCommandBufferAllocator>,
         >,
-        position: LogicalPosition,
-        scale: LogicalScale,
+        position: VkPosition,
+        size: VkSize,
         window_size: [u32; 2],
     ) -> Result<(), Box<ValidationError>> {
-        let line_size = LogicalScale::from_f32x2([self.line_size, self.line_size], window_size);
+        let line_size = VkSize::from_physical([self.line_size, self.line_size], window_size);
 
         command_buffer
             .bind_pipeline_graphics(self.pipeline.clone())?
@@ -207,8 +207,10 @@ impl Border {
                 self.pipeline.layout().clone(),
                 0,
                 PushConstants {
-                    border_position: position.into(),
-                    border_scale: scale.into(),
+                    base_position: [0.0, 0.0],
+                    base_size: [2.0, 2.0],
+                    target_position: position.into(),
+                    target_size: size.into(),
                     line_size: line_size.into(),
                 },
             )?

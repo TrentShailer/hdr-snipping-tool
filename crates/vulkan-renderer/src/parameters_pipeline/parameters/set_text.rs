@@ -44,8 +44,8 @@ impl Parameters {
             let index = glyph_data.index;
 
             let instance = InstanceData {
-                position_offset: [glyph.x, glyph.y],
-                size: [glyph.width as f32, glyph.height as f32],
+                glyph_position: [glyph.x, glyph.y],
+                glyph_size: [glyph.width as f32, glyph.height as f32],
                 bitmap_size: [
                     glyph_data.metrics.width as f32,
                     glyph_data.metrics.height as f32,
@@ -58,7 +58,7 @@ impl Parameters {
                 ],
             };
 
-            if glyph.x + glyph.width as f32 > text_right {
+            if glyph.x + glyph.width as f32 > text_right && glyph.char_data.rasterize() {
                 text_right = glyph.x + glyph.width as f32;
             }
 

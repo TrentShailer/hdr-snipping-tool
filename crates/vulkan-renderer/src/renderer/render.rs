@@ -14,7 +14,7 @@ use vulkano::{
 use winit::window::Window;
 
 use super::{
-    units::{LogicalPosition, LogicalScale},
+    units::{vk_scale::VkSize, AddPhysical, FromPhysical, VkPosition},
     window_size_dependent_setup, Renderer,
 };
 
@@ -23,7 +23,8 @@ impl Renderer {
         &mut self,
         vk: &VulkanInstance,
         window: Arc<Window>,
-        selection: [u32; 4],
+        selection_top_left: [u32; 2],
+        selection_size: [u32; 2],
         mouse_position: [u32; 2],
     ) -> Result<(), Error> {
         let image_extent: [u32; 2] = window.inner_size().into();
@@ -100,7 +101,6 @@ impl Renderer {
         .map_err(Error::CreateCommandBuffer)?;
 
         builder
-            // Before we can draw, we have to *enter a render pass*.
             .begin_render_pass(
                 RenderPassBeginInfo {
                     clear_values: vec![Some([0.05, 0.05, 0.05, 1.0].into())],
@@ -119,24 +119,22 @@ impl Renderer {
 
         self.capture.render(&mut builder)?;
 
-        let selection_position =
-            LogicalPosition::from_u32x2([selection[0], selection[1]], window_size);
-        let selection_scale = LogicalScale::from_u32x2(
-            [selection[2] - selection[0], selection[3] - selection[1]],
-            window_size,
-        );
+        // Selection and mouse guide rendering
+        let selection_top_left = VkPosition::from_physical(selection_top_left, window_size);
+        let selection_size = VkSize::from_physical(selection_size, window_size);
+        let selection_position = VkPosition::get_center(selection_top_left, selection_size);
 
         self.selection
-            .render(&mut builder, selection_position, selection_scale)?;
+            .render(&mut builder, selection_position, selection_size)?;
         self.mouse.render(
             &mut builder,
-            LogicalPosition::from_u32x2(mouse_position, window_size),
+            VkPosition::from_physical(mouse_position, window_size),
             window_size,
         )?;
         self.selection_border.render(
             &mut builder,
             selection_position,
-            selection_scale,
+            selection_size,
             window_size,
         )?;
 
@@ -145,15 +143,14 @@ impl Renderer {
             .parameters
             .get_position_size(mouse_position, window_size);
 
-        let rect_position = text_position.add_f32x2([-10.0, -5.0], window_size);
-        let rect_scale = text_size.add_f32x2([20.0, 10.0], window_size);
+        let rect_size = text_size.add_physical([20.0, 20.0], window_size);
 
         self.text_rect
-            .render(&mut builder, rect_position, rect_scale)?;
+            .render(&mut builder, text_position, rect_size)?;
         self.text_border
-            .render(&mut builder, rect_position, rect_scale, window_size)?;
+            .render(&mut builder, text_position, rect_size, window_size)?;
         self.parameters
-            .render(&mut builder, text_position, window_size)?;
+            .render(&mut builder, text_position, text_size, window_size)?;
 
         builder.end_render_pass(Default::default())?;
 

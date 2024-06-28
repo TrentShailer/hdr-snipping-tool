@@ -16,10 +16,13 @@ impl App {
             return;
         }
 
+        let selection = self.selection.as_pos_size();
+
         let result = app.renderer.render(
             &app.vulkan_instance,
             app.window.clone(),
-            self.selection.as_ltrb(),
+            selection.0.into(),
+            selection.1.into(),
             self.mouse_position.into(),
         );
 

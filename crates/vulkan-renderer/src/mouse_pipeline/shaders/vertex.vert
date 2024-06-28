@@ -43,19 +43,19 @@ void main() {
 	// offset border_points position based on position and line size
 	if (positive_shift && vertical) {
 		// offset x by line +x
-		x += line_size.x;
+		x += line_size.x / 2.0;
 	}
 	else if (!positive_shift && vertical) {
 		// offset x by line -x
-		x -= line_size.x;
+		x -= line_size.x / 2.0;
 	}
 	else if (positive_shift && !vertical) {
 		// offset y by line +y
-		y += line_size.y;
+		y += line_size.y / 2.0;
 	}
 	else if (!positive_shift && !vertical) {
 		// offset y by line -y
-		y -= line_size.y;
+		y -= line_size.y / 2.0;
 	}
 
 	gl_Position = vec4(x, y, 0.0, 1.0);
