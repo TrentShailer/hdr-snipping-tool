@@ -10,7 +10,7 @@ See [version 2 deep dive](https://github.com/TrentShailer/hdr-snipping-tool/blob
 
 Requires Rust v1.79 or later.
 
-`cargo install --git 'https://github.com/TrentShailer/hdr-snipping-tool'`
+`cargo install --git 'https://github.com/TrentShailer/hdr-snipping-tool.git'`
 
 ## Usage
 
