@@ -20,11 +20,15 @@ impl VulkanInstance {
         let surface =
             Surface::from_window(instance.clone(), window.clone()).map_err(Error::NewSurface)?;
 
-        let (physical_device, queue_family_index) =
+        let (physical_device, queue_family_index, supported_optional_features) =
             get_physical_device(instance.clone(), surface.clone())?;
 
-        let (device, mut queues) = get_logical_device(physical_device.clone(), queue_family_index)
-            .map_err(Error::LogicalDevice)?;
+        let (device, mut queues) = get_logical_device(
+            physical_device.clone(),
+            queue_family_index,
+            supported_optional_features.clone(),
+        )
+        .map_err(Error::LogicalDevice)?;
 
         let allocators = Arc::new(Allocators::new(device.clone()));
 
@@ -39,10 +43,18 @@ impl VulkanInstance {
 
         Ok(Self {
             allocators,
+            physical_device,
             device,
             queue,
             surface,
+            supported_optional_features,
         })
+    }
+
+    pub fn queue_supports_timestamps(&self) -> bool {
+        self.physical_device.queue_family_properties()[self.queue.queue_family_index() as usize]
+            .timestamp_valid_bits
+            .is_some()
     }
 }
 

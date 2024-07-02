@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 use vulkano::{
-    instance::{Instance, InstanceCreateFlags, InstanceCreateInfo},
+    instance::{Instance, InstanceCreateInfo},
     swapchain::Surface,
     LoadingError, Validated, VulkanError, VulkanLibrary,
 };
@@ -23,7 +23,7 @@ pub fn aquire_instance(event_loop: &ActiveEventLoop) -> Result<Arc<Instance>, Er
     let required_extensions = Surface::required_extensions(&event_loop);
 
     let instance_create_info = InstanceCreateInfo {
-        flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
+        // flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
         enabled_extensions: required_extensions,
         ..Default::default()
     };
