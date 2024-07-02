@@ -61,6 +61,7 @@ impl Renderer {
                 .surface_formats(&vk.surface, Default::default())
                 .map_err(Error::GetSurfaceFormats)?[0]
                 .0;
+            log::debug!("Image format: {:?}", image_format);
 
             let composite_alpha = surface_capabilities
                 .supported_composite_alpha
@@ -75,6 +76,7 @@ impl Renderer {
                 .map_err(Error::GetSurfaceCapabilites)?;
 
             let swapchain_image_count = surface_capabilities.min_image_count + 1;
+            log::debug!("Swapchain images: {}", swapchain_image_count);
 
             let mailbox_score = if swapchain_image_count > 2 { 0 } else { 1 };
             let immediate_score = if swapchain_image_count <= 2 { 0 } else { 1 };
@@ -92,7 +94,7 @@ impl Renderer {
                 })
                 .expect("Device has no present modes");
 
-            log::info!("Present mode: {:?}", present_mode);
+            log::debug!("Present mode: {:?}", present_mode);
 
             Swapchain::new(
                 vk.device.clone(),

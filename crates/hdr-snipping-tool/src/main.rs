@@ -29,6 +29,10 @@ use winit::{
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
+    if std::env::args().any(|arg| arg.eq("--debug")) {
+        std::env::set_var("hdr-snipping-tool-debug", "true");
+    }
+
     if let Err(e) = fs::create_dir_all(project_directory()) {
         display_message(
             &format!("We encountered an error while creating necessary files.\n{e}"),

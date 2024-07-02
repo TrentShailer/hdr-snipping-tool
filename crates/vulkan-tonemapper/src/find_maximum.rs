@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use half::f16;
 use thiserror::Error;
 use vulkan_instance::{
@@ -31,6 +33,7 @@ pub fn find_maximum(
     staging_buffer: Subbuffer<[u8]>,
     byte_count: u32,
 ) -> Result<f16, Error> {
+    let start = Instant::now();
     let pipeline = {
         let shader = shader::load(vk.device.clone())
             .map_err(Error::LoadShader)?
@@ -206,6 +209,12 @@ pub fn find_maximum(
 
     let reader = &output_staging_buffer.read()?;
     let maximum = f16::from_le_bytes([reader[0], reader[1]]);
+
+    let end = Instant::now();
+    log::debug!(
+        "Found maximum in {}ms",
+        end.duration_since(start).as_millis()
+    );
 
     Ok(maximum)
 }

@@ -1,7 +1,8 @@
 pub mod config;
+pub mod debug;
 pub mod tonemap;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use half::f16;
 use shader::Config;
@@ -42,6 +43,7 @@ impl Tonemapper {
         alpha: f16,
         gamma: f16,
     ) -> Result<Self, Error> {
+        let start = Instant::now();
         let pipeline = {
             let compute_shader = shader::load(vk.device.clone())
                 .map_err(Error::LoadShader)?
@@ -149,6 +151,14 @@ impl Tonemapper {
         )
         .map_err(Error::Descriptor)?;
 
+        let end = Instant::now();
+        log::debug!(
+            "Created tonemapper in {}ms",
+            end.duration_since(start).as_millis()
+        );
+
+        let timestamp_pool = debug::maybe_create_timestamp_pool(vk);
+
         Ok(Self {
             pipeline,
             config,
@@ -156,6 +166,7 @@ impl Tonemapper {
             config_buffer,
             io_set,
             config_set,
+            timestamp_pool,
         })
     }
 }
