@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Instant};
+use std::{collections::HashMap, sync::Arc};
 
 use fontdue::{
     layout::{GlyphRasterConfig, Layout, TextStyle},
@@ -53,8 +53,6 @@ impl TextRenderer {
             .map_err(Error::Font)?,
         );
 
-        let s = Instant::now();
-
         // Build atlas
         let atlas_dim = (ATLAS_GLYPHS.chars().count() as f32).sqrt().ceil() as usize;
 
@@ -70,7 +68,6 @@ impl TextRenderer {
 
         for glyph in layout.glyphs() {
             let (metrics, bitmap) = font.rasterize_config(glyph.key);
-            log::info!("{}", bitmap.len());
 
             // Because altas_data needs to be built row-wise, the data in the bitmap should be copied
             // into the atlas row by row with correct offsets.
@@ -163,9 +160,6 @@ impl TextRenderer {
             .then_signal_fence_and_flush()
             .map_err(Error::SignalFence)?;
         future.wait(None).map_err(Error::AwaitFence)?;
-
-        let e = Instant::now();
-        log::info!("Built atlas in {}ms", e.duration_since(s).as_millis());
 
         Ok(Self {
             atlas,
