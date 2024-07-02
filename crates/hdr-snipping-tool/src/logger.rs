@@ -10,7 +10,7 @@ pub fn init_fern() -> Result<(), fern::InitError> {
 
             out.finish(format_args!("[{time}] [{level}] [{target}]\n{message}\n",))
         })
-        .level(log::LevelFilter::Debug)
+        .level(log::LevelFilter::Info)
         .chain(std::io::stdout())
         .chain(fern::log_file(project_directory().join("log.txt"))?)
         .apply()?;

@@ -24,7 +24,7 @@ use vulkano::{
 use winit::dpi::PhysicalPosition;
 
 const ATLAS_GLYPHS: &str = "-0123456789:.AlphaGmMIxn ";
-pub const FONT_SIZE: f32 = 32.0;
+pub const FONT_SIZE: f32 = 16.0;
 
 pub struct GlyphData {
     pub metrics: Metrics,
