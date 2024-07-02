@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use fontdue::{
     layout::{GlyphRasterConfig, Layout, TextStyle},
@@ -24,7 +24,7 @@ use vulkano::{
 use winit::dpi::PhysicalPosition;
 
 const ATLAS_GLYPHS: &str = "-0123456789:.AlphaGmMIxn ";
-pub const FONT_SIZE: f32 = 16.0;
+pub const FONT_SIZE: f32 = 32.0;
 
 pub struct GlyphData {
     pub metrics: Metrics,
@@ -42,7 +42,18 @@ pub struct TextRenderer {
 impl TextRenderer {
     pub fn new(vk: &VulkanInstance, layout: &mut Layout) -> Result<Self, Error> {
         let font = include_bytes!("../fonts/FiraMono-Regular.ttf") as &[u8];
-        let font = Arc::from(Font::from_bytes(font, FontSettings::default()).map_err(Error::Font)?);
+        let font = Arc::from(
+            Font::from_bytes(
+                font,
+                FontSettings {
+                    scale: FONT_SIZE,
+                    ..Default::default()
+                },
+            )
+            .map_err(Error::Font)?,
+        );
+
+        let s = Instant::now();
 
         // Build atlas
         let atlas_dim = (ATLAS_GLYPHS.chars().count() as f32).sqrt().ceil() as usize;
@@ -59,6 +70,7 @@ impl TextRenderer {
 
         for glyph in layout.glyphs() {
             let (metrics, bitmap) = font.rasterize_config(glyph.key);
+            log::info!("{}", bitmap.len());
 
             // Because altas_data needs to be built row-wise, the data in the bitmap should be copied
             // into the atlas row by row with correct offsets.
@@ -151,6 +163,9 @@ impl TextRenderer {
             .then_signal_fence_and_flush()
             .map_err(Error::SignalFence)?;
         future.wait(None).map_err(Error::AwaitFence)?;
+
+        let e = Instant::now();
+        log::info!("Built atlas in {}ms", e.duration_since(s).as_millis());
 
         Ok(Self {
             atlas,
