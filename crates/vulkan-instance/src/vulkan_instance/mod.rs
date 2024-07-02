@@ -41,6 +41,12 @@ impl VulkanInstance {
             physical_device.properties().device_type,
         );
 
+        log::debug!(
+            "Queue family index: {}\nSupported optional featuers: {:?}",
+            queue_family_index,
+            supported_optional_features
+        );
+
         Ok(Self {
             allocators,
             physical_device,

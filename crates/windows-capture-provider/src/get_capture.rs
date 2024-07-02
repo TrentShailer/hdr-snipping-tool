@@ -1,4 +1,4 @@
-use std::sync::mpsc::RecvError;
+use std::{sync::mpsc::RecvError, time::Instant};
 
 use hdr_capture::{CaptureInfo, CaptureProvider, DisplayInfo};
 use thiserror::Error;
@@ -16,6 +16,8 @@ impl CaptureProvider for WindowsCaptureProvider {
     fn get_capture(
         &mut self,
     ) -> Result<(Vec<u8>, hdr_capture::DisplayInfo, hdr_capture::CaptureInfo), Self::Error> {
+        let start = Instant::now();
+
         self.displays = refresh_displays(&mut self.displays).map_err(Error::Displays)?;
 
         let mut mouse_point: POINT = Default::default();
@@ -48,6 +50,9 @@ impl CaptureProvider for WindowsCaptureProvider {
 
         unsafe { self.d3d_context.ClearState() };
         self.dxgi_device.Trim().map_err(Error::Trim)?;
+
+        let end = Instant::now();
+        log::debug!("Got capture in {}ms", end.duration_since(start).as_millis());
 
         Ok((raw_capture, display_info, capture_info))
     }

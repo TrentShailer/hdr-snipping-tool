@@ -56,6 +56,11 @@ impl App {
 
         let vulkan_instance = VulkanInstance::new(Arc::clone(&window), event_loop)?;
 
+        log::debug!(
+            "VkQueue supports timestamps: {}",
+            vulkan_instance.queue_supports_timestamps()
+        );
+
         let renderer = Renderer::new(&vulkan_instance, window.clone())?;
 
         let active_app = ActiveApp {

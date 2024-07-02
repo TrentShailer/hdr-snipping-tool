@@ -156,7 +156,6 @@ impl Renderer {
 
         let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
 
-        //
         let future = self
             .previous_frame_end
             .take()
