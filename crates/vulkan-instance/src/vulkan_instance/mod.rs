@@ -43,11 +43,18 @@ impl VulkanInstance {
 
         Ok(Self {
             allocators,
+            physical_device,
             device,
             queue,
             surface,
             supported_optional_features,
         })
+    }
+
+    pub fn queue_supports_timestamps(&self) -> bool {
+        self.physical_device.queue_family_properties()[self.queue.queue_family_index() as usize]
+            .timestamp_valid_bits
+            .is_some()
     }
 }
 

@@ -7,11 +7,12 @@ use std::sync::Arc;
 
 use allocators::Allocators;
 use vulkano::{
-    device::{Device, Features, Queue},
+    device::{physical::PhysicalDevice, Device, Features, Queue},
     swapchain::Surface,
 };
 
 pub struct VulkanInstance {
+    pub physical_device: Arc<PhysicalDevice>,
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
     pub surface: Arc<Surface>,
