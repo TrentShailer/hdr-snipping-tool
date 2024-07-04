@@ -114,21 +114,8 @@ impl Tonemapper {
             maximum,
             input_width: size.width,
             input_height: size.height,
+            buffer_padding: f16::ZERO,
         };
-
-        let config_buffer: Subbuffer<shader::Config> = Buffer::from_data(
-            vk.allocators.memory.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::UNIFORM_BUFFER,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            config,
-        )?;
 
         let io_layout = &pipeline.layout().set_layouts()[0];
         let io_set = PersistentDescriptorSet::new(
@@ -138,15 +125,6 @@ impl Tonemapper {
                 WriteDescriptorSet::buffer(0, input_buffer.clone()),
                 WriteDescriptorSet::image_view(1, texture.image_view.clone()),
             ],
-            [],
-        )
-        .map_err(Error::Descriptor)?;
-
-        let config_layout = &pipeline.layout().set_layouts()[1];
-        let config_set = PersistentDescriptorSet::new(
-            &vk.allocators.descriptor,
-            config_layout.clone(),
-            [WriteDescriptorSet::buffer(0, config_buffer.clone())],
             [],
         )
         .map_err(Error::Descriptor)?;
@@ -163,9 +141,7 @@ impl Tonemapper {
             pipeline,
             config,
             input_buffer,
-            config_buffer,
             io_set,
-            config_set,
             timestamp_pool,
         })
     }
