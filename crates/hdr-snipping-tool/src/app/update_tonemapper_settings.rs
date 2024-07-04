@@ -1,6 +1,6 @@
 use half::f16;
 use thiserror::Error;
-use vulkan_renderer::parameters_pipeline::parameters;
+use vulkan_renderer::text;
 use vulkan_tonemapper::tonemapper;
 
 use super::{ActiveApp, ActiveCapture};
@@ -20,8 +20,9 @@ impl ActiveCapture {
 
         self.tonemapper.tonemap(&app.vulkan_instance)?;
 
-        app.renderer.parameters.update_parameters(
+        app.renderer.parameters.set_parameters(
             &app.vulkan_instance,
+            &mut app.renderer.glyph_cache,
             self.tonemapper.config.alpha,
             self.tonemapper.config.gamma,
             self.tonemapper.config.maximum,
@@ -37,5 +38,5 @@ pub enum Error {
     Tonemap(#[from] tonemapper::tonemap::Error),
 
     #[error("Failed to update UI:\n{0}")]
-    UpdateUI(#[from] parameters::set_text::Error),
+    UpdateUI(#[from] text::set_text::Error),
 }

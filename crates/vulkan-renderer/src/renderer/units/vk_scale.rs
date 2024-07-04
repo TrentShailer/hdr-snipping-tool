@@ -1,3 +1,5 @@
+use std::ops::Mul;
+
 use super::from_physical::{AddPhysical, FromPhysical};
 
 /// Represents a size in vulkan coordinate space `(0.0, 0.0), (2.0, 2.0)`
@@ -96,6 +98,28 @@ impl AddPhysical<f64> for VkSize {
         Self {
             x: self.x + offset.x,
             y: self.y + offset.y,
+        }
+    }
+}
+
+impl Mul<f64> for VkSize {
+    type Output = VkSize;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self {
+            x: self.x * rhs,
+            y: self.y * rhs,
+        }
+    }
+}
+
+impl Mul<f32> for VkSize {
+    type Output = VkSize;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self {
+            x: self.x * rhs as f64,
+            y: self.y * rhs as f64,
         }
     }
 }

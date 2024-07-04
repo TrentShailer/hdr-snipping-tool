@@ -1093,7 +1093,7 @@ dependencies = [
 
 [[package]]
 name = "hdr-snipping-tool"
-version = "2.1.2"
+version = "2.2.0"
 dependencies = [
  "arboard",
  "chrono",
@@ -2650,7 +2650,7 @@ dependencies = [
 
 [[package]]
 name = "vulkan-instance"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "log",
  "smallvec",
@@ -2661,10 +2661,12 @@ dependencies = [
 
 [[package]]
 name = "vulkan-renderer"
-version = "1.2.1"
+version = "1.3.0"
 dependencies = [
  "fontdue",
+ "half",
  "log",
+ "smallvec",
  "thiserror",
  "vulkan-instance",
  "vulkano",

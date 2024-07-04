@@ -1,13 +1,6 @@
 #version 450
 
-// Get f16 capabilities
-#if defined(GL_AMD_gpu_shader_half_float)
-	#extension GL_AMD_gpu_shader_half_float : require
-#elif defined(GL_NV_gpu_shader5)
-	#extension GL_NV_gpu_shader5 : require
-#else
-	#error No extension available for FP16.
-#endif
+// glslc --target-spv=spv1.3 maximum.comp -o maximum.spv
 
 // Get subgroup f16 capabilities
 #extension GL_EXT_shader_subgroup_extended_types_float16 : enable

@@ -58,7 +58,6 @@ pub(crate) fn fetch_capture(
     };
 
     // Map the staging texture to allow CPU read
-    // TODO this mapping is causing the application to cling to 16MB of memory
     let staging_resource: ID3D11Resource = staging_texture.cast()?;
     let mut mapped_resource = D3D11_MAPPED_SUBRESOURCE::default();
     unsafe {
