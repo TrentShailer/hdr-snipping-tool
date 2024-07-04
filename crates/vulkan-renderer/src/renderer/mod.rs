@@ -4,21 +4,11 @@ pub mod window_size_dependent_setup;
 
 use std::sync::Arc;
 
-use crate::{
-    border_pipeline::{self, border::Border},
-    capture_pipeline::{self, capture::CaptureObject},
-    mouse_pipeline::{self, mouse::Mouse},
-    parameters_pipeline::{self, parameters::Parameters},
-    rect_pipeline::{self, rect::Rect},
-    selection_pipeline::{self, selection::Selection},
-};
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
 use vulkano::{
-    image::ImageUsage,
-    pipeline::graphics::viewport::Viewport,
-    render_pass::{Framebuffer, RenderPass, Subpass},
-    single_pass_renderpass,
+    image::{view::ImageView, ImageUsage},
+    pipeline::graphics::{subpass::PipelineRenderingCreateInfo, viewport::Viewport},
     swapchain::{Swapchain, SwapchainCreateInfo},
     sync::{self, GpuFuture},
     Validated, VulkanError,
@@ -26,21 +16,30 @@ use vulkano::{
 use window_size_dependent_setup::window_size_dependent_setup;
 use winit::window::Window;
 
+use crate::{
+    capture::Capture,
+    glyph_cache::{self, GlyphCache},
+    mouse_guides::MouseGuides,
+    parameters::{self, Parameters},
+    pipelines,
+    selection::Selection,
+};
+
+const BASE_FONT_SIZE: f32 = 17.0;
+
 pub struct Renderer {
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
     pub swapchain: Arc<Swapchain>,
-    pub framebuffers: Vec<Arc<Framebuffer>>,
-    pub render_pass: Arc<RenderPass>,
+    pub attachment_views: Vec<Arc<ImageView>>,
     pub viewport: Viewport,
+    pub glyph_cache: GlyphCache,
+    pub window_scale: f64,
     //
-    pub capture: CaptureObject,
+    pub capture: Capture,
     pub selection: Selection,
-    pub selection_border: Border,
-    pub mouse: Mouse,
+    pub mouse_guides: MouseGuides,
     pub parameters: Parameters,
-    pub text_rect: Rect,
-    pub text_border: Border,
 }
 
 impl Renderer {
@@ -61,7 +60,6 @@ impl Renderer {
                 .surface_formats(&vk.surface, Default::default())
                 .map_err(Error::GetSurfaceFormats)?[0]
                 .0;
-            log::debug!("Image format: {:?}", image_format);
 
             let composite_alpha = surface_capabilities
                 .supported_composite_alpha
@@ -76,7 +74,6 @@ impl Renderer {
                 .map_err(Error::GetSurfaceCapabilites)?;
 
             let swapchain_image_count = surface_capabilities.min_image_count + 1;
-            log::debug!("Swapchain images: {}", swapchain_image_count);
 
             let mailbox_score = if swapchain_image_count > 2 { 0 } else { 1 };
             let immediate_score = if swapchain_image_count <= 2 { 0 } else { 1 };
@@ -94,7 +91,12 @@ impl Renderer {
                 })
                 .expect("Device has no present modes");
 
-            log::debug!("Present mode: {:?}", present_mode);
+            log::debug!(
+                "Image format: {:?}\nSwapchain images: {}\nPresent mode: {:?}",
+                image_format,
+                swapchain_image_count,
+                present_mode
+            );
 
             Swapchain::new(
                 vk.device.clone(),
@@ -112,67 +114,72 @@ impl Renderer {
             .map_err(Error::CreateSwapchain)?
         };
 
-        let render_pass = single_pass_renderpass!(vk.device.clone(),
-            attachments: {
-                output_color: {
-                    format: swapchain.image_format(),
-                    samples: 1,
-                    load_op: Clear,
-                    store_op: Store,
-                }
-            },
-            pass: {
-                color: [output_color],
-                depth_stencil: {},
-            },
-        )
-        .map_err(Error::CreateRenderpass)?;
-
         let mut viewport = Viewport {
             offset: [0.0, 0.0],
             extent: [0.0, 0.0],
             depth_range: 0.0..=1.0,
         };
 
-        let framebuffers =
-            window_size_dependent_setup(&images, render_pass.clone(), &mut viewport)?;
+        let attachment_views = window_size_dependent_setup(&images, &mut viewport)?;
 
-        let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
+        let subpass = PipelineRenderingCreateInfo {
+            color_attachment_formats: vec![Some(swapchain.image_format())],
+            ..Default::default()
+        };
 
-        let capture_pipeline = capture_pipeline::create_pipeline(vk, subpass.clone())?;
-        let capture = CaptureObject::new(vk, capture_pipeline)?;
+        // Create pipelines
+        let capture_pipeline = pipelines::capture::create_pipeline(vk, subpass.clone())
+            .map_err(|e| Error::Pipeline(e, "capture"))?;
 
-        let selection_pipeline = selection_pipeline::create_pipeline(vk, subpass.clone())?;
-        let selection = Selection::new(vk, selection_pipeline)?;
+        let selection_shading_pipeline =
+            pipelines::selection_shading::create_pipeline(vk, subpass.clone())
+                .map_err(|e| Error::Pipeline(e, "selection shading"))?;
 
-        let border_pipeline = border_pipeline::create_pipeline(vk, subpass.clone())?;
-        let selection_border = Border::new(vk, border_pipeline.clone(), [255, 255, 255, 255], 2.0)?;
+        let border_pipeline = pipelines::border::create_pipeline(vk, subpass.clone())
+            .map_err(|e| Error::Pipeline(e, "border"))?;
 
-        let mouse_pipeline = mouse_pipeline::create_pipeline(vk, subpass.clone())?;
-        let mouse = Mouse::new(vk, mouse_pipeline, 1.0)?;
+        let mouse_guides_pipeline = pipelines::mouse_guides::create_pipeline(vk, subpass.clone())
+            .map_err(|e| Error::Pipeline(e, "mouse guide"))?;
 
-        let text_pipeline = parameters_pipeline::create_pipeline(vk, subpass.clone())?;
-        let parameters = Parameters::new(vk, text_pipeline, 64)?;
+        let rect_pipeline = pipelines::rect::create_pipeline(vk, subpass.clone())
+            .map_err(|e| Error::Pipeline(e, "rect"))?;
 
-        let rect_pipeline = rect_pipeline::create_pipeline(vk, subpass.clone())?;
-        let text_rect = Rect::new(vk, rect_pipeline, [45, 55, 72, 255])?;
+        let text_pipeline = pipelines::text::create_pipeline(vk, subpass.clone())
+            .map_err(|e| Error::Pipeline(e, "text"))?;
 
-        let text_border = Border::new(vk, border_pipeline.clone(), [23, 25, 35, 255], 1.0)?;
+        let glyph_cache = GlyphCache::new(vk, BASE_FONT_SIZE * window.scale_factor() as f32)?;
+
+        // Objects
+        let capture =
+            Capture::new(vk, capture_pipeline).map_err(|e| Error::Object(e, "capture"))?;
+
+        let selection = Selection::new(vk, selection_shading_pipeline, border_pipeline.clone())
+            .map_err(|e| Error::Object(e, "selection"))?;
+
+        let mouse_guides = MouseGuides::new(vk, mouse_guides_pipeline, 1.0)
+            .map_err(|e| Error::Object(e, "mouse guides"))?;
+
+        let parameters = Parameters::new(
+            vk,
+            &glyph_cache,
+            text_pipeline,
+            rect_pipeline,
+            border_pipeline,
+        )?;
 
         Ok(Self {
-            framebuffers,
             viewport,
             swapchain,
-            render_pass,
-            capture,
-            selection,
-            selection_border,
-            mouse,
-            parameters,
-            text_rect,
-            text_border,
+            attachment_views,
             previous_frame_end: Some(sync::now(vk.device.clone()).boxed()),
             recreate_swapchain: false,
+            glyph_cache,
+            window_scale: window.scale_factor(),
+            //
+            capture,
+            selection,
+            mouse_guides,
+            parameters,
         })
     }
 }
@@ -203,39 +210,16 @@ pub enum Error {
     #[error("Failed to perform Window Size Dependent Setup:\n{0}")]
     WindowSizeDependentSetup(#[from] window_size_dependent_setup::Error),
 
-    #[error("Failed to create capture pipeline:\n{0}")]
-    CapturePipeline(#[from] capture_pipeline::Error),
+    //
+    #[error("Failed to create {1} pipeline:\n{0}")]
+    Pipeline(#[source] pipelines::Error, &'static str),
 
-    #[error("Failed to create capture object:\n{0}")]
-    CaptureObject(#[from] capture_pipeline::capture::Error),
+    #[error("Failed to create {1} render object:\n{0}")]
+    Object(#[source] crate::vertex_index_buffer::Error, &'static str),
 
-    #[error("Failed to create selection shading pipeline:\n{0}")]
-    SelectionShadingPipeline(#[from] selection_pipeline::Error),
+    #[error("Failed to create glyph cache:\n{0}")]
+    GlyphCache(#[from] glyph_cache::Error),
 
-    #[error("Failed to create selection shading object:\n{0}")]
-    SelectionShadingObject(#[from] selection_pipeline::selection::Error),
-
-    #[error("Failed to create border pipeline:\n{0}")]
-    BorderPipeline(#[from] border_pipeline::Error),
-
-    #[error("Failed to create border object:\n{0}")]
-    BorderObject(#[from] border_pipeline::border::Error),
-
-    #[error("Failed to create mouse pipeline:\n{0}")]
-    MousePipeline(#[from] mouse_pipeline::Error),
-
-    #[error("Failed to create mouse object:\n{0}")]
-    MouseObject(#[from] mouse_pipeline::mouse::Error),
-
-    #[error("Failed to create text pipeline:\n{0}")]
-    TextPipeline(#[from] parameters_pipeline::Error),
-
-    #[error("Failed to create text renderer:\n{0}")]
-    TextRenderer(#[from] parameters_pipeline::parameters::Error),
-
-    #[error("Failed to create rect pipeline:\n{0}")]
-    RectPipeline(#[from] rect_pipeline::Error),
-
-    #[error("Failed to create rect:\n{0}")]
-    Rect(#[from] rect_pipeline::rect::Error),
+    #[error("Failed to create parameters render object:\n{0}")]
+    Parameters(#[from] parameters::Error),
 }

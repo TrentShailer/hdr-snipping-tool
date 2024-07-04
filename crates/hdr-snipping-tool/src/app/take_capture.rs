@@ -4,7 +4,7 @@ use half::f16;
 use hdr_capture::CaptureProvider;
 use thiserror::Error;
 use vulkan_instance::texture::Texture;
-use vulkan_renderer::{capture_pipeline::capture, parameters_pipeline::parameters};
+use vulkan_renderer::{capture, text};
 use vulkan_tonemapper::{tonemapper, Tonemapper};
 use winit::dpi::PhysicalPosition;
 
@@ -40,8 +40,9 @@ impl App {
             f16::from_f32(self.settings.default_gamma),
         )?;
 
-        app.renderer.parameters.update_parameters(
+        app.renderer.parameters.set_parameters(
             &app.vulkan_instance,
+            &mut app.renderer.glyph_cache,
             tonemapper.config.alpha,
             tonemapper.config.gamma,
             tonemapper.config.maximum,
@@ -84,11 +85,11 @@ pub enum Error {
     Tonemapper(#[from] tonemapper::Error),
 
     #[error("Failed to update renderer:\n{0}")]
-    UpdateRenderer(#[from] parameters::set_text::Error),
+    UpdateRenderer(#[from] text::set_text::Error),
 
     #[error("Failed to tonemap:\n{0}")]
     Tonemap(#[from] tonemapper::tonemap::Error),
 
     #[error("Failed to load capture into renderer:\n{0}")]
-    LoadCapture(#[from] capture::Error),
+    LoadCapture(#[from] capture::load::Error),
 }

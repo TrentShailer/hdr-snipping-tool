@@ -4,8 +4,8 @@ use thiserror::Error;
 use vulkan_instance::VulkanInstance;
 use vulkano::{
     command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage, RenderPassBeginInfo,
-        SubpassBeginInfo, SubpassContents,
+        AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage,
+        RenderingAttachmentInfo, RenderingInfo,
     },
     swapchain::{acquire_next_image, SwapchainCreateInfo, SwapchainPresentInfo},
     sync::{self, GpuFuture},
@@ -13,10 +13,12 @@ use vulkano::{
 };
 use winit::window::Window;
 
-use super::{
-    units::{vk_scale::VkSize, AddPhysical, FromPhysical, VkPosition},
-    window_size_dependent_setup, Renderer,
+use crate::{
+    glyph_cache::{self, GlyphCache},
+    text,
 };
+
+use super::{window_size_dependent_setup, Renderer, BASE_FONT_SIZE};
 
 impl Renderer {
     pub fn render(
@@ -27,7 +29,17 @@ impl Renderer {
         selection_size: [u32; 2],
         mouse_position: [u32; 2],
     ) -> Result<(), Error> {
-        let image_extent: [u32; 2] = window.inner_size().into();
+        let window_size: [u32; 2] = window.inner_size().into();
+        let window_scale = window.scale_factor();
+
+        if window_scale != self.window_scale {
+            self.window_scale = window_scale;
+
+            self.glyph_cache = GlyphCache::new(vk, BASE_FONT_SIZE * window_scale as f32)?;
+            self.parameters
+                .text
+                .update_glyph_cache(vk, &mut self.glyph_cache)?;
+        }
 
         // Checks if the previous frame future has finished, if so, releases its resources
         // Non-blocking
@@ -36,7 +48,7 @@ impl Renderer {
         }
 
         // Don't try to render a surface that isn't visible
-        if image_extent.contains(&0) {
+        if window_size.contains(&0) {
             return Ok(());
         }
 
@@ -49,49 +61,46 @@ impl Renderer {
             let (new_swapchain, new_images) = self
                 .swapchain
                 .recreate(SwapchainCreateInfo {
-                    image_extent,
+                    image_extent: window_size,
                     ..self.swapchain.create_info()
                 })
                 .map_err(Error::RecreateSwapchain)?;
-            // TODO maybe handle ImageExtentNotSupported aparently
-            // can happen while resizing
 
             self.swapchain = new_swapchain;
 
-            // Because framebuffers contains a reference to the old swapchain, we need to
-            // recreate framebuffers as well.
-            let framebuffers = window_size_dependent_setup(
-                &new_images,
-                self.render_pass.clone(),
-                &mut self.viewport,
-            )?;
+            // Because the attachment views are for the old swapchain, they must be recreated
+            let attachment_views = window_size_dependent_setup(&new_images, &mut self.viewport)?;
 
-            self.framebuffers = framebuffers;
-
+            self.attachment_views = attachment_views;
             self.recreate_swapchain = false;
         }
 
-        // Returns a future that is cleared when the image is available
-        let next_image_result = match acquire_next_image(self.swapchain.clone(), None) {
-            Ok(v) => Ok(v),
-            Err(e) => match e {
-                Validated::Error(_) => Err(Validated::unwrap(e)),
-                Validated::ValidationError(_) => return Err(Error::AquireImage(e)),
-            },
-        };
+        // Get the next image index and future for when it is available
+        let (image_index, image_future) = {
+            // Returns a future that is cleared when the image is available
+            let next_image_result = match acquire_next_image(self.swapchain.clone(), None) {
+                Ok(v) => Ok(v),
+                Err(e) => match e {
+                    Validated::Error(_) => Err(Validated::unwrap(e)),
+                    Validated::ValidationError(_) => return Err(Error::AquireImage(e)),
+                },
+            };
 
-        let (image_index, suboptimal, acquire_future) = match next_image_result {
-            Ok(r) => r,
-            Err(VulkanError::OutOfDate) => {
+            let (image_index, suboptimal, acquire_future) = match next_image_result {
+                Ok(r) => r,
+                Err(VulkanError::OutOfDate) => {
+                    self.recreate_swapchain = true;
+                    return Ok(());
+                }
+                Err(e) => return Err(Error::AquireImage(Validated::Error(e))),
+            };
+
+            if suboptimal {
                 self.recreate_swapchain = true;
-                return Ok(());
             }
-            Err(e) => return Err(Error::AquireImage(Validated::Error(e))),
-        };
 
-        if suboptimal {
-            self.recreate_swapchain = true;
-        }
+            (image_index, acquire_future)
+        };
 
         let mut builder = AutoCommandBufferBuilder::primary(
             &vk.allocators.command,
@@ -101,58 +110,41 @@ impl Renderer {
         .map_err(Error::CreateCommandBuffer)?;
 
         builder
-            .begin_render_pass(
-                RenderPassBeginInfo {
-                    clear_values: vec![Some([0.05, 0.05, 0.05, 1.0].into())],
-                    ..RenderPassBeginInfo::framebuffer(
-                        self.framebuffers[image_index as usize].clone(),
+            .begin_rendering(RenderingInfo {
+                color_attachments: vec![Some(RenderingAttachmentInfo {
+                    load_op: vulkano::render_pass::AttachmentLoadOp::Clear,
+                    store_op: vulkano::render_pass::AttachmentStoreOp::Store,
+                    clear_value: Some([0.05, 0.05, 0.05, 1.0].into()),
+                    ..RenderingAttachmentInfo::image_view(
+                        self.attachment_views[image_index as usize].clone(),
                     )
-                },
-                SubpassBeginInfo {
-                    contents: SubpassContents::Inline,
-                    ..Default::default()
-                },
-            )?
+                })],
+                ..Default::default()
+            })?
             .set_viewport(0, [self.viewport.clone()].into_iter().collect())?;
-
-        let window_size: [u32; 2] = window.inner_size().into();
 
         self.capture.render(&mut builder)?;
 
-        // Selection and mouse guide rendering
-        let selection_top_left = VkPosition::from_physical(selection_top_left, window_size);
-        let selection_size = VkSize::from_physical(selection_size, window_size);
-        let selection_position = VkPosition::get_center(selection_top_left, selection_size);
+        self.mouse_guides
+            .render(&mut builder, mouse_position, window_size, window_scale)?;
 
-        self.selection
-            .render(&mut builder, selection_position, selection_size)?;
-        self.mouse.render(
+        self.selection.render(
             &mut builder,
-            VkPosition::from_physical(mouse_position, window_size),
-            window_size,
-        )?;
-        self.selection_border.render(
-            &mut builder,
-            selection_position,
+            selection_top_left,
             selection_size,
             window_size,
+            window_scale,
         )?;
 
-        // Text rendering
-        let (text_position, text_size) = self
-            .parameters
-            .get_position_size(mouse_position, window_size);
+        self.parameters.render(
+            &mut builder,
+            &self.glyph_cache,
+            mouse_position,
+            window_size,
+            window_scale,
+        )?;
 
-        let rect_size = text_size.add_physical([20.0, 20.0], window_size);
-
-        self.text_rect
-            .render(&mut builder, text_position, rect_size)?;
-        self.text_border
-            .render(&mut builder, text_position, rect_size, window_size)?;
-        self.parameters
-            .render(&mut builder, text_position, text_size, window_size)?;
-
-        builder.end_render_pass(Default::default())?;
+        builder.end_rendering()?;
 
         let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
 
@@ -160,7 +152,7 @@ impl Renderer {
             .previous_frame_end
             .take()
             .unwrap_or_else(|| sync::now(vk.device.clone()).boxed())
-            .join(acquire_future)
+            .join(image_future)
             .then_execute(vk.queue.clone(), command_buffer)?
             .then_swapchain_present(
                 vk.queue.clone(),
@@ -196,6 +188,12 @@ impl Renderer {
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Failed to recreate glyph cache:\n{0}")]
+    GlyphCache(#[from] glyph_cache::Error),
+
+    #[error("Failed to update glyph cache text:\n{0}")]
+    UpdateGlyphCache(#[from] text::update_glyph_cache::Error),
+
     #[error("Failed to recreate swapchain:\n{0:?}")]
     RecreateSwapchain(#[source] Validated<VulkanError>),
 
