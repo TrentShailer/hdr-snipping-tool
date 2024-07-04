@@ -34,12 +34,7 @@ impl Tonemapper {
                 0,
                 self.io_set.clone(),
             )?
-            .bind_descriptor_sets(
-                vulkano::pipeline::PipelineBindPoint::Compute,
-                self.pipeline.layout().clone(),
-                1,
-                self.config_set.clone(),
-            )?
+            .push_constants(self.pipeline.layout().clone(), 0, self.config)?
             .dispatch([workgroup_x, workgroup_y, 1])?;
 
         debug::maybe_record_timestamp(&self, &mut builder, 1, sync::PipelineStage::BottomOfPipe);

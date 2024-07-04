@@ -2,10 +2,21 @@
 
 // glslc tonemap.comp -o tonemap.spv
 
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+
 const uint WORKGROUP_SIZE = 32;
 
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = 1) in;
 
+layout(push_constant) uniform Config
+{
+	uint input_width;
+	uint input_height;
+	float16_t alpha;
+	float16_t gamma;
+	float16_t maximum;
+	float16_t buffer_padding;
+};
 
 layout(set = 0, binding = 0) buffer InputLayout
 {
@@ -14,14 +25,6 @@ layout(set = 0, binding = 0) buffer InputLayout
 
 layout(set = 0, binding = 1, rgba8) uniform image2D output_image;
 
-layout(set = 1, binding = 0) uniform Config
-{
-	uint input_width;
-	uint input_height;
-	float16_t alpha;
-	float16_t gamma;
-	float16_t maximum;
-};
 
 // float16_t tonemap(float16_t value) {
 // 	float16_t ratio = value/maximum;
