@@ -4,7 +4,7 @@ use thiserror::Error;
 use vulkano::{
     device::{
         physical::{PhysicalDevice, PhysicalDeviceType},
-        Features,
+        DeviceExtensions, Features,
     },
     instance::Instance,
     swapchain::Surface,
@@ -12,7 +12,8 @@ use vulkano::{
 };
 
 use super::requirements::{
-    DEVICE_EXTENSIONS, OPTIONAL_FEATURES, QUEUE_COUNT, QUEUE_FLAGS, REQUIRED_FEATURES,
+    FeatureSupport, OPTIONAL_FEATURES, QUEUE_COUNT, QUEUE_FLAGS, REQUIRED_EXTENSIONS,
+    REQUIRED_FEATURES,
 };
 
 #[derive(Debug, Error)]
@@ -20,7 +21,7 @@ pub enum Error {
     #[error(
         "No physical devices were suitable.\nRequired Features: {:?}\nRequired Extensions: {:?}\nRequired Queue Flags: {:?}\nRequired Queue Count: {}",
         REQUIRED_FEATURES,
-        DEVICE_EXTENSIONS,
+        REQUIRED_EXTENSIONS,
         QUEUE_FLAGS,
         QUEUE_COUNT
     )]
@@ -33,18 +34,44 @@ pub enum Error {
 pub fn get_physical_device(
     instance: Arc<Instance>,
     surface: Arc<Surface>,
-) -> Result<(Arc<PhysicalDevice>, u32, Features), Error> {
+) -> Result<(Arc<PhysicalDevice>, u32, Features, DeviceExtensions), Error> {
     let physical_devices = instance
         .enumerate_physical_devices()
         .map_err(Error::DeviceEnumeration)?;
 
-    // Filter deviecs to find the ones that support the features and extensions that are required
-    let valid_devices = physical_devices.filter(|d| {
-        d.supported_features().contains(&REQUIRED_FEATURES)
-            && d.supported_extensions().contains(&DEVICE_EXTENSIONS)
+    // find the devices that support the required extensions
+    let devices =
+        physical_devices.filter(|d| d.supported_extensions().contains(&REQUIRED_EXTENSIONS));
+
+    // find the devices that support the required features,
+    // and bundle the extensions that need to be enabled for
+    // those features
+    let devices = devices.filter_map(|d| {
+        // Filter out devices that don't support the features we need
+        if REQUIRED_FEATURES
+            .iter()
+            .any(|f| f.is_supported(&d) == FeatureSupport::NotSupported)
+        {
+            return None;
+        }
+
+        // Find the list of required extensions to get the features we need
+        let feature_extensions = REQUIRED_FEATURES.iter().map(|f| match f.is_supported(&d) {
+            FeatureSupport::SupportedExtension => f.extensions,
+            _ => DeviceExtensions::empty(),
+        });
+
+        // Reduce the list into one set of device extensions
+        let feature_extensions = feature_extensions
+            .reduce(|acc, e| acc | e)
+            .unwrap_or(DeviceExtensions::empty());
+
+        Some((d, feature_extensions))
     });
 
-    let valid_devices = valid_devices.filter_map(|d| {
+    // find the devices that have the queue family properties we require and bundle
+    // the queue family with it
+    let devices = devices.filter_map(|(d, feature_extensions)| {
         // Find the index of the first queue family that meets the requirements
         let queue_index = d.queue_family_properties().iter().enumerate().position(
             |(family_index, family_properties)| {
@@ -56,28 +83,51 @@ pub fn get_physical_device(
         );
 
         // bundle the queue family with the device
-        queue_index.map(|family_index| (d, family_index as u32))
+        queue_index.map(|family_index| (d, family_index as u32, feature_extensions))
     });
 
     // Select the preferred type of device
-    let best_device =
-        valid_devices.min_by_key(|(device, _)| match device.properties().device_type {
-            PhysicalDeviceType::DiscreteGpu => 0,
-            PhysicalDeviceType::IntegratedGpu => 1,
-            PhysicalDeviceType::VirtualGpu => 2,
-            PhysicalDeviceType::Cpu => 3,
-            PhysicalDeviceType::Other => 4,
-            _ => 5,
-        });
+    let best_device = devices.min_by_key(|(device, _, _)| match device.properties().device_type {
+        PhysicalDeviceType::DiscreteGpu => 0,
+        PhysicalDeviceType::IntegratedGpu => 1,
+        PhysicalDeviceType::VirtualGpu => 2,
+        PhysicalDeviceType::Cpu => 3,
+        PhysicalDeviceType::Other => 4,
+        _ => 5,
+    });
 
-    let best_device = match best_device {
-        Some(v) => Ok(v),
-        None => Err(Error::NoneSuitable),
+    let (best_device, queue_family_index, feature_extensions) = match best_device {
+        Some(v) => v,
+        None => return Err(Error::NoneSuitable),
     };
 
-    // bundle the supported optional features with the device
-    best_device.map(|(device, family_index)| {
-        let supported_optionals = device.supported_features().intersection(&OPTIONAL_FEATURES);
-        (device, family_index, supported_optionals)
-    })
+    // find the suppored optional features and
+    // extract them and their required extensions,
+    // then reduce the many sets of features and extensions into one set.
+    let optional_features = OPTIONAL_FEATURES
+        .iter()
+        .filter_map(|f| {
+            let support = f.is_supported(&best_device);
+            let extensions = match support {
+                FeatureSupport::NotSupported => return None,
+                FeatureSupport::SupportedExtension => f.extensions,
+                _ => DeviceExtensions::empty(),
+            };
+
+            Some((f.features, extensions))
+        })
+        .reduce(|f, acc| (acc.0 | f.0, acc.1 | f.1));
+
+    // unwrap the optional value with emptpy defaults should there be no supported features
+    let (optional_features, optional_feature_extensions) =
+        optional_features.unwrap_or((Features::empty(), DeviceExtensions::empty()));
+
+    let feature_extensions = feature_extensions | optional_feature_extensions;
+
+    Ok((
+        best_device,
+        queue_family_index,
+        optional_features,
+        feature_extensions,
+    ))
 }
