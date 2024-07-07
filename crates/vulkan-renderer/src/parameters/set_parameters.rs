@@ -1,4 +1,3 @@
-use half::f16;
 use vulkan_instance::VulkanInstance;
 
 use crate::{glyph_cache::GlyphCache, text::set_text};
@@ -10,9 +9,9 @@ impl Parameters {
         &mut self,
         vk: &VulkanInstance,
         glyph_cache: &mut GlyphCache,
-        alpha: f16,
-        gamma: f16,
-        maximum: f16,
+        alpha: f32,
+        gamma: f32,
+        maximum: f32,
     ) -> Result<(), set_text::Error> {
         let text = format!(
             "Gamma: {:.2}\nAlpha: {:.2}\nInMax: {:.2}",
