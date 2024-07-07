@@ -1,3 +1,6 @@
+pub mod find_maximum;
+pub mod tonemapper;
+
 use std::sync::Arc;
 
 use tonemapper::shader::Config;
@@ -5,9 +8,6 @@ use vulkano::{
     buffer::Subbuffer, descriptor_set::PersistentDescriptorSet, pipeline::ComputePipeline,
     query::QueryPool,
 };
-
-pub mod find_maximum;
-pub mod tonemapper;
 
 pub struct Tonemapper {
     pub pipeline: Arc<ComputePipeline>,

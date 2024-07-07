@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use half::f16;
 use hdr_capture::CaptureProvider;
 use thiserror::Error;
 use vulkan_instance::texture::Texture;
@@ -14,12 +13,11 @@ use super::ActiveCapture;
 
 impl App {
     pub fn take_capture(&mut self) -> Result<(), Error> {
-        // If window is not visible, take and present capture
-        let app = match self.app.as_mut() {
-            Some(v) => v,
-            None => return Ok(()),
+        let Some(app) = self.app.as_mut() else {
+            return Ok(());
         };
 
+        // If window is not visible, take and present capture
         if app.window.is_visible().unwrap_or(true) {
             return Ok(());
         }
@@ -36,8 +34,8 @@ impl App {
             texture.clone(),
             &raw_capture,
             capture_info.size,
-            f16::from_f32(1.0),
-            f16::from_f32(self.settings.default_gamma),
+            self.settings.default_gamma,
+            self.settings.curve_midpoint,
         )?;
 
         app.renderer.parameters.set_parameters(

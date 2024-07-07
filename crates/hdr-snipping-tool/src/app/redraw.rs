@@ -7,10 +7,7 @@ use super::App;
 
 impl App {
     pub fn redraw(&mut self, event_loop: &ActiveEventLoop) {
-        let app = match self.app.as_mut() {
-            Some(v) => v,
-            None => return,
-        };
+        let Some(app) = self.app.as_mut() else { return };
 
         if !app.window.is_visible().unwrap_or(true) {
             return;

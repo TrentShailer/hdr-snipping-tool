@@ -1,4 +1,3 @@
-use half::f16;
 use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use winit::{
     event::{ElementState, KeyEvent},
@@ -12,62 +11,77 @@ use super::App;
 
 impl App {
     pub fn keyboard_input(&mut self, event: KeyEvent, event_loop: &ActiveEventLoop) {
-        let app = match self.app.as_mut() {
-            Some(v) => v,
-            None => return,
-        };
-        let capture = match self.capture.as_mut() {
-            Some(v) => v,
-            None => return,
-        };
-
-        if !app.window.is_visible().unwrap_or(true) {
+        if self.app.is_none() || self.capture.is_none() {
             return;
         }
 
-        if event.state == ElementState::Pressed {
-            let mut alpha_increment = f16::ZERO;
-            let mut gamma_increment = f16::ZERO;
+        let keycode: KeyCode = match event.physical_key {
+            PhysicalKey::Code(code) => code,
+            PhysicalKey::Unidentified(_) => return,
+        };
 
-            let keycode: KeyCode = match event.physical_key {
-                PhysicalKey::Code(code) => code,
-                PhysicalKey::Unidentified(_) => return,
-            };
+        match event.state {
+            ElementState::Pressed => self.pressed(keycode, event_loop),
+            ElementState::Released => self.released(keycode, event_loop),
+        }
+    }
 
-            match keycode {
-                KeyCode::ArrowRight => gamma_increment = f16::from_f32(0.02),
-                KeyCode::ArrowLeft => gamma_increment = f16::from_f32(-0.02),
-                KeyCode::ArrowUp => alpha_increment = f16::from_f32(0.1),
-                KeyCode::ArrowDown => alpha_increment = f16::from_f32(-0.1),
-                _ => {}
-            };
-
-            if alpha_increment != f16::ZERO || gamma_increment != f16::ZERO {
-                let update_result =
-                    capture.update_tonemapper_settings(app, alpha_increment, gamma_increment);
-
-                if let Err(e) = update_result {
+    fn pressed(&mut self, keycode: KeyCode, event_loop: &ActiveEventLoop) {
+        match keycode {
+            KeyCode::Escape => self.clear_capture(),
+            KeyCode::Enter => {
+                if let Err(e) = self.save_capture() {
                     log::error!("{e}");
-                    display_message("We encountered an error while updaing the tonemapper.\nMore details are in the logs.", MB_ICONERROR);
+                    display_message(
+						"We encountered an error while saving the capture.\nMore details are in the logs.",
+						MB_ICONERROR,
+					);
                     event_loop.exit();
-                    return;
                 }
             }
+            KeyCode::ArrowRight | KeyCode::ArrowLeft | KeyCode::ArrowUp | KeyCode::ArrowDown => {
+                self.adjust_tonemap_settings(keycode, event_loop)
+            }
+            _ => {}
+        }
+    }
+
+    fn released(&mut self, keycode: KeyCode, _event_loop: &ActiveEventLoop) {
+        match keycode {
+            _ => {}
+        }
+    }
+
+    fn adjust_tonemap_settings(&mut self, keycode: KeyCode, event_loop: &ActiveEventLoop) {
+        let Some(app) = self.app.as_mut() else { return };
+        let Some(capture) = self.capture.as_mut() else {
+            return;
+        };
+
+        let mut alpha_increment = 0.0;
+        let mut gamma_increment = 0.0;
+
+        match keycode {
+            KeyCode::ArrowRight => gamma_increment = 0.01,
+            KeyCode::ArrowLeft => gamma_increment = -0.01,
+            KeyCode::ArrowUp => alpha_increment = 0.01,
+            KeyCode::ArrowDown => alpha_increment = -0.01,
+            _ => return,
+        };
+
+        if self.keyboard_modifiers.shift_key() {
+            alpha_increment *= 10.0;
+            gamma_increment *= 10.0;
         }
 
-        if event.physical_key == KeyCode::Escape {
-            self.clear_capture();
-        } else if event.physical_key == KeyCode::Enter {
-            let result = self.save_capture();
+        let update_result =
+            capture.update_tonemapper_settings(app, alpha_increment, gamma_increment);
 
-            if let Err(e) = result {
-                log::error!("{e}");
-                display_message(
-                "We encountered an error while saving the capture.\nMore details are in the logs.",
-                MB_ICONERROR,
-            );
-                event_loop.exit();
-            }
+        if let Err(e) = update_result {
+            log::error!("{e}");
+            display_message("We encountered an error while updaing the tonemapper.\nMore details are in the logs.", MB_ICONERROR);
+            event_loop.exit();
+            return;
         }
     }
 }

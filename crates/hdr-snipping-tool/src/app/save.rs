@@ -36,14 +36,11 @@ pub enum Error {
 
 impl App {
     pub fn save_capture(&mut self) -> Result<(), Error> {
-        let app = match self.app.as_mut() {
-            Some(v) => v,
-            None => return Ok(()),
+        let Some(app) = self.app.as_mut() else {
+            return Ok(());
         };
-
-        let ActiveCapture { texture, .. } = match self.capture.as_mut() {
-            Some(v) => v,
-            None => return Ok(()),
+        let Some(ActiveCapture { texture, .. }) = self.capture.as_mut() else {
+            return Ok(());
         };
 
         // Create image buffer

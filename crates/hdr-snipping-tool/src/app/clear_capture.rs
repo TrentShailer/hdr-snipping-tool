@@ -5,10 +5,7 @@ impl App {
         self.capture = None;
         self.scroll = 0.0;
 
-        let app = match self.app.as_mut() {
-            Some(v) => v,
-            None => return,
-        };
+        let Some(app) = self.app.as_mut() else { return };
 
         app.window.set_visible(false);
         app.renderer.capture.unload_capture();

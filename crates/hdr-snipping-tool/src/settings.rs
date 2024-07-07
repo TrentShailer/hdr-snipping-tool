@@ -16,6 +16,7 @@ const SETTINGS_FILE: &str = "hdr-config.toml";
 pub struct Settings {
     pub screenshot_key: Code,
     pub default_gamma: f32,
+    pub curve_midpoint: f32,
 }
 
 #[derive(Debug, Error)]
@@ -83,6 +84,7 @@ impl Default for Settings {
         Self {
             screenshot_key: Code::PrintScreen,
             default_gamma: 0.5,
+            curve_midpoint: 0.875,
         }
     }
 }
