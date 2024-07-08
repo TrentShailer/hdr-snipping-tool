@@ -19,7 +19,7 @@ use windows_capture_provider::WindowsCaptureProvider;
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalPosition,
-    event::{Modifiers, MouseButton, WindowEvent},
+    event::{MouseButton, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::ModifiersState,
     window::{Window, WindowId},
@@ -32,7 +32,7 @@ use crate::{
 pub struct ActiveApp {
     pub window_id: WindowId,
     pub window: Arc<Window>,
-    pub tray_icon: TrayIcon,
+    pub _tray_icon: TrayIcon,
     pub vulkan_instance: VulkanInstance,
     pub renderer: Renderer,
 }

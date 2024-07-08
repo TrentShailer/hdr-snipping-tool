@@ -59,7 +59,7 @@ impl App {
         let renderer = Renderer::new(&vulkan_instance, window.clone())?;
 
         let active_app = ActiveApp {
-            tray_icon,
+            _tray_icon: tray_icon,
             vulkan_instance,
             window,
             window_id,
