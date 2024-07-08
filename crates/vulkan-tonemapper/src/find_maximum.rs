@@ -68,9 +68,9 @@ pub fn find_maximum(
         .subgroup_size
         .unwrap_or(1);
 
-    // 1024 threads * two values per thread * sugroup_size
+    // 1024 threads * sugroup_size
     // This is how much the input gets reduced by on a single pass
-    let compute_blocksize = 1024 * 2 * subgroup_size;
+    let compute_blocksize = 1024 * subgroup_size;
 
     let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
         vk.allocators.memory.clone(),

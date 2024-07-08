@@ -1093,7 +1093,7 @@ dependencies = [
 
 [[package]]
 name = "hdr-snipping-tool"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "arboard",
  "chrono",
@@ -2676,7 +2676,7 @@ dependencies = [
 
 [[package]]
 name = "vulkan-tonemapper"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "half",
  "log",
