@@ -29,7 +29,6 @@ pub const REQUIRED_FEATURES: [FeatureSet; 4] = [
         features: Features {
             storage_buffer16_bit_access: true,
             uniform_and_storage_buffer16_bit_access: true,
-            storage_push_constant16: true,
             ..Features::empty()
         },
         version: Some(Version::V1_1),
