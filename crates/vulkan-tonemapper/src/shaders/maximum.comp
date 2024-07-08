@@ -31,31 +31,27 @@ shared float16_t shared_data[WORKGROUP_SIZE];
 
 void main() {
 	uint thread_id = gl_LocalInvocationID.x;
-	uint index = gl_WorkGroupID.x * WORKGROUP_SIZE * gl_SubgroupSize * 2 + thread_id;	// Starting index for this thread
 
-	// Each thread should have a value to work on to ensure maximum utilisation
-	// Subgroups are used to quickly reduce the number of items that are needed to be recursively reduced
+	// The space between each thread
+	uint thread_space = gl_SubgroupSize;
+	// The space between each invocation
+	uint invocation_space = thread_space * WORKGROUP_SIZE;
+
+	// the starting index for this thread
+	uint index = (gl_WorkGroupID.x * invocation_space) + (thread_id * thread_space);
+
+	// Subgroups are used to quickly reduce subgroup_size items for each thread
 	for (uint i = 0; i < gl_SubgroupSize; i++) {
-		// Each invocation in each iteration fetches two values
-		// and computes the maximum before sending that value
-		// to be reduced in the subgroup
-		// this improves performance a little
-		uint fetch_index = index + i * (WORKGROUP_SIZE * 2);
-		uint fetch_index_2 = fetch_index + WORKGROUP_SIZE;
+		uint fetch_index = index + i;
 
 		float16_t fetch_value = OUT_OF_BOUNDS_VALUE; // Handle out of bounds by using a very small number
 		if (fetch_index < input_length) {
-			if (fetch_index_2 < input_length) {
-				fetch_value = max(input_buffer[fetch_index], input_buffer[fetch_index_2]);
-			}
-			else {
-				fetch_value = input_buffer[fetch_index];
-			}
+			fetch_value = input_buffer[fetch_index];
 		}
 
 		float16_t iteration_maximum = subgroupMax(fetch_value);
-		// If the iteration is finding a result for this subgroup invocation
-		// then store the value for use later in shared memory
+
+		// If the maximum value is for this thread, not another, store it
 		if (gl_SubgroupInvocationID == i) {
 			shared_data[thread_id] = iteration_maximum;
 		}

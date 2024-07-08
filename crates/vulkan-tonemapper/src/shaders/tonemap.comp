@@ -12,10 +12,9 @@ layout(push_constant) uniform Config
 {
 	uint input_width;
 	uint input_height;
-	float16_t alpha;
-	float16_t gamma;
-	float16_t maximum;
-	float16_t buffer_padding;
+	float alpha;
+	float gamma;
+	float maximum;
 };
 
 layout(set = 0, binding = 0) buffer InputLayout
@@ -25,15 +24,11 @@ layout(set = 0, binding = 0) buffer InputLayout
 
 layout(set = 0, binding = 1, rgba8) uniform image2D output_image;
 
+float tonemap(float16_t value) {
+	float value_d = float(value);
+	float ratio = value/maximum;
 
-// float16_t tonemap(float16_t value) {
-// 	float16_t ratio = value/maximum;
-// 	return alpha * (-exp(-gamma * ratio) * (1.0hf - ratio) + 1.0hf);
-// }
-
-float16_t tonemap(float16_t value) {
-	float16_t ratio = value/maximum;
-	return clamp(alpha * pow(ratio, gamma), 0.0hf, 1.0hf);
+	return clamp(alpha * pow(ratio, gamma), 0.0, 1.0);
 }
 
 void main() {
@@ -55,9 +50,9 @@ void main() {
 
 
 
-	float r_out = float(tonemap(r_in));
-	float g_out = float(tonemap(g_in));
-	float b_out = float(tonemap(b_in));
+	float r_out = tonemap(r_in);
+	float g_out = tonemap(g_in);
+	float b_out = tonemap(b_in);
 	float a_out = float(a_in);
 
 	vec4 out_color = vec4(r_out, g_out, b_out, a_out);

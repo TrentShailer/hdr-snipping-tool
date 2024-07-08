@@ -1,10 +1,8 @@
-pub mod config;
 pub mod debug;
 pub mod tonemap;
 
 use std::{sync::Arc, time::Instant};
 
-use half::f16;
 use shader::Config;
 use thiserror::Error;
 use vulkan_instance::{
@@ -40,8 +38,8 @@ impl Tonemapper {
         texture: Arc<Texture>,
         bytes: &[u8],
         size: PhysicalSize<u32>,
-        alpha: f16,
-        gamma: f16,
+        gamma: f32,
+        curve_midpoint: f32,
     ) -> Result<Self, Error> {
         let start = Instant::now();
         let pipeline = {
@@ -87,6 +85,7 @@ impl Tonemapper {
         staging_buffer.write()?.copy_from_slice(bytes);
 
         let maximum = find_maximum(vk, staging_buffer.clone(), bytes.len() as u32)?;
+        let maximum = f32::from(maximum);
 
         let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
             vk.allocators.memory.clone(),
@@ -108,13 +107,14 @@ impl Tonemapper {
             vulkan_instance::copy_buffer::Region::SmallestBuffer,
         )?;
 
+        let alpha = Self::alpha_from_midpoint(maximum, curve_midpoint, gamma);
+
         let config = Config {
             alpha,
             gamma,
             maximum,
             input_width: size.width,
             input_height: size.height,
-            buffer_padding: f16::ZERO,
         };
 
         let io_layout = &pipeline.layout().set_layouts()[0];
@@ -144,6 +144,12 @@ impl Tonemapper {
             io_set,
             timestamp_pool,
         })
+    }
+
+    /// Uses the tonemapping curve to solve for alpha given a midpoint
+    /// where the curve should produce `y = 0.5`
+    fn alpha_from_midpoint(maximum: f32, midpoint: f32, gamma: f32) -> f32 {
+        0.5 / f32::powf(midpoint / maximum, gamma)
     }
 }
 

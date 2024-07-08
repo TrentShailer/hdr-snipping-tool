@@ -21,6 +21,7 @@ use winit::{
     dpi::PhysicalPosition,
     event::{MouseButton, WindowEvent},
     event_loop::ActiveEventLoop,
+    keyboard::ModifiersState,
     window::{Window, WindowId},
 };
 
@@ -31,7 +32,7 @@ use crate::{
 pub struct ActiveApp {
     pub window_id: WindowId,
     pub window: Arc<Window>,
-    pub tray_icon: TrayIcon,
+    pub _tray_icon: TrayIcon,
     pub vulkan_instance: VulkanInstance,
     pub renderer: Renderer,
 }
@@ -49,6 +50,7 @@ pub struct App {
     pub mouse_position: PhysicalPosition<u32>,
     pub selection: Selection,
     pub scroll: f32,
+    pub keyboard_modifiers: ModifiersState,
 }
 
 impl App {
@@ -61,6 +63,7 @@ impl App {
             mouse_position: PhysicalPosition::default(),
             selection: Selection::default(),
             scroll: 0.0,
+            keyboard_modifiers: ModifiersState::default(),
         }
     }
 }
@@ -68,6 +71,7 @@ impl App {
 impl ApplicationHandler<()> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let init_result = self.init(event_loop);
+
         if let Err(e) = init_result {
             log::error!("{e}");
             let message = match e {
@@ -109,10 +113,7 @@ impl ApplicationHandler<()> for App {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        let app = match self.app.as_ref() {
-            Some(app) => app,
-            None => return,
-        };
+        let Some(app) = self.app.as_ref() else { return };
 
         if let Ok(tray_event) = MenuEvent::receiver().try_recv() {
             match tray_event.id.0.as_str() {
@@ -137,10 +138,7 @@ impl ApplicationHandler<()> for App {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let app = match self.app.as_mut() {
-            Some(v) => v,
-            None => return,
-        };
+        let Some(app) = self.app.as_mut() else { return };
 
         if event == WindowEvent::Destroyed && app.window_id == window_id {
             self.clear_capture();
@@ -162,9 +160,19 @@ impl ApplicationHandler<()> for App {
                 self.clear_capture();
                 self.app = None;
             }
-            WindowEvent::RedrawRequested => {
-                self.redraw(event_loop);
-            }
+            WindowEvent::RedrawRequested => self.redraw(event_loop),
+            //
+            WindowEvent::KeyboardInput {
+                device_id: _,
+                event,
+                is_synthetic: _,
+            } => self.keyboard_input(event, event_loop),
+            WindowEvent::MouseWheel {
+                device_id: _,
+                delta,
+                phase: _,
+            } => self.mouse_wheel(delta, event_loop),
+            WindowEvent::ModifiersChanged(modifiers) => self.keyboard_modifiers = modifiers.state(),
             WindowEvent::MouseInput {
                 device_id: _,
                 state,
@@ -192,20 +200,6 @@ impl ApplicationHandler<()> for App {
                         }
                     }
                 }
-            }
-            WindowEvent::KeyboardInput {
-                device_id: _,
-                event,
-                is_synthetic: _,
-            } => {
-                self.keyboard_input(event, event_loop);
-            }
-            WindowEvent::MouseWheel {
-                device_id: _,
-                delta,
-                phase: _,
-            } => {
-                self.mouse_wheel(delta, event_loop);
             }
             WindowEvent::CursorMoved {
                 device_id: _,

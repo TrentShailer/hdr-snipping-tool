@@ -1,4 +1,3 @@
-use half::f16;
 use thiserror::Error;
 use vulkan_renderer::text;
 use vulkan_tonemapper::tonemapper;
@@ -10,13 +9,11 @@ impl ActiveCapture {
     pub fn update_tonemapper_settings(
         &mut self,
         app: &mut ActiveApp,
-        alpha_increment: f16,
-        gamma_increment: f16,
+        alpha_increment: f32,
+        gamma_increment: f32,
     ) -> Result<(), Error> {
-        self.tonemapper
-            .set_gamma(self.tonemapper.config.gamma + gamma_increment);
-        self.tonemapper
-            .set_alpha(self.tonemapper.config.alpha + alpha_increment);
+        self.tonemapper.config.gamma += gamma_increment;
+        self.tonemapper.config.alpha += alpha_increment;
 
         self.tonemapper.tonemap(&app.vulkan_instance)?;
 

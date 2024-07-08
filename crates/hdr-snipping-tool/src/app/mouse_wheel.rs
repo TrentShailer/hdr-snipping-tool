@@ -1,4 +1,3 @@
-use half::f16;
 use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use winit::{event::MouseScrollDelta, event_loop::ActiveEventLoop};
 
@@ -8,13 +7,9 @@ use super::App;
 
 impl App {
     pub fn mouse_wheel(&mut self, delta: MouseScrollDelta, event_loop: &ActiveEventLoop) {
-        let app = match self.app.as_mut() {
-            Some(v) => v,
-            None => return,
-        };
-        let capture = match self.capture.as_mut() {
-            Some(v) => v,
-            None => return,
+        let Some(app) = self.app.as_mut() else { return };
+        let Some(capture) = self.capture.as_mut() else {
+            return;
         };
 
         if !app.window.is_visible().unwrap_or(true) {
@@ -28,17 +23,19 @@ impl App {
 
         self.scroll += y_delta;
 
-        let result = if self.scroll <= -1.0 {
-            self.scroll = 0.0;
-            capture.update_tonemapper_settings(app, f16::from_f32(-0.1), f16::ZERO)
-        } else if self.scroll >= 1.0 {
-            self.scroll = 0.0;
-            capture.update_tonemapper_settings(app, f16::from_f32(0.1), f16::ZERO)
-        } else {
-            Ok(())
-        };
+        if self.scroll.abs() < 1.0 {
+            return;
+        }
 
-        if let Err(e) = result {
+        let mut alpha_increment = if self.scroll < 0.0 { -0.01 } else { 0.01 };
+
+        if self.keyboard_modifiers.shift_key() {
+            alpha_increment *= 10.0;
+        }
+
+        self.scroll = 0.0;
+
+        if let Err(e) = capture.update_tonemapper_settings(app, alpha_increment, 0.0) {
             log::error!("{e}");
             display_message("We encountered an error while updaing the tonemapper.\nMore details are in the logs.", MB_ICONERROR);
             event_loop.exit();
