@@ -1086,7 +1086,7 @@ dependencies = [
 
 [[package]]
 name = "hdr-capture"
-version = "1.0.1"
+version = "2.0.0"
 dependencies = [
  "winit",
 ]
@@ -2895,7 +2895,7 @@ dependencies = [
 
 [[package]]
 name = "windows-capture-provider"
-version = "2.0.1"
+version = "2.1.0"
 dependencies = [
  "hdr-capture",
  "log",
