@@ -2897,13 +2897,11 @@ dependencies = [
 name = "windows-capture-provider"
 version = "3.0.0"
 dependencies = [
- "hdr-capture",
  "log",
  "thiserror",
  "windows",
  "windows-core 0.57.0",
  "windows-result",
- "winit",
 ]
 
 [[package]]

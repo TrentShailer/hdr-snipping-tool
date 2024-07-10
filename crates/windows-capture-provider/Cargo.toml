@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hdr-capture = { workspace = true }
 log = { workspace = true }
 thiserror = { workspace = true }
 windows = { workspace = true, features = [
@@ -28,4 +27,3 @@ windows = { workspace = true, features = [
 ] }
 windows-core = { workspace = true }
 windows-result = { workspace = true }
-winit = { workspace = true }
