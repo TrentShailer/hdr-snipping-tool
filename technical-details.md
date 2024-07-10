@@ -1,14 +1,4 @@
-# Version 2 Deep Dive
-
-Version 2 has been a large rewrite with a few goals:
-
-- Perform tonemapping on your GPU.
-- Minimise memory usage when in the background while maintaining good startup speed.
-- Give me more control over dependencies.
-
-The bulk of the work for this new version is shifting as much of the processing work onto the GPU as possible. The rest of the article will detail exactly how the application, as of v2.3.2, works.
-
-## How it works
+# Technical Details
 
 After starting, the application waits for the screenshot key which kicks off everything.
 

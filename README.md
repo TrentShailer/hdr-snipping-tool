@@ -4,7 +4,7 @@ A Windows Snipping Tool alternative that handles HDR content better.
 
 ## How it works
 
-See [version 2 deep dive](https://github.com/TrentShailer/hdr-snipping-tool/blob/version-2/version2.md).
+See [version 2 deep dive](https://github.com/TrentShailer/hdr-snipping-tool/blob/gpu-version/technical-details.md).
 
 ## Installation
 
@@ -55,5 +55,5 @@ After saving the file is in the storage directory and saved in your clipboard.
 
 ![HDR example 1][hdr-example-1]
 
-[win-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/version-2/media/windows-snipping-tool-example.jpg "Windows Snipping Tool Screenshot of Cyberpunk 2077 with blown out highlights."
-[hdr-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/version-2/media/hdr-snipping-tool-example.jpg "HDR Snipping Tool Screenshot showing the same content as the Windows Snipping Tool but without any blown out highlights."
+[win-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/gpu-version/media/windows-snipping-tool-example.jpg "Windows Snipping Tool Screenshot of Cyberpunk 2077 with blown out highlights."
+[hdr-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/gpu-version/media/hdr-snipping-tool-example.jpg "HDR Snipping Tool Screenshot showing the same content as the Windows Snipping Tool but without any blown out highlights."
