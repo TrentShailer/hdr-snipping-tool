@@ -7,18 +7,19 @@ use windows::{
             D3D11_USAGE_STAGING,
         },
         System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess,
+        UI::WindowsAndMessaging::WM_APP,
     },
 };
-use windows_core::Interface;
-use winit::dpi::PhysicalSize;
+use windows_core::{Interface, HRESULT};
+use windows_result::Error as WindowsError;
 
-pub(crate) fn fetch_capture(
-    frame: Direct3D11CaptureFrame,
+pub fn retrieve_capture(
+    d3d_capture: Direct3D11CaptureFrame,
     d3d_device: &ID3D11Device,
     d3d_context: &ID3D11DeviceContext,
-) -> windows_result::Result<(Vec<u8>, PhysicalSize<u32>)> {
-    // Get the frame we captured
-    let surface = frame.Surface()?;
+) -> Result<Box<[u8]>, WindowsError> {
+    // Get the surface of the capture
+    let surface = d3d_capture.Surface()?;
     let access: IDirect3DDxgiInterfaceAccess = surface.cast()?;
     let source_texture = unsafe { access.GetInterface::<ID3D11Texture2D>()? };
 
@@ -38,15 +39,10 @@ pub(crate) fn fetch_capture(
         let mut texture = None;
         unsafe { d3d_device.CreateTexture2D(&staging_desc, None, Some(&mut texture))? };
 
-        match texture {
-            Some(v) => v,
-            None => {
-                return Err(windows_result::Error::new(
-                    windows_core::HRESULT(-1),
-                    "Failed to create the staging texture",
-                ))
-            }
-        }
+        texture.ok_or(WindowsError::new(
+            HRESULT::from_win32(WM_APP),
+            "Failed to create the staging texture",
+        ))?
     };
 
     // Copy from to the staging texture
@@ -78,29 +74,33 @@ pub(crate) fn fetch_capture(
         )
     };
 
-    // TODO could add a check to skip this step
+    let capture_width = mapped_resource.RowPitch / 4 / 2;
+
     // DirectX may add padding onto the width of the image for better alignment
     // To remove this, we copy the relevant data we want from each row to a new vec
-    let bytes_per_pixel = 8; // RGBAF16 = 8 bpp
-    let width = staging_desc.Width as usize;
-    let height = staging_desc.Height as usize;
-    let mut output_vec = vec![0u8; width * height * bytes_per_pixel];
+    let capture = if capture_width != staging_desc.Width {
+        let bytes_per_pixel = 8; // RGBAF16 = 8 bpp
+        let width = staging_desc.Width as usize;
+        let height = staging_desc.Height as usize;
+        let mut output_vec = vec![0u8; width * height * bytes_per_pixel];
 
-    let output_row_length = width * bytes_per_pixel;
-    for row in 0..height {
-        let data_begin = row * output_row_length;
-        let data_end = (row + 1) * output_row_length;
+        let output_row_length = width * bytes_per_pixel;
+        for row in 0..height {
+            let data_begin = row * output_row_length;
+            let data_end = (row + 1) * output_row_length;
 
-        let slice_begin = row * mapped_resource.RowPitch as usize;
-        let slice_end = slice_begin + output_row_length;
+            let slice_begin = row * mapped_resource.RowPitch as usize;
+            let slice_end = slice_begin + output_row_length;
 
-        output_vec[data_begin..data_end].copy_from_slice(&raw_slice[slice_begin..slice_end]);
-    }
+            output_vec[data_begin..data_end].copy_from_slice(&raw_slice[slice_begin..slice_end]);
+        }
 
-    // let size = PhysicalSize::new(mapped_resource.RowPitch / 4 / 2, staging_desc.Height);
-    let size = PhysicalSize::new(staging_desc.Width, staging_desc.Height);
+        output_vec.into_boxed_slice()
+    } else {
+        raw_slice.to_vec().into_boxed_slice()
+    };
 
     unsafe { d3d_context.Unmap(Some(&staging_resource), 0) };
 
-    Ok((output_vec, size))
+    Ok(capture)
 }
