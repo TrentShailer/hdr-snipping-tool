@@ -12,26 +12,35 @@ use prepare_capture::prepare_capture;
 use thiserror::Error;
 use windows::{
     Graphics::DirectX::Direct3D11::IDirect3DDevice,
-    Win32::Graphics::Direct3D11::{ID3D11Device, ID3D11DeviceContext},
+    Win32::Graphics::{
+        Direct3D11::{ID3D11Device, ID3D11DeviceContext},
+        Dxgi::{IDXGIAdapter1, IDXGIDevice},
+    },
 };
 
 pub struct WindowsCaptureProvider {
-    dxgi_device: IDirect3DDevice,
-    d3d_device: ID3D11Device,
-    d3d_context: ID3D11DeviceContext,
+    _dxgi_device: IDXGIDevice,
+    dxgi_adapter: IDXGIAdapter1,
+    d3d_device: IDirect3DDevice,
+    d3d11_device: ID3D11Device,
+    d3d11_context: ID3D11DeviceContext,
     displays: Vec<Display>,
 }
 
 impl WindowsCaptureProvider {
     pub fn new() -> Result<Self, Error> {
-        let (dxgi_device, d3d_device, d3d_context) = d3d_devices::create_d3d_devices()?;
+        let (dxgi_device, dxgi_adapter, d3d_device, d3d11_device, d3d11_context) =
+            d3d_devices::create_d3d_devices()?;
 
-        let displays = refresh_displays(&mut []).map_err(Error::EnumerateDisplays)?;
+        let mut displays = vec![];
+        refresh_displays(&dxgi_adapter, &mut displays).map_err(Error::EnumerateDisplays)?;
 
         Ok(Self {
-            dxgi_device,
+            _dxgi_device: dxgi_device,
+            dxgi_adapter,
             d3d_device,
-            d3d_context,
+            d3d11_device,
+            d3d11_context,
             displays,
         })
     }
