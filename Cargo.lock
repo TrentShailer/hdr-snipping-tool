@@ -1085,13 +1085,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hdr-capture"
-version = "2.0.0"
-dependencies = [
- "winit",
-]
-
-[[package]]
 name = "hdr-snipping-tool"
 version = "2.3.2"
 dependencies = [
@@ -1101,8 +1094,6 @@ dependencies = [
  "embed-resource",
  "fern",
  "global-hotkey",
- "half",
- "hdr-capture",
  "image",
  "log",
  "serde",
@@ -2664,7 +2655,6 @@ name = "vulkan-renderer"
 version = "1.4.0"
 dependencies = [
  "fontdue",
- "half",
  "log",
  "smallvec",
  "thiserror",

@@ -6,13 +6,11 @@ edition = "2021"
 build = "build.rs"
 
 [dependencies]
-hdr-capture = { workspace = true }
 vulkan-instance = { workspace = true }
 vulkan-renderer = { workspace = true }
 vulkan-tonemapper = { workspace = true }
 windows-capture-provider = { workspace = true }
 
-half = { workspace = true }
 log = { workspace = true }
 thiserror = { workspace = true }
 windows = { workspace = true, features = [

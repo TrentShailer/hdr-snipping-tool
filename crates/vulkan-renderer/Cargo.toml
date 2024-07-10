@@ -6,11 +6,11 @@ edition = "2021"
 [dependencies]
 vulkan-instance = { workspace = true }
 
-fontdue = { workspace = true }
 log = { workspace = true }
 thiserror = { workspace = true }
 vulkano = { workspace = true }
 vulkano-shaders = { workspace = true }
 winit = { workspace = true }
 smallvec = { workspace = true }
-half = { workspace = true }
+
+fontdue = "0.9"
