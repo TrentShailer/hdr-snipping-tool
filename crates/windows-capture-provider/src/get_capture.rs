@@ -18,38 +18,41 @@ impl CaptureProvider for WindowsCaptureProvider {
     ) -> Result<(Vec<u8>, hdr_capture::DisplayInfo, hdr_capture::CaptureInfo), Self::Error> {
         let start = Instant::now();
 
-        self.displays = refresh_displays(&mut self.displays).map_err(Error::Displays)?;
+        refresh_displays(&self.dxgi_adapter, &mut self.displays).map_err(Error::Displays)?;
 
         let mut mouse_point: POINT = Default::default();
         unsafe { GetCursorPos(&mut mouse_point) }.map_err(Error::Mouse)?;
         let mouse_pos = PhysicalPosition::new(mouse_point.x, mouse_point.y);
 
-        let display = match self.displays.iter().find(|d| d.contains(mouse_pos)) {
-            Some(v) => v,
-            None => return Err(Error::NoDisplay),
-        };
-
-        let capture_item = match display.capture_item.as_ref() {
-            Some(v) => v,
-            None => return Err(Error::NoCaptureItem),
+        let maybe_display = self.displays.iter().find(|d| d.contains(mouse_pos));
+        let Some(display) = maybe_display else {
+            return Err(Error::NoDisplay);
         };
 
         let (framepool, capture_session, capture_receiver) =
-            prepare_capture(capture_item, &self.dxgi_device).map_err(Error::PrepareCapture)?;
+            prepare_capture(&display.capture_item, &self.d3d_device)
+                .map_err(Error::PrepareCapture)?;
 
         let frame = capture_receiver.recv()?;
 
         capture_session.Close().map_err(Error::CloseSession)?;
         framepool.Close().map_err(Error::CloseSession)?;
 
-        let (raw_capture, capture_size) = fetch_capture(frame, &self.d3d_device, &self.d3d_context)
-            .map_err(Error::FetchGapture)?;
+        let (raw_capture, capture_size) =
+            fetch_capture(frame, &self.d3d11_device, &self.d3d11_context)
+                .map_err(Error::FetchGapture)?;
 
         let capture_info = CaptureInfo::new(capture_size, display.position);
-        let display_info = DisplayInfo::new(display.size, display.position);
+        let display_info = DisplayInfo::new(
+            display.size,
+            display.position,
+            display.maximum_luminance,
+            display.sdr_whitepoint,
+            display.sdr_whitepoint_nits,
+        );
 
-        unsafe { self.d3d_context.ClearState() };
-        self.dxgi_device.Trim().map_err(Error::Trim)?;
+        unsafe { self.d3d11_context.ClearState() };
+        self.d3d_device.Trim().map_err(Error::Trim)?;
 
         let end = Instant::now();
         log::debug!("Got capture in {}ms", end.duration_since(start).as_millis());
