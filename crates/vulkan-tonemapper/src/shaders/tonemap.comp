@@ -24,11 +24,28 @@ layout(set = 0, binding = 0) buffer InputLayout
 
 layout(set = 0, binding = 1, rgba8) uniform image2D output_image;
 
-float tonemap(float16_t value) {
-	float value_d = float(value);
+float reinhard(float16_t value) {
+	float ratio = value/maximum;
+	return clamp(value / (value + 1.0), 0.0, 1.0);
+}
+
+float gamma_correct(float16_t value) {
 	float ratio = value/maximum;
 
 	return clamp(alpha * pow(ratio, gamma), 0.0, 1.0);
+}
+
+// Performs gamma correction to convert linear RGB values to sRGB
+// From https://en.wikipedia.org/wiki/SRGB#Transformation
+float gamma_correct_linear(float16_t value) {
+	float ratio = value/maximum; // TODO obtain maximum differently
+
+	if (ratio <= 0.0031308) {
+		return clamp(12.92 * ratio, 0.0, 1.0);
+	}
+	else {
+		return clamp(1.055 * pow(ratio, (1.0/2.4)) - 0.055, 0.0, 1.0);
+	}
 }
 
 void main() {
@@ -50,9 +67,9 @@ void main() {
 
 
 
-	float r_out = tonemap(r_in);
-	float g_out = tonemap(g_in);
-	float b_out = tonemap(b_in);
+	float r_out = gamma_correct_linear(r_in);
+	float g_out = gamma_correct_linear(g_in);
+	float b_out = gamma_correct_linear(b_in);
 	float a_out = float(a_in);
 
 	vec4 out_color = vec4(r_out, g_out, b_out, a_out);
