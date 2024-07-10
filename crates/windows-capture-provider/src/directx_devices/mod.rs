@@ -17,13 +17,13 @@ pub struct DirectXDevices {
     /// Used to aquire display information.
     pub dxgi_adapter: IDXGIAdapter1,
 
-    /// TODO
+    /// Used to create framepool.
     pub d3d_device: IDirect3DDevice,
 
-    /// TODO
+    /// Used to retrieve capture from the GPU.
     pub d3d11_device: ID3D11Device,
 
-    /// TODO
+    /// Used to retrieve capture from the GPU.
     pub d3d11_context: ID3D11DeviceContext,
 }
 

@@ -7,6 +7,7 @@ use crate::{
 };
 
 impl WindowsCaptureProvider {
+    /// Refreshes the stored displays and capture items to match the currently active displays.
     pub fn refresh_displays(&mut self) -> Result<(), Error> {
         let displays = get_current_displays(&self.devices.dxgi_adapter)?;
 

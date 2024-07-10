@@ -15,13 +15,22 @@ use thiserror::Error;
 use windows::Graphics::Capture::GraphicsCaptureItem;
 use windows_result::Error as WindowsError;
 
+/// Structure to obtain captures on windows.
 pub struct WindowsCaptureProvider {
+    /// DirectX devices used through the capture process.
     pub devices: DirectXDevices,
+
+    /// Set of currently active displays at the time of creation
+    /// or last capture.
     pub displays: Box<[Display]>,
+
+    /// A mapp between HMONITOR handles and their capture item,
+    /// this is updated whenever displays are updated.
     pub display_capture_items: HashMap<isize, GraphicsCaptureItem>,
 }
 
 impl WindowsCaptureProvider {
+    /// Create a new windows capture provider.
     pub fn new() -> Result<Self, Error> {
         let devices = DirectXDevices::new()?;
         let displays = get_current_displays(&devices.dxgi_adapter)?;
