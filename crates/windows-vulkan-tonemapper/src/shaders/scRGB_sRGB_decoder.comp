@@ -1,0 +1,75 @@
+// glslc scRGB_sRGB_decoder.comp -o scRGB_sRGB_decoder.spv
+
+#version 450
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+layout(push_constant) uniform Metadata
+{
+	float whitepoint;
+};
+
+layout(set = 0, binding = 0) buffer InputLayout
+{
+    float16_t input_buffer[];
+};
+layout(set = 0, binding = 1, rgba8) uniform image2D output_image;
+
+/// Helper functions
+
+const uint INDEX_OUT_OF_BOUNDS = 0xffffffff;
+uint get_1d_pixel_index(ivec2 pixel) {
+	ivec2 image_size = imageSize(output_image);
+
+	if (pixel.x > image_size.x || pixel.y > image_size.y) {
+		return INDEX_OUT_OF_BOUNDS;
+	}
+
+	uint pixel_index_1d = (pixel.y * image_size.x + pixel.x) * 4;
+	return pixel_index_1d;
+}
+
+vec4 get_pixel_color(uint index) {
+	float r = float(input_buffer[index]);
+	float g = float(input_buffer[index + 1]);
+	float b = float(input_buffer[index + 2]);
+	float a = float(input_buffer[index + 3]);
+
+	return vec4(r, g, b, a);
+}
+
+// Performs gamma correction to decode sRGB values encoded as scRGB values
+// From https://en.wikipedia.org/wiki/SRGB#Transformation
+float scRGB_to_sRGB(float value) {
+	float ratio = value / whitepoint;
+	float gamma_decode = 1.0 / 2.4;
+
+	if (ratio <= 0.0031308) {
+		return clamp(12.92 * ratio, 0.0, 1.0);
+	}
+	else {
+		return clamp(1.055 * pow(ratio, gamma_decode) - 0.055, 0.0, 1.0);
+	}
+}
+
+void main() {
+	ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+
+	uint index = get_1d_pixel_index(pixel);
+	if (index == INDEX_OUT_OF_BOUNDS) {
+		return;
+	}
+
+	vec4 scRGB = get_pixel_color(index);
+
+	vec4 sRGB = vec4(
+		scRGB_to_sRGB(scRGB.r),
+		scRGB_to_sRGB(scRGB.g),
+		scRGB_to_sRGB(scRGB.b),
+		scRGB.a
+	);
+
+	imageStore(output_image, pixel, sRGB);
+}
+
