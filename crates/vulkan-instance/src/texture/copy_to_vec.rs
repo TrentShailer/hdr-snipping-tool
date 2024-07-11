@@ -26,7 +26,7 @@ impl Texture {
                     | MemoryTypeFilter::HOST_RANDOM_ACCESS,
                 ..Default::default()
             },
-            self.size.width as u64 * self.size.height as u64 * 4,
+            self.size[0] as u64 * self.size[1] as u64 * 4,
         )?;
 
         let mut builder = AutoCommandBufferBuilder::primary(

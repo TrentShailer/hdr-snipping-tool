@@ -13,7 +13,6 @@ use vulkano::{
     memory::allocator::AllocationCreateInfo,
     Validated, VulkanError,
 };
-use winit::dpi::PhysicalSize;
 
 use crate::VulkanInstance;
 
@@ -21,12 +20,12 @@ pub struct Texture {
     pub image: Arc<Image>,
     pub image_view: Arc<ImageView>,
     pub sampler: Arc<Sampler>,
-    pub size: PhysicalSize<u32>,
+    pub size: [u32; 2],
 }
 
 impl Texture {
-    pub fn new(vk: &VulkanInstance, size: PhysicalSize<u32>) -> Result<Self, Error> {
-        let extent = [size.width, size.height, 1];
+    pub fn new(vk: &VulkanInstance, size: [u32; 2]) -> Result<Self, Error> {
+        let extent = [size[0], size[1], 1];
 
         let image = Image::new(
             vk.allocators.memory.clone(),
