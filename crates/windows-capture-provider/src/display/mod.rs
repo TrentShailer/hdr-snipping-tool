@@ -1,12 +1,11 @@
 pub mod get_current_displays;
 
+use scrgb::ScRGB;
 use windows::{
     Graphics::Capture::GraphicsCaptureItem,
     Win32::{
         Foundation::RECT,
-        Graphics::{
-            Direct2D::D2D1_SCENE_REFERRED_SDR_WHITE_LEVEL, Dxgi::DXGI_OUTPUT_DESC1, Gdi::HMONITOR,
-        },
+        Graphics::{Dxgi::DXGI_OUTPUT_DESC1, Gdi::HMONITOR},
         System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop,
     },
 };
@@ -25,30 +24,26 @@ pub struct Display {
     /// The size of the display in pixels.
     pub size: [u32; 2],
 
-    /// The maximum luminance of the display in nits.
-    pub luminance: f32,
+    /// The maximum luminance of the display.
+    pub luminance: ScRGB,
 
-    /// The display's SDR reference white in nits.
-    pub sdr_referece_white: f32,
+    /// The display's SDR reference white.
+    pub sdr_referece_white: ScRGB,
 }
 
 impl Display {
     /// Create a display object from a `DXGI_OUTPUT_DESC1` and sdr reference white.
-    pub fn from_desc1(desc: &DXGI_OUTPUT_DESC1, sdr_referece_white: f32) -> Self {
+    pub fn from_desc1(desc: &DXGI_OUTPUT_DESC1, sdr_referece_white: ScRGB) -> Self {
         let (position, size) = Self::position_size_from_rect(desc.DesktopCoordinates);
+        let luminance = ScRGB::from_nits(desc.MaxLuminance);
 
         Self {
             handle: desc.Monitor,
             position,
             size,
-            luminance: desc.MaxLuminance,
+            luminance,
             sdr_referece_white,
         }
-    }
-
-    /// Calculate what the encoded sdr reference white is.
-    pub fn encoded_sdr_reference_white(&self) -> f32 {
-        self.sdr_referece_white / D2D1_SCENE_REFERRED_SDR_WHITE_LEVEL
     }
 
     /// Returns whether a point is contained within the bounds of the display.

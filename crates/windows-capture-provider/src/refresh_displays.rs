@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+
 use thiserror::Error;
 use windows_result::Error as WindowsError;
 
@@ -14,20 +16,19 @@ impl WindowsCaptureProvider {
         // Remove inactive displays from the capture item hashmap
         let keys: Box<[isize]> = self.display_capture_items.keys().cloned().collect();
         for handle in keys.iter() {
-            if displays.iter().find(|d| d.handle.0 == *handle).is_none() {
-                self.display_capture_items.remove(&handle);
+            if displays.iter().any(|d| d.handle.0 == *handle) {
+                self.display_capture_items.remove(handle);
             }
         }
 
         // Insert new displays into the hashmap
         for display in displays.iter() {
-            if !self.display_capture_items.contains_key(&display.handle.0) {
+            if let Entry::Vacant(entry) = self.display_capture_items.entry(display.handle.0) {
                 let capture_item = display
                     .create_capture_item()
                     .map_err(Error::CreateCaputreItem)?;
 
-                self.display_capture_items
-                    .insert(display.handle.0, capture_item);
+                entry.insert(capture_item);
             }
         }
 

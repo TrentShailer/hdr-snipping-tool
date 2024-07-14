@@ -15,14 +15,11 @@ pub fn get_current_displays(dxgi_adapter: &IDXGIAdapter1) -> Result<Box<[Display
     let display_configs = get_display_configs()?;
 
     let displays = descriptors
-        .into_iter()
+        .iter()
         .filter_map(|descriptor| {
-            let maybe_config = display_configs
+            let config = display_configs
                 .iter()
-                .find(|config| config.name == descriptor.DeviceName);
-            let Some(config) = maybe_config else {
-                return None;
-            };
+                .find(|config| config.name == descriptor.DeviceName)?;
 
             Some(Display::from_desc1(descriptor, config.sdr_reference_white))
         })

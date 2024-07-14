@@ -59,7 +59,7 @@ impl WindowsCaptureProvider {
 
         Ok(Capture {
             data: capture,
-            display: display.clone(),
+            display: *display,
         })
     }
 }
