@@ -130,7 +130,7 @@ impl FeatureSet {
             return FeatureSupport::SupportedExtension;
         }
 
-        return FeatureSupport::Supported;
+        FeatureSupport::Supported
     }
 }
 
