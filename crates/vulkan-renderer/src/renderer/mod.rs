@@ -9,7 +9,7 @@ use vulkan_instance::VulkanInstance;
 use vulkano::{
     image::{view::ImageView, ImageUsage},
     pipeline::graphics::{subpass::PipelineRenderingCreateInfo, viewport::Viewport},
-    swapchain::{Swapchain, SwapchainCreateInfo},
+    swapchain::{CompositeAlpha, Swapchain, SwapchainCreateInfo},
     sync::{self, GpuFuture},
     Validated, VulkanError,
 };
@@ -64,7 +64,13 @@ impl Renderer {
             let composite_alpha = surface_capabilities
                 .supported_composite_alpha
                 .into_iter()
-                .next()
+                .min_by_key(|composite_alpha| match composite_alpha {
+                    CompositeAlpha::Opaque => 0,
+                    CompositeAlpha::PreMultiplied => 1,
+                    CompositeAlpha::PostMultiplied => 2,
+                    CompositeAlpha::Inherit => 3,
+                    _ => 4,
+                })
                 .ok_or(Error::CompositeAlpha)?;
 
             let present_modes = vk
@@ -92,10 +98,11 @@ impl Renderer {
                 .expect("Device has no present modes");
 
             log::debug!(
-                "Image format: {:?}\nSwapchain images: {}\nPresent mode: {:?}",
+                "Image format: {:?}\nSwapchain images: {}\nPresent mode: {:?}\nComposite Alpha: {:?}",
                 image_format,
                 swapchain_image_count,
-                present_mode
+                present_mode,
+                composite_alpha
             );
 
             Swapchain::new(

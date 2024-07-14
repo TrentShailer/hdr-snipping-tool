@@ -9,6 +9,16 @@ pub struct VkSize {
     pub y: f64,
 }
 
+impl VkSize {
+    pub fn as_f32_array(&self) -> [f32; 2] {
+        [self.x as f32, self.y as f32]
+    }
+
+    pub fn as_f64_array(&self) -> [f64; 2] {
+        [self.x, self.y]
+    }
+}
+
 impl FromPhysical<u32> for VkSize {
     fn from_physical(value: [u32; 2], screen_size: [u32; 2]) -> Self {
         let value: [f64; 2] = [value[0].into(), value[1].into()];
@@ -39,24 +49,12 @@ impl FromPhysical<f64> for VkSize {
     }
 }
 
-impl Into<[f32; 2]> for VkSize {
-    fn into(self) -> [f32; 2] {
-        [self.x as f32, self.y as f32]
-    }
-}
-
 impl From<[f32; 2]> for VkSize {
     fn from(value: [f32; 2]) -> Self {
         Self {
             x: value[0].into(),
             y: value[1].into(),
         }
-    }
-}
-
-impl Into<[f64; 2]> for VkSize {
-    fn into(self) -> [f64; 2] {
-        [self.x, self.y]
     }
 }
 

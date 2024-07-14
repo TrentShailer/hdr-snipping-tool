@@ -40,8 +40,8 @@ impl MouseGuides {
                 self.pipeline.layout().clone(),
                 0,
                 PushConstants {
-                    mouse_position: mouse_position.into(),
-                    line_size: line_size.into(),
+                    mouse_position: mouse_position.as_f32_array(),
+                    line_size: line_size.as_f32_array(),
                 },
             )?
             .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?;

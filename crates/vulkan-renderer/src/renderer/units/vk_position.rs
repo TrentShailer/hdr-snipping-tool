@@ -16,6 +16,14 @@ impl VkPosition {
     pub fn get_center(top_left: VkPosition, size: VkSize) -> VkPosition {
         VkPosition::from([top_left.x + size.x / 2.0, top_left.y + size.y / 2.0])
     }
+
+    pub fn as_f32_array(&self) -> [f32; 2] {
+        [self.x as f32, self.y as f32]
+    }
+
+    pub fn as_f64_array(&self) -> [f64; 2] {
+        [self.x, self.y]
+    }
 }
 
 impl FromPhysical<u32> for VkPosition {
@@ -48,24 +56,12 @@ impl FromPhysical<f64> for VkPosition {
     }
 }
 
-impl Into<[f32; 2]> for VkPosition {
-    fn into(self) -> [f32; 2] {
-        [self.x as f32, self.y as f32]
-    }
-}
-
 impl From<[f32; 2]> for VkPosition {
     fn from(value: [f32; 2]) -> Self {
         Self {
             x: value[0].into(),
             y: value[1].into(),
         }
-    }
-}
-
-impl Into<[f64; 2]> for VkPosition {
-    fn into(self) -> [f64; 2] {
-        [self.x, self.y]
     }
 }
 
