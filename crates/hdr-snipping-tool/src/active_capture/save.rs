@@ -8,51 +8,23 @@ use arboard::{Clipboard, ImageData};
 use chrono::Local;
 use image::{codecs::png::PngEncoder, GenericImageView, ImageBuffer, ImageError, Rgba};
 use thiserror::Error;
+use vulkan_instance::VulkanInstance;
 
 use crate::project_directory;
 
-use super::{ActiveCapture, App};
+use super::ActiveCapture;
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("Failed to copy texture to CPU:\n{0}")]
-    VecCopy(#[from] vulkan_instance::texture::copy_to_vec::Error),
-
-    #[error("Failed to create image buffer:\nTexture Size: {0}, {1}\nCapture Data: {2}")]
-    ImageBuffer(u32, u32, usize),
-
-    #[error("Failed to create file for capture:\n{0}")]
-    CreateFile(#[source] io::Error),
-
-    #[error("Failed to write capture to file:\n{0}")]
-    WriteFile(#[from] ImageError),
-
-    #[error("Failed to get an clipboard instance:\n{0}")]
-    ClipboardInstance(#[source] arboard::Error),
-
-    #[error("Failed to save the capture in the clipboard:\n{0}")]
-    ClipboardSave(#[source] arboard::Error),
-}
-
-impl App {
-    pub fn save_capture(&mut self) -> Result<(), Error> {
-        let Some(app) = self.app.as_mut() else {
-            return Ok(());
-        };
-        let Some(ActiveCapture { texture, .. }) = self.capture.as_mut() else {
-            return Ok(());
-        };
-
-        // Create image buffer
-        let raw_capture = texture.copy_to_vec(&app.vulkan_instance)?;
+impl ActiveCapture {
+    pub fn save(&mut self, vk: &VulkanInstance) -> Result<(), Error> {
+        let raw_capture = self.texture.copy_to_vec(vk)?;
         let raw_capture_len = raw_capture.len();
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-            match ImageBuffer::from_raw(texture.size.width, texture.size.height, raw_capture) {
+            match ImageBuffer::from_raw(self.texture.size[0], self.texture.size[1], raw_capture) {
                 Some(v) => v,
                 None => {
                     return Err(Error::ImageBuffer(
-                        texture.size.width,
-                        texture.size.height,
+                        self.texture.size[0],
+                        self.texture.size[1],
                         raw_capture_len,
                     ))
                 }
@@ -87,8 +59,27 @@ impl App {
             })
             .map_err(Error::ClipboardSave)?;
 
-        self.clear_capture();
-
         Ok(())
     }
+}
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Failed to copy texture to CPU:\n{0}")]
+    VecCopy(#[from] vulkan_instance::texture::copy_to_vec::Error),
+
+    #[error("Failed to create image buffer:\nTexture Size: {0}, {1}\nCapture Data: {2}")]
+    ImageBuffer(u32, u32, usize),
+
+    #[error("Failed to create file for capture:\n{0}")]
+    CreateFile(#[source] io::Error),
+
+    #[error("Failed to write capture to file:\n{0}")]
+    WriteFile(#[from] ImageError),
+
+    #[error("Failed to get an clipboard instance:\n{0}")]
+    ClipboardInstance(#[source] arboard::Error),
+
+    #[error("Failed to save the capture in the clipboard:\n{0}")]
+    ClipboardSave(#[source] arboard::Error),
 }
