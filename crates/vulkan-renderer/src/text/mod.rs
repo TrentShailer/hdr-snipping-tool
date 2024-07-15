@@ -76,12 +76,11 @@ impl Text {
         let instance_buffer: Subbuffer<[InstanceData]> = Buffer::new_slice(
             vk.allocators.memory.clone(),
             BufferCreateInfo {
-                usage: BufferUsage::VERTEX_BUFFER,
+                usage: BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
                 ..Default::default()
             },
             AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
                 ..Default::default()
             },
             instance_capacity as u64,

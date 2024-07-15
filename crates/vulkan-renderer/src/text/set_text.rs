@@ -1,8 +1,11 @@
 use fontdue::layout::{GlyphRasterConfig, TextStyle};
 use thiserror::Error;
-use vulkan_instance::VulkanInstance;
+use vulkan_instance::{
+    copy_buffer::{self, copy_buffer_and_wait},
+    VulkanInstance,
+};
 use vulkano::{
-    buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage},
+    buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     sync::HostAccessError,
     Validated,
@@ -71,19 +74,39 @@ impl Text {
             self.instance_buffer = Buffer::new_slice(
                 vk.allocators.memory.clone(),
                 BufferCreateInfo {
-                    usage: BufferUsage::VERTEX_BUFFER,
+                    usage: BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_DST,
                     ..Default::default()
                 },
                 AllocationCreateInfo {
-                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
                     ..Default::default()
                 },
                 self.instance_buffer.len() * 2,
             )?;
         }
 
-        self.instance_buffer.write()?[..instances.len()].copy_from_slice(&instances);
+        let instance_staging: Subbuffer<[InstanceData]> = Buffer::new_slice(
+            vk.allocators.memory.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::VERTEX_BUFFER | BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            instances.len() as u64,
+        )?;
+        instance_staging.write()?[..instances.len()].copy_from_slice(&instances);
+
+        copy_buffer_and_wait(
+            vk,
+            instance_staging,
+            self.instance_buffer.clone(),
+            vulkan_instance::copy_buffer::Region::SmallestBuffer,
+        )?;
+
         self.instances = instances.len() as u32;
         self.extent = [text_right, self.layout.height()];
 
@@ -101,4 +124,7 @@ pub enum Error {
 
     #[error("Failed to write to buffer:\n{0}")]
     BufferWrite(#[from] HostAccessError),
+
+    #[error("Failed to copy to buffer:\n{0}")]
+    BufferCopy(#[from] copy_buffer::Error),
 }
