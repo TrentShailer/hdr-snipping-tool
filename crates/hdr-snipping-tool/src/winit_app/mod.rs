@@ -60,7 +60,7 @@ impl ApplicationHandler<()> for WinitApp {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        let Some(app) = self.app.as_ref() else { return };
+        let Some(app) = self.app.as_mut() else { return };
 
         app.handle_tray_icon(event_loop);
 

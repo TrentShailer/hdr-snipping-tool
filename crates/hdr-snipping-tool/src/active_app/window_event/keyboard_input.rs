@@ -1,4 +1,5 @@
 use scrgb::ScRGB;
+use scrgb_tonemapper::whitepoint::Whitepoint;
 use winit::{
     event::{DeviceId, ElementState, KeyEvent},
     keyboard::{KeyCode, PhysicalKey},
@@ -53,7 +54,15 @@ impl ActiveApp {
         Ok(())
     }
 
-    fn released(&mut self, _keycode: KeyCode) -> Result<(), Error> {
+    fn released(&mut self, keycode: KeyCode) -> Result<(), Error> {
+        match keycode {
+            KeyCode::Digit1 => self.set_whitepoint(Whitepoint::SdrReferenceWhite)?,
+            KeyCode::Digit2 => self.set_whitepoint(Whitepoint::MaximumLuminance)?,
+            KeyCode::Digit3 => self.set_whitepoint(Whitepoint::InputMaximum)?,
+
+            _ => {}
+        }
+
         Ok(())
     }
 }

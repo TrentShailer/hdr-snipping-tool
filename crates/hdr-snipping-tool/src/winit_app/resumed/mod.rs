@@ -1,6 +1,8 @@
 pub mod create_tray_icon;
 pub mod create_window;
 
+use std::sync::Arc;
+
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
 use vulkan_renderer::renderer::Renderer;
@@ -18,7 +20,7 @@ impl WinitApp {
         let tray_icon = Self::create_tray_icon()?;
         tray_icon.set_visible(true)?;
 
-        let vk = VulkanInstance::new(window.clone(), event_loop)?;
+        let vk = Arc::new(VulkanInstance::new(window.clone(), event_loop)?);
         let renderer = Renderer::new(&vk, window.clone())?;
 
         let capture_provider = WindowsCaptureProvider::new()?;

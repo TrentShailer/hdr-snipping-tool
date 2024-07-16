@@ -1,4 +1,5 @@
 use scrgb::ScRGB;
+use scrgb_tonemapper::whitepoint::Whitepoint;
 use thiserror::Error;
 
 use super::ActiveApp;
@@ -13,12 +14,30 @@ impl ActiveApp {
             amount *= 10.0;
         }
 
-        let whitepoint = capture.adjust_whitepoint(&self.vk, amount)?;
+        capture.adjust_whitepoint(&self.vk, amount)?;
 
-        self.renderer.parameters.set_whitepoint(
+        self.renderer.parameters.set_parameters(
             &self.vk,
             &mut self.renderer.glyph_cache,
-            whitepoint,
+            capture.tonemapper.curve_target,
+            capture.tonemapper.get_whitepoint(),
+        )?;
+
+        Ok(())
+    }
+
+    pub fn set_whitepoint(&mut self, whitepoint: Whitepoint) -> Result<(), Error> {
+        let Some(capture) = self.active_capture.as_mut() else {
+            return Ok(());
+        };
+
+        capture.set_whitepoint(&self.vk, whitepoint)?;
+
+        self.renderer.parameters.set_parameters(
+            &self.vk,
+            &mut self.renderer.glyph_cache,
+            capture.tonemapper.curve_target,
+            capture.tonemapper.get_whitepoint(),
         )?;
 
         Ok(())

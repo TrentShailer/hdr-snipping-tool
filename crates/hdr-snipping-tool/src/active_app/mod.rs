@@ -18,7 +18,7 @@ pub struct ActiveApp {
     pub window: Arc<Window>,
     pub _tray_icon: TrayIcon,
     pub renderer: Renderer,
-    pub vk: VulkanInstance,
+    pub vk: Arc<VulkanInstance>,
     pub capture_provider: WindowsCaptureProvider,
     pub mouse_position: PhysicalPosition<u32>,
     pub scroll: f32,

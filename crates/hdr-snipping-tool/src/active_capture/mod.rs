@@ -4,15 +4,15 @@ pub mod selection;
 use std::sync::Arc;
 
 use scrgb::ScRGB;
-use scrgb_tonemapper::ScrgbTonemapper;
+use scrgb_tonemapper::{whitepoint::Whitepoint, ScrgbTonemapper};
 use selection::Selection;
 use thiserror::Error;
 use vulkan_instance::{texture::Texture, VulkanInstance};
-use windows_capture_provider::{capture::Capture, WindowsCaptureProvider};
+use windows_capture_provider::{display::Display, WindowsCaptureProvider};
 use winit::dpi::PhysicalPosition;
 
 pub struct ActiveCapture {
-    pub capture: Capture,
+    pub display: Display,
     pub texture: Arc<Texture>,
     pub tonemapper: ScrgbTonemapper,
     pub selection: Selection,
@@ -20,25 +20,38 @@ pub struct ActiveCapture {
 
 impl ActiveCapture {
     pub fn new(
-        vk: &VulkanInstance,
+        vk: Arc<VulkanInstance>,
         capture_provider: &mut WindowsCaptureProvider,
     ) -> Result<Self, Error> {
         let capture = capture_provider.take_capture()?;
-        let texture = Arc::new(Texture::new(vk, capture.display.size)?);
-        let tonemapper = ScrgbTonemapper::new(vk, texture.image_view.clone(), &capture)?;
-        tonemapper.tonemap(vk)?;
+        let texture = Arc::new(Texture::new(&vk, capture.display.size)?);
+        let tonemapper = ScrgbTonemapper::new(&vk, texture.image_view.clone(), &capture)?;
+        tonemapper.tonemap(&vk)?;
 
         let selection = Selection::new(
             PhysicalPosition::new(0, 0),
             PhysicalPosition::new(capture.display.size[0], capture.display.size[1]),
         );
 
+        let display = capture.display;
+
         Ok(Self {
-            capture,
+            display,
             selection,
             texture,
             tonemapper,
         })
+    }
+
+    /// Sets the whitepoint to a new setting.
+    pub fn set_whitepoint(
+        &mut self,
+        vk: &VulkanInstance,
+        whitepoint: Whitepoint,
+    ) -> Result<(), scrgb_tonemapper::tonemap::Error> {
+        self.tonemapper.set_curve_target(whitepoint);
+        self.tonemapper.tonemap(vk)?;
+        Ok(())
     }
 
     /// Adjusts the whitepoint of the tonemapper by an amount.
@@ -46,10 +59,10 @@ impl ActiveCapture {
         &mut self,
         vk: &VulkanInstance,
         amount: ScRGB,
-    ) -> Result<ScRGB, scrgb_tonemapper::tonemap::Error> {
-        self.tonemapper.whitepoint += amount;
+    ) -> Result<(), scrgb_tonemapper::tonemap::Error> {
+        self.tonemapper.adjust_whitepoint(amount);
         self.tonemapper.tonemap(vk)?;
-        Ok(self.tonemapper.whitepoint)
+        Ok(())
     }
 }
 
