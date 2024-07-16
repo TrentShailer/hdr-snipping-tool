@@ -4,6 +4,7 @@ pub mod set_parameters;
 use std::sync::Arc;
 
 use scrgb::ScRGB;
+use scrgb_tonemapper::whitepoint::Whitepoint;
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
 use vulkano::pipeline::GraphicsPipeline;
@@ -23,6 +24,7 @@ pub struct Parameters {
     pub text: Text,
     pub rect: Rect,
     pub border: Border,
+    pub curve_target: Whitepoint,
     pub whitepoint: ScRGB,
 }
 
@@ -48,6 +50,7 @@ impl Parameters {
             text,
             rect,
             border,
+            curve_target: Whitepoint::SdrReferenceWhite,
             whitepoint: ScRGB(0.0),
         })
     }

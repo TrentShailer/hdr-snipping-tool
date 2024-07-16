@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 vulkan-instance = { workspace = true }
+scrgb-tonemapper = { workspace = true }
 scrgb = { workspace = true }
 
 log = { workspace = true }
