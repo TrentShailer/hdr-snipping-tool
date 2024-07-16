@@ -1,4 +1,6 @@
+pub mod find_maximum;
 pub mod tonemap;
+pub mod whitepoint;
 
 use std::{fmt::Debug, sync::Arc};
 
@@ -23,6 +25,8 @@ use vulkano::{
 };
 use windows_capture_provider::{capture::Capture, display::Display};
 
+use crate::{find_maximum::find_maximum, whitepoint::Whitepoint};
+
 mod shader {
     vulkano_shaders::shader! {ty: "compute", bytes: "src/shaders/scRGB_to_sRGB.spv"}
 }
@@ -30,10 +34,13 @@ mod shader {
 /// A tonemapper setup to tonemap from the scRGB color space to the sRGB color space.
 pub struct ScrgbTonemapper {
     /// The whitepoint to control the tonemapping curve.
-    pub whitepoint: ScRGB,
+    pub curve_target: Whitepoint,
 
     /// The display metadata from the capture.
     display: Display,
+
+    /// The value of the brightest component in the capture.
+    brightest_component: ScRGB,
 
     pipeline: Arc<ComputePipeline>,
     io_set: Arc<PersistentDescriptorSet>,
@@ -60,6 +67,11 @@ impl ScrgbTonemapper {
             capture.data.len() as u64,
         )?;
         staging_buffer.write()?.copy_from_slice(&capture.data);
+
+        // find the brightest component in the capture.
+        let brightest_component =
+            find_maximum(vk, staging_buffer.clone(), capture.data.len() as u32)?.to_f32();
+        let brightest_component = ScRGB(brightest_component);
 
         let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
             vk.allocators.memory.clone(),
@@ -116,11 +128,19 @@ impl ScrgbTonemapper {
         .map_err(Error::Descriptor)?;
 
         let tonemapper = Self {
-            whitepoint: capture.display.sdr_referece_white,
+            curve_target: Whitepoint::SdrReferenceWhite,
             display: capture.display,
+            brightest_component,
             io_set,
             pipeline,
         };
+
+        log::debug!(
+            "Tonemapper {{curve_target: {:?}, display: {:?}, brightest_component: {:?}}}",
+            tonemapper.curve_target,
+            tonemapper.display.handle,
+            tonemapper.brightest_component
+        );
 
         Ok(tonemapper)
     }
@@ -151,4 +171,7 @@ pub enum Error {
 
     #[error("Failed to create descriptor set:\n{0:?}")]
     Descriptor(#[source] Validated<VulkanError>),
+
+    #[error("Failed to find capture maximum:\n{0}")]
+    Maximum(#[from] find_maximum::Error),
 }

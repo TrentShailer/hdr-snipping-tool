@@ -12,6 +12,8 @@ use crate::{shader::Metadata, ScrgbTonemapper};
 impl ScrgbTonemapper {
     /// Tonemap the capture.
     pub fn tonemap(&self, vk: &VulkanInstance) -> Result<(), Error> {
+        let whitepoint = self.get_whitepoint();
+
         let workgroup_x = self.display.size[0].div_ceil(32);
         let workgroup_y = self.display.size[1].div_ceil(32);
 
@@ -34,7 +36,7 @@ impl ScrgbTonemapper {
                 self.pipeline.layout().clone(),
                 0,
                 Metadata {
-                    whitepoint: self.whitepoint.0,
+                    whitepoint: whitepoint.0,
                 },
             )?
             .dispatch([workgroup_x, workgroup_y, 1])?;
