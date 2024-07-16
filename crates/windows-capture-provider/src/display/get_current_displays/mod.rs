@@ -1,5 +1,7 @@
 mod display_configs;
 
+use std::fmt::Debug;
+
 use display_configs::get_display_configs;
 use thiserror::Error;
 use windows::Win32::Graphics::Dxgi::{IDXGIAdapter1, IDXGIOutput6, DXGI_OUTPUT_DESC1};
@@ -14,7 +16,7 @@ pub fn get_current_displays(dxgi_adapter: &IDXGIAdapter1) -> Result<Box<[Display
     let descriptors = get_output_descriptors(dxgi_adapter).map_err(Error::GetDescriptors)?;
     let display_configs = get_display_configs()?;
 
-    let displays = descriptors
+    let displays: Box<[Display]> = descriptors
         .iter()
         .filter_map(|descriptor| {
             let config = display_configs
@@ -24,6 +26,14 @@ pub fn get_current_displays(dxgi_adapter: &IDXGIAdapter1) -> Result<Box<[Display
             Some(Display::from_desc1(descriptor, config.sdr_reference_white))
         })
         .collect();
+
+    log::debug!(
+        "Current Displays:{}",
+        displays.iter().fold(String::new(), |acc, display| format!(
+            "{}\n{}",
+            acc, display
+        ))
+    );
 
     Ok(displays)
 }

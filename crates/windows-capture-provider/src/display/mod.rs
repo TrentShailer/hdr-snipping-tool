@@ -1,5 +1,7 @@
 pub mod get_current_displays;
 
+use std::fmt::Debug;
+
 use scrgb::ScRGB;
 use windows::{
     Graphics::Capture::GraphicsCaptureItem,
@@ -83,3 +85,9 @@ impl PartialEq for Display {
 }
 
 impl Eq for Display {}
+
+impl std::fmt::Display for Display {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Display {{handle: {:?}, position: {:?}, size: {:?}, luminance: {:?}, sdr_reference_white: {:?}}}", self.handle, self.position, self.size, self.luminance, self.sdr_referece_white)
+    }
+}
