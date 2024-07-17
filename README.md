@@ -4,7 +4,7 @@ A Windows Snipping Tool alternative that handles HDR content better.
 
 ## How it works
 
-See [version 2 deep dive](https://github.com/TrentShailer/hdr-snipping-tool/blob/gpu-version/technical-details.md).
+See [technical details](https://github.com/TrentShailer/hdr-snipping-tool/blob/gpu-version/technical-details.md).
 
 ## Installation
 
