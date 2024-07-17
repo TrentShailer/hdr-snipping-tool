@@ -41,9 +41,9 @@ impl Border {
                 PushConstants {
                     base_position: [0.0, 0.0],
                     base_size: [2.0, 2.0],
-                    target_position: position.into(),
-                    target_size: size.into(),
-                    line_size: line_size.into(),
+                    target_position: position.as_f32_array(),
+                    target_size: size.as_f32_array(),
+                    line_size: line_size.as_f32_array(),
                 },
             )?
             .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?;

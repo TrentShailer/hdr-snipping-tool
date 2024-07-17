@@ -42,8 +42,8 @@ impl Selection {
                 PushConstants {
                     base_position: [0.0, 0.0],
                     base_size: [1.0, 1.0],
-                    target_position: selection_position.into(),
-                    target_size: selection_size.into(),
+                    target_position: selection_position.as_f32_array(),
+                    target_size: selection_size.as_f32_array(),
                 },
             )?
             .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?;

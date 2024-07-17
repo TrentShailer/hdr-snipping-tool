@@ -1,15 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-mod app;
+mod active_app;
+mod active_capture;
 mod logger;
 mod message_box;
 mod only_instance;
-mod selection;
 mod settings;
+mod winit_app;
 
 use std::{fs, path::PathBuf};
 
-use app::App;
 use directories::ProjectDirs;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use logger::init_fern;
@@ -21,12 +21,18 @@ use windows::{
     Graphics::Capture::GraphicsCaptureSession,
     Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_ICONWARNING},
 };
-use windows_capture_provider::{Error, WindowsCaptureProvider};
+use windows_capture_provider::Error;
 use winit::{
     error::EventLoopError, event_loop::EventLoop, platform::run_on_demand::EventLoopExtRunOnDemand,
 };
+use winit_app::WinitApp;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg(debug_assertions)]
+pub const IS_DEV: bool = true;
+#[cfg(not(debug_assertions))]
+pub const IS_DEV: bool = false;
 
 fn main() {
     if std::env::args().any(|arg| arg.eq("--debug")) {
@@ -173,8 +179,7 @@ fn init() -> Result<(), AppError> {
     }));
 
     // Create the app
-    let capture_provider = WindowsCaptureProvider::new()?;
-    let mut app = App::new(capture_provider, settings);
+    let mut app = WinitApp::new();
 
     // run the app
     event_loop.run_app_on_demand(&mut app)?;

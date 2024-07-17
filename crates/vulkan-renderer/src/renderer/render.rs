@@ -52,10 +52,6 @@ impl Renderer {
             return Ok(());
         }
 
-        if self.capture.capture.is_none() {
-            return Ok(());
-        }
-
         // Handle recreatin the swapchain
         if self.recreate_swapchain {
             let (new_swapchain, new_images) = self
@@ -123,26 +119,28 @@ impl Renderer {
             })?
             .set_viewport(0, [self.viewport.clone()].into_iter().collect())?;
 
-        self.capture.render(&mut builder)?;
+        if self.capture.capture.is_some() {
+            self.capture.render(&mut builder)?;
 
-        self.mouse_guides
-            .render(&mut builder, mouse_position, window_size, window_scale)?;
+            self.mouse_guides
+                .render(&mut builder, mouse_position, window_size, window_scale)?;
 
-        self.selection.render(
-            &mut builder,
-            selection_top_left,
-            selection_size,
-            window_size,
-            window_scale,
-        )?;
+            self.selection.render(
+                &mut builder,
+                selection_top_left,
+                selection_size,
+                window_size,
+                window_scale,
+            )?;
 
-        self.parameters.render(
-            &mut builder,
-            &self.glyph_cache,
-            mouse_position,
-            window_size,
-            window_scale,
-        )?;
+            self.parameters.render(
+                &mut builder,
+                &self.glyph_cache,
+                mouse_position,
+                window_size,
+                window_scale,
+            )?;
+        }
 
         builder.end_rendering()?;
 

@@ -1,47 +1,65 @@
-pub mod d3d_devices;
+pub mod capture;
+pub mod directx_devices;
 pub mod display;
-pub mod enumerate_displays;
-pub mod fetch_capture;
-pub mod get_capture;
-pub mod prepare_capture;
+pub mod refresh_displays;
 
-use display::Display;
-use enumerate_displays::refresh_displays;
-use prepare_capture::prepare_capture;
+use std::collections::HashMap;
 
-use thiserror::Error;
-use windows::{
-    Graphics::DirectX::Direct3D11::IDirect3DDevice,
-    Win32::Graphics::Direct3D11::{ID3D11Device, ID3D11DeviceContext},
+use directx_devices::DirectXDevices;
+use display::{
+    get_current_displays::{self, get_current_displays},
+    Display,
 };
 
+use thiserror::Error;
+use windows::Graphics::Capture::GraphicsCaptureItem;
+use windows_result::Error as WindowsError;
+
+/// Structure to obtain captures on windows.
 pub struct WindowsCaptureProvider {
-    dxgi_device: IDirect3DDevice,
-    d3d_device: ID3D11Device,
-    d3d_context: ID3D11DeviceContext,
-    displays: Vec<Display>,
+    /// DirectX devices used through the capture process.
+    pub devices: DirectXDevices,
+
+    /// Set of currently active displays at the time of creation
+    /// or last capture.
+    pub displays: Box<[Display]>,
+
+    /// A mapp between HMONITOR handles and their capture item,
+    /// this is updated whenever displays are updated.
+    pub display_capture_items: HashMap<isize, GraphicsCaptureItem>,
 }
 
 impl WindowsCaptureProvider {
+    /// Create a new windows capture provider.
     pub fn new() -> Result<Self, Error> {
-        let (dxgi_device, d3d_device, d3d_context) = d3d_devices::create_d3d_devices()?;
+        let devices = DirectXDevices::new()?;
+        let displays = get_current_displays(&devices.dxgi_adapter)?;
+        let mut display_capture_items = HashMap::new();
 
-        let displays = refresh_displays(&mut []).map_err(Error::EnumerateDisplays)?;
+        for display in displays.iter() {
+            let capture_item = display
+                .create_capture_item()
+                .map_err(Error::CreateCaputreItem)?;
+
+            display_capture_items.insert(display.handle.0, capture_item);
+        }
 
         Ok(Self {
-            dxgi_device,
-            d3d_device,
-            d3d_context,
+            devices,
             displays,
+            display_capture_items,
         })
     }
 }
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to create D3D Devices:\n{0}")]
-    CreateDevices(#[from] d3d_devices::Error),
+    #[error("Failed to create directX devices:\n{0}")]
+    CreateDevices(#[from] directx_devices::Error),
 
-    #[error("Failed to enumerate displays:\n{0}")]
-    EnumerateDisplays(#[source] windows_result::Error),
+    #[error("Failed to get current displays:\n{0}")]
+    GetDisplays(#[from] get_current_displays::Error),
+
+    #[error("Failed to create capture item for display:\n{0}")]
+    CreateCaputreItem(#[source] WindowsError),
 }

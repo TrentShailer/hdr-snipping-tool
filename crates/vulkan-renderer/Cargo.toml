@@ -1,16 +1,18 @@
 [package]
 name = "vulkan-renderer"
-version = "1.4.0"
+version = "1.5.0"
 edition = "2021"
 
 [dependencies]
 vulkan-instance = { workspace = true }
+scrgb-tonemapper = { workspace = true }
+scrgb = { workspace = true }
 
-fontdue = { workspace = true }
 log = { workspace = true }
 thiserror = { workspace = true }
 vulkano = { workspace = true }
 vulkano-shaders = { workspace = true }
 winit = { workspace = true }
 smallvec = { workspace = true }
-half = { workspace = true }
+
+fontdue = "0.9"

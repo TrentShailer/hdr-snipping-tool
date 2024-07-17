@@ -52,8 +52,8 @@ impl Text {
 
                     atlas_dim: glyph_cache.atlas.extent()[0] as f32,
                     window_size: [window_size[0] as f32, window_size[1] as f32],
-                    text_position: position.into(),
-                    text_size: size.into(),
+                    text_position: position.as_f32_array(),
+                    text_size: size.as_f32_array(),
                 },
             )?
             .draw_indexed(self.index_buffer.len() as u32, self.instances, 0, 0, 0)?;

@@ -11,13 +11,15 @@ use vulkano::{
     Validated, ValidationError, VulkanError,
 };
 
+pub type VertexIndexBuffer<V> = (Subbuffer<[V]>, Subbuffer<[u32]>);
+
 /// Creates device local, not host accessable vertex and index buffers
 /// from a set of verticies and indicies.
 pub fn create_vertex_and_index_buffer<V: Vertex>(
     vk: &VulkanInstance,
     verticies: Vec<V>,
     indicies: Vec<u32>,
-) -> Result<(Subbuffer<[V]>, Subbuffer<[u32]>), Error> {
+) -> Result<VertexIndexBuffer<V>, Error> {
     // verticies
     let vertex_buffer = Buffer::new_slice(
         vk.allocators.memory.clone(),

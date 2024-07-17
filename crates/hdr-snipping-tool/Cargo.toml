@@ -1,18 +1,17 @@
 [package]
 name = "hdr-snipping-tool"
-version = "2.3.2"
+version = "3.0.0"
 edition = "2021"
 
 build = "build.rs"
 
 [dependencies]
-hdr-capture = { workspace = true }
 vulkan-instance = { workspace = true }
 vulkan-renderer = { workspace = true }
-vulkan-tonemapper = { workspace = true }
+scrgb-tonemapper = { workspace = true }
+scrgb = { workspace = true }
 windows-capture-provider = { workspace = true }
 
-half = { workspace = true }
 log = { workspace = true }
 thiserror = { workspace = true }
 windows = { workspace = true, features = [
@@ -27,11 +26,17 @@ windows-result = { workspace = true }
 winit = { workspace = true, features = ["rwh_05"] }
 
 arboard = "3.4"
-chrono = { version = "0.4", features = ["clock"] }
+chrono = { version = "0.4", features = [
+	"clock",
+	"std",
+], default-features = false }
 directories = "5.0"
 fern = "0.6"
 global-hotkey = "0.5"
-image = { version = "0.25", features = ["png"] }
+image = { version = "0.25", features = [
+	"rayon",
+	"png",
+], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 tray-icon = "0.14"

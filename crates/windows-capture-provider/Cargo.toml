@@ -1,18 +1,20 @@
 [package]
 name = "windows-capture-provider"
-version = "2.0.1"
+version = "3.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hdr-capture = { workspace = true }
+scrgb = { workspace = true }
+
 log = { workspace = true }
 thiserror = { workspace = true }
 windows = { workspace = true, features = [
 	"Foundation",
 	"Graphics_Capture",
 	"Graphics_DirectX_Direct3D11",
+	"Win32_Devices_Display",
 	"Win32_Foundation",
 	"Win32_Graphics_Direct3D_Fxc",
 	"Win32_Graphics_Direct3D11",
@@ -22,8 +24,6 @@ windows = { workspace = true, features = [
 	"Win32_System_Threading",
 	"Win32_System_WinRT_Direct3D11",
 	"Win32_System_WinRT_Graphics_Capture",
-	"Win32_UI_WindowsAndMessaging",
 ] }
 windows-core = { workspace = true }
 windows-result = { workspace = true }
-winit = { workspace = true }
