@@ -2,3 +2,5 @@
 hdr-config.toml
 log.txt
 /*.png
+*.afdesign~lock~
+media/details.afdesign
