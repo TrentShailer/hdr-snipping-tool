@@ -9,7 +9,7 @@ use winit::{
 
 use crate::{
     active_app::{self, take_capture, ActiveApp},
-    message_box::display_message,
+    windows_helpers::display_message,
 };
 
 pub struct WinitApp {

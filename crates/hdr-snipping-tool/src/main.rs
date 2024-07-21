@@ -3,9 +3,8 @@
 mod active_app;
 mod active_capture;
 mod logger;
-mod message_box;
-mod only_instance;
 mod settings;
+mod windows_helpers;
 mod winit_app;
 
 use std::{fs, path::PathBuf};
@@ -13,8 +12,6 @@ use std::{fs, path::PathBuf};
 use directories::ProjectDirs;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use logger::init_fern;
-use message_box::display_message;
-use only_instance::ensure_only_instance;
 use settings::Settings;
 use thiserror::Error;
 use windows::{
@@ -22,6 +19,7 @@ use windows::{
     Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_ICONWARNING},
 };
 use windows_capture_provider::Error;
+use windows_helpers::{display_message, ensure_only_instance};
 use winit::{
     error::EventLoopError, event_loop::EventLoop, platform::run_on_demand::EventLoopExtRunOnDemand,
 };
@@ -98,7 +96,7 @@ fn main() {
 #[derive(Debug, Error)]
 enum AppError {
     #[error("Failed to ensure only one instance:\n{0}")]
-    OnlyInstance(#[from] only_instance::Error),
+    OnlyInstance(#[from] windows_helpers::only_instance::Error),
 
     #[error("Failed to check if graphics capture is supported:\n{0}")]
     GraphicsCaptureSupport(#[source] windows_result::Error),

@@ -19,7 +19,6 @@ impl WinitApp {
             .with_title("HDR Snipping Tool")
             .with_window_icon(Some(window_icon))
             .with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
-            .with_transparent(true)
             .with_active(false)
             .with_visible(false);
 
