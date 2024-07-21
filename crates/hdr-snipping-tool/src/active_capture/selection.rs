@@ -2,8 +2,13 @@ use winit::dpi::{PhysicalPosition, PhysicalSize};
 
 #[derive(Debug, PartialEq, Default)]
 pub enum SelectionState {
-    Clicked,
+    /// User has clicked but not started selecting
+    Clicked(PhysicalPosition<u32>),
+
+    /// Selection in progress
     Selecting,
+
+    /// No currently active selection
     #[default]
     None,
 }
@@ -13,7 +18,6 @@ pub struct Selection {
     pub state: SelectionState,
     pub start: PhysicalPosition<u32>,
     pub end: PhysicalPosition<u32>,
-    pub preemptive_start: PhysicalPosition<u32>,
 }
 
 impl Selection {
@@ -22,6 +26,47 @@ impl Selection {
             start,
             end,
             ..Default::default()
+        }
+    }
+
+    pub fn start_selection(&mut self, position: PhysicalPosition<u32>) {
+        self.state = SelectionState::Clicked(position);
+    }
+
+    pub fn end_selection(&mut self) -> bool {
+        let valid_selection = self.state == SelectionState::Selecting;
+        self.state = SelectionState::None;
+
+        valid_selection
+    }
+
+    pub fn update_selection(&mut self, position: PhysicalPosition<u32>) {
+        match self.state {
+            SelectionState::Clicked(start) => {
+                if position.x == start.x || position.y == start.y {
+                    return;
+                }
+
+                self.start = start;
+                self.end = position;
+                self.state = SelectionState::Selecting;
+            }
+
+            SelectionState::Selecting => {
+                if position.x != self.start.x {
+                    self.end.x = position.x;
+                } else {
+                    self.end.x = Self::nonzero_size(self.start.x, self.end.x);
+                }
+
+                if position.y != self.start.y {
+                    self.end.y = position.y;
+                } else {
+                    self.end.y = Self::nonzero_size(self.start.y, self.end.y);
+                }
+            }
+
+            SelectionState::None => (),
         }
     }
 
@@ -42,63 +87,11 @@ impl Selection {
         (position, size)
     }
 
-    pub fn mouse_moved(&mut self, position: PhysicalPosition<u32>, window_size: PhysicalSize<u32>) {
-        // We only care if we are selecting
-        if self.state == SelectionState::None {
-            return;
+    fn nonzero_size(start: u32, end: u32) -> u32 {
+        if end > start {
+            start + 1
+        } else {
+            start - 1
         }
-
-        let window_size_pos = PhysicalPosition::new(window_size.width, window_size.height);
-
-        // clamp mouse position to window
-        let position: PhysicalPosition<u32> =
-            clamp_position(position, PhysicalPosition::new(0, 0), window_size_pos);
-
-        if position == self.preemptive_start || position == self.start {
-            return;
-        }
-
-        if self.state == SelectionState::Clicked {
-            self.state = SelectionState::Selecting;
-            self.start = self.preemptive_start;
-        }
-
-        // clamp pos to window
-        self.end = position;
     }
-
-    pub fn mouse_pressed(
-        &mut self,
-        position: PhysicalPosition<u32>,
-        window_size: PhysicalSize<u32>,
-    ) {
-        // Ensure mouse is in bounds
-        if position.x > window_size.width || position.y > window_size.height {
-            return;
-        }
-
-        if self.state == SelectionState::None {
-            self.state = SelectionState::Clicked;
-        }
-
-        self.preemptive_start = position;
-    }
-
-    pub fn mouse_released(&mut self) -> bool {
-        let should_save = self.state == SelectionState::Selecting;
-        self.state = SelectionState::None;
-
-        should_save
-    }
-}
-
-fn clamp_position(
-    position: PhysicalPosition<u32>,
-    min: PhysicalPosition<u32>,
-    max: PhysicalPosition<u32>,
-) -> PhysicalPosition<u32> {
-    PhysicalPosition::new(
-        position.x.clamp(min.x, max.x),
-        position.y.clamp(min.y, max.y),
-    )
 }
