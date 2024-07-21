@@ -4,7 +4,7 @@ use tray_icon::menu::MenuEvent;
 use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use winit::event_loop::ActiveEventLoop;
 
-use crate::{message_box::display_message, project_directory};
+use crate::{project_directory, windows_helpers::display_message};
 
 use super::ActiveApp;
 

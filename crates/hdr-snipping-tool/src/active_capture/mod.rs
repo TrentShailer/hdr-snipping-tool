@@ -8,14 +8,18 @@ use scrgb_tonemapper::{whitepoint::Whitepoint, ScrgbTonemapper};
 use selection::Selection;
 use thiserror::Error;
 use vulkan_instance::{texture::Texture, VulkanInstance};
+use windows::Win32::Foundation::HWND;
 use windows_capture_provider::{display::Display, WindowsCaptureProvider};
 use winit::dpi::PhysicalPosition;
+
+use crate::windows_helpers::foreground_window::get_foreground_window;
 
 pub struct ActiveCapture {
     pub display: Display,
     pub texture: Arc<Texture>,
     pub tonemapper: ScrgbTonemapper,
     pub selection: Selection,
+    pub formerly_focused_window: HWND,
 }
 
 impl ActiveCapture {
@@ -23,6 +27,8 @@ impl ActiveCapture {
         vk: Arc<VulkanInstance>,
         capture_provider: &mut WindowsCaptureProvider,
     ) -> Result<Self, Error> {
+        let formerly_focused_window = get_foreground_window();
+
         let capture = capture_provider.take_capture()?;
         let texture = Arc::new(Texture::new(&vk, capture.display.size)?);
         let tonemapper = ScrgbTonemapper::new(&vk, texture.image_view.clone(), &capture)?;
@@ -40,6 +46,7 @@ impl ActiveCapture {
             selection,
             texture,
             tonemapper,
+            formerly_focused_window,
         })
     }
 

@@ -1,6 +1,6 @@
 [package]
 name = "hdr-snipping-tool"
-version = "3.0.0"
+version = "3.1.0"
 edition = "2021"
 
 build = "build.rs"
@@ -23,7 +23,7 @@ windows = { workspace = true, features = [
 	"Win32_UI_WindowsAndMessaging",
 ] }
 windows-result = { workspace = true }
-winit = { workspace = true, features = ["rwh_05"] }
+winit = { workspace = true, features = ["rwh_05", "rwh_06"] }
 
 arboard = "3.4"
 chrono = { version = "0.4", features = [
