@@ -22,8 +22,6 @@ impl ActiveApp {
             return;
         };
 
-        capture
-            .selection
-            .mouse_moved(self.mouse_position, self.window.inner_size());
+        capture.selection.update_selection(self.mouse_position);
     }
 }

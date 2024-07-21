@@ -21,12 +21,10 @@ impl ActiveApp {
 
         match state {
             winit::event::ElementState::Pressed => {
-                capture
-                    .selection
-                    .mouse_pressed(self.mouse_position, self.window.inner_size());
+                capture.selection.start_selection(self.mouse_position);
             }
             winit::event::ElementState::Released => {
-                let should_save = capture.selection.mouse_released();
+                let should_save = capture.selection.end_selection();
                 if should_save {
                     capture.save(&self.vk)?;
                     self.clear_capture()?;
