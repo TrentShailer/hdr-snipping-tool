@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::windows_helpers::foreground_window::set_foreground_window;
+
 use super::ActiveApp;
 
 impl ActiveApp {
@@ -19,6 +21,7 @@ impl ActiveApp {
                 selection.1.into(),
                 self.mouse_position.into(),
             )?;
+            set_foreground_window(capture.formerly_focused_window);
         }
 
         self.active_capture = None;

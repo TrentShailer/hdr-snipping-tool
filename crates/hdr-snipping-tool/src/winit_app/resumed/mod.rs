@@ -9,13 +9,18 @@ use vulkan_renderer::renderer::Renderer;
 use windows_capture_provider::WindowsCaptureProvider;
 use winit::{dpi::PhysicalPosition, event_loop::ActiveEventLoop, keyboard::ModifiersState};
 
-use crate::active_app::ActiveApp;
+use crate::{
+    active_app::ActiveApp,
+    windows_helpers::foreground_window::{get_foreground_window, set_foreground_window},
+};
 
 use super::WinitApp;
 
 impl WinitApp {
     pub fn on_resume(&mut self, event_loop: &ActiveEventLoop) -> Result<(), Error> {
+        let focused = get_foreground_window();
         let window = Self::create_window(event_loop)?;
+        set_foreground_window(focused);
 
         let tray_icon = Self::create_tray_icon()?;
         tray_icon.set_visible(true)?;
