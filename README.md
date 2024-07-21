@@ -20,7 +20,11 @@ The application storage directory is found in `%APPDATA%\Roaming\trentshailer\hd
 
 To take a capture press the screenshot key (default PrintSrc). This key can be changed in the config, found in the `hdr-config.toml` in the storage directory. Valid values can be found in the [global-hotkey docs](https://docs.rs/global-hotkey/latest/global_hotkey/hotkey/enum.Code.html), restarting the app is required.
 
-Once the capture window appears you can use the up and down arrows or the scrollwheel to control the brightness of the output. The left and right arrows control the contrast. You can hold shift to change the tonemapping values faster.
+One the capture window appears you are able to tweak the exposure (brightness) of the capture.
+
+You can use '1', '2', or '3' to switch between tonemapping for your displays SDR White, your displays peak brightness, or the captures peak brightness.
+
+You may also used up and down arrows or the scrollwheel to control the manually control the exposure of the output. Holding shift will change the exposure faster.
 
 Use enter to save the entire capture, or click and drag the mouse to save a portion of the capture.
 
