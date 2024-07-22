@@ -3,12 +3,6 @@ use log::LevelFilter;
 use crate::project_directory;
 
 pub fn init_fern() -> Result<(), fern::InitError> {
-    let log_level = if std::env::var("hdr-snipping-tool-debug").is_ok() {
-        LevelFilter::Debug
-    } else {
-        LevelFilter::Warn
-    };
-
     fern::Dispatch::new()
         .format(move |out, message, record| {
             let message = message.to_string();
@@ -18,14 +12,26 @@ pub fn init_fern() -> Result<(), fern::InitError> {
 
             out.finish(format_args!("[{time}] [{level}] [{target}]\n{message}\n",))
         })
-        .level(LevelFilter::Warn)
-        .level_for("hdr_snipping_tool", log_level)
-        .level_for("vulkan_instance", log_level)
-        .level_for("vulkan_renderer", log_level)
-        .level_for("scrgb_tonemapper", log_level)
-        .level_for("windows_capture_provider", log_level)
-        .chain(std::io::stdout())
-        .chain(fern::log_file(project_directory().join("log.txt"))?)
+        .chain(
+            fern::Dispatch::new()
+                .level(LevelFilter::Warn)
+                .chain(std::io::stdout())
+                .chain(fern::log_file(project_directory().join("error.log"))?),
+        )
         .apply()?;
+
+    if std::env::var("hdr-snipping-tool-debug").is_ok() {
+        fern::Dispatch::new()
+            .format(move |out, message, _record| {
+                let message = message.to_string();
+                out.finish(format_args!("{message}"))
+            })
+            .filter(|metadata| metadata.level() == LevelFilter::Debug)
+            .level(LevelFilter::Debug)
+            .chain(std::io::stdout())
+            .chain(fern::log_file(project_directory().join("debug.log"))?)
+            .apply()?;
+    }
+
     Ok(())
 }
