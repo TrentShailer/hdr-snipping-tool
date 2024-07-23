@@ -18,7 +18,7 @@ impl WindowsCaptureProvider {
         // Remove inactive displays from the capture item hashmap
         let keys: Box<[isize]> = self.display_capture_items.keys().cloned().collect();
         for handle in keys.iter() {
-            if displays.iter().any(|d| d.handle.0 == *handle) {
+            if !displays.iter().any(|d| d.handle.0 == *handle) {
                 self.display_capture_items.remove(handle);
             }
         }
