@@ -19,3 +19,5 @@ vulkan-renderer = { path = "crates/vulkan-renderer" }
 scrgb-tonemapper = { path = "crates/scrgb-tonemapper" }
 scrgb = { path = "crates/scrgb" }
 windows-capture-provider = { path = "crates/windows-capture-provider" }
+vulkan-timestamp-helper = { path = "crates/vulkan-timestamp-helper" }
+debug-helper = { path = "crates/debug-helper" }
