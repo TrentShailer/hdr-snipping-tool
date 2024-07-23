@@ -1,4 +1,4 @@
-use std::collections::hash_map::Entry;
+use std::{collections::hash_map::Entry, time::Instant};
 
 use thiserror::Error;
 use windows_result::Error as WindowsError;
@@ -11,6 +11,8 @@ use crate::{
 impl WindowsCaptureProvider {
     /// Refreshes the stored displays and capture items to match the currently active displays.
     pub fn refresh_displays(&mut self) -> Result<(), Error> {
+        let display_start = Instant::now();
+
         let displays = get_current_displays(&self.devices.dxgi_adapter)?;
 
         // Remove inactive displays from the capture item hashmap
@@ -33,6 +35,12 @@ impl WindowsCaptureProvider {
         }
 
         self.displays = displays;
+
+        log::debug!(
+            "[refresh_displays]
+  [TIMING] {}ms",
+            display_start.elapsed().as_millis()
+        );
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 mod display_configs;
 
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Instant};
 
 use display_configs::get_display_configs;
 use thiserror::Error;
@@ -13,6 +13,8 @@ use super::Display;
 /// Gets the current displays by enumerating the `IDXGIAdapter1`'s output descriptors and matching them
 /// with their `DISPLAYCONFIG_PATH_INFO` containing their SDR reference white.
 pub fn get_current_displays(dxgi_adapter: &IDXGIAdapter1) -> Result<Box<[Display]>, Error> {
+    let start = Instant::now();
+
     let descriptors = get_output_descriptors(dxgi_adapter).map_err(Error::GetDescriptors)?;
     let display_configs = get_display_configs()?;
 
@@ -28,11 +30,13 @@ pub fn get_current_displays(dxgi_adapter: &IDXGIAdapter1) -> Result<Box<[Display
         .collect();
 
     log::debug!(
-        "Current Displays:{}",
+        "[get_current_displays]{}
+  [TIMING] {}ms",
         displays.iter().fold(String::new(), |acc, display| format!(
-            "{}\n{}",
+            "{}\n  {}",
             acc, display
-        ))
+        )),
+        start.elapsed().as_millis()
     );
 
     Ok(displays)

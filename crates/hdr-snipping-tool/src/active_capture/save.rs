@@ -16,6 +16,7 @@ use super::ActiveCapture;
 
 impl ActiveCapture {
     pub fn save(&mut self, vk: &VulkanInstance) -> Result<(), Error> {
+        log::info!("----- Saving Capture [{}] -----", self.id);
         let raw_capture = self.texture.copy_to_vec(vk)?;
         let raw_capture_len = raw_capture.len();
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> =

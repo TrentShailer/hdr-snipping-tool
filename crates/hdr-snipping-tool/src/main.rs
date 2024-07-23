@@ -9,6 +9,7 @@ mod winit_app;
 
 use std::{fs, path::PathBuf};
 
+use debug_helper::{enable_debug, enable_verbose, IS_DEV};
 use directories::ProjectDirs;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use logger::init_fern;
@@ -27,14 +28,13 @@ use winit_app::WinitApp;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg(debug_assertions)]
-pub const IS_DEV: bool = true;
-#[cfg(not(debug_assertions))]
-pub const IS_DEV: bool = false;
-
 fn main() {
     if std::env::args().any(|arg| arg.eq("--debug")) {
-        std::env::set_var("hdr-snipping-tool-debug", "true");
+        if std::env::args().any(|arg| arg.eq("--verbose")) {
+            enable_verbose();
+        } else {
+            enable_debug();
+        }
     }
 
     if let Err(e) = fs::create_dir_all(project_directory()) {
@@ -52,6 +52,12 @@ fn main() {
         );
         return;
     };
+
+    {
+        log::info!("\n----- Application Opened -----");
+        let dev_tooltip = if IS_DEV { "-dev" } else { "" };
+        log::debug!("HDR Snipping Tool v{}{}-debug", VERSION, dev_tooltip,);
+    }
 
     if let Err(e) = init() {
         log::error!("{e}");
@@ -152,7 +158,7 @@ fn init() -> Result<(), AppError> {
             _ => return Err(AppError::LoadSettings(e)),
         },
     };
-    log::info!("{:#?}", &settings);
+    log::debug!("{:?}", &settings);
 
     // Create event loop
     let mut event_loop: EventLoop<()> = EventLoop::with_user_event().build()?;

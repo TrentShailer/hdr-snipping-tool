@@ -6,6 +6,7 @@ use winit::{
     error::OsError,
     event_loop::ActiveEventLoop,
     platform::windows::IconExtWindows,
+    raw_window_handle::HasWindowHandle,
     window::{BadIcon, Icon, Window},
 };
 
@@ -23,6 +24,8 @@ impl WinitApp {
             .with_visible(false);
 
         let window = Arc::from(event_loop.create_window(window_attributes)?);
+
+        log::debug!("Window handle: {:?}", window.window_handle());
 
         Ok(window)
     }

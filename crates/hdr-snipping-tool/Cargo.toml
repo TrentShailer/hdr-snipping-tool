@@ -1,6 +1,6 @@
 [package]
 name = "hdr-snipping-tool"
-version = "3.1.1"
+version = "3.1.2"
 edition = "2021"
 
 build = "build.rs"
@@ -11,6 +11,7 @@ vulkan-renderer = { workspace = true }
 scrgb-tonemapper = { workspace = true }
 scrgb = { workspace = true }
 windows-capture-provider = { workspace = true }
+debug-helper = { workspace = true }
 
 log = { workspace = true }
 thiserror = { workspace = true }
@@ -40,6 +41,7 @@ image = { version = "0.25", features = [
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 tray-icon = "0.14"
+uuid = { version = "1.10", features = ["v4", "fast-rng"] }
 
 [build-dependencies]
 embed-resource = "2.4"

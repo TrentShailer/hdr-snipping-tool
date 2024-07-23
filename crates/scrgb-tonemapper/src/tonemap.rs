@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
 use vulkano::{
@@ -12,6 +14,8 @@ use crate::{shader::Metadata, ScrgbTonemapper};
 impl ScrgbTonemapper {
     /// Tonemap the capture.
     pub fn tonemap(&self, vk: &VulkanInstance) -> Result<(), Error> {
+        let start = Instant::now();
+
         let whitepoint = self.get_whitepoint();
 
         let workgroup_x = self.display.size[0].div_ceil(32);
@@ -23,6 +27,10 @@ impl ScrgbTonemapper {
             CommandBufferUsage::OneTimeSubmit,
         )
         .map_err(Error::CreateCommandBuffer)?;
+
+        self.timestamps.reset_timestamps(&mut builder, 0..2);
+        self.timestamps
+            .record_timestamp(&mut builder, 0, sync::PipelineStage::TopOfPipe);
 
         builder
             .bind_pipeline_compute(self.pipeline.clone())?
@@ -41,12 +49,28 @@ impl ScrgbTonemapper {
             )?
             .dispatch([workgroup_x, workgroup_y, 1])?;
 
+        self.timestamps
+            .record_timestamp(&mut builder, 1, sync::PipelineStage::BottomOfPipe);
         let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
         let future = sync::now(vk.device.clone())
             .then_execute(vk.queue.clone(), command_buffer)?
             .then_signal_fence_and_flush()
             .map_err(Error::SignalFenceAndFlush)?;
         future.wait(None).map_err(Error::AwaitFence)?;
+
+        let gpu_time = self.timestamps.get_delta_ms_wait(vk, 0..2);
+
+        log::debug!(
+            "[tonemap]
+  target: {:?}
+  whitepoint: {:?}
+  [GPU TIMING] {:.2}ms,
+  [CPU TIMING] {}ms",
+            self.curve_target,
+            whitepoint,
+            gpu_time,
+            start.elapsed().as_millis(),
+        );
 
         Ok(())
     }

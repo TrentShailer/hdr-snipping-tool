@@ -35,39 +35,42 @@ impl VulkanInstance {
 
         let queue = queues.next().unwrap();
 
-        log::info!(
-            "Vulkan {}\nUsing device: {} (type: {:?})",
-            instance.api_version(),
-            physical_device.properties().device_name,
-            physical_device.properties().device_type,
-        );
-
-        let supports_timestmaps = physical_device.queue_family_properties()
-            [queue.queue_family_index() as usize]
-            .timestamp_valid_bits
-            .is_some();
-        log::debug!(
-            "Queue family index: {}\nSupports timestamps: {}\nSupported optional features: {:?}\nFeature Extensions: {:?}",
-            queue_family_index,
-            supports_timestmaps,
-            supported_optional_features,
-            feature_extensions,
-        );
-
-        Ok(Self {
+        let vk = Self {
             allocators,
             physical_device,
             device,
             queue,
             surface,
             supported_optional_features,
-        })
+        };
+
+        let supports_timestamps = vk.supports_timestamps();
+
+        log::debug!(
+            "[Vulkan]
+  v{}
+  {} ({:?})
+  Queue Index: {}
+  Supports timestamps: {}
+  Supported optional features: {:?}
+  Feature extensions: {:?}",
+            instance.api_version(),
+            vk.physical_device.properties().device_name,
+            vk.physical_device.properties().device_type,
+            queue_family_index,
+            supports_timestamps,
+            supported_optional_features,
+            feature_extensions,
+        );
+
+        Ok(vk)
     }
 
-    pub fn queue_supports_timestamps(&self) -> bool {
+    pub fn supports_timestamps(&self) -> bool {
         self.physical_device.queue_family_properties()[self.queue.queue_family_index() as usize]
             .timestamp_valid_bits
             .is_some()
+            && self.device.enabled_features().host_query_reset
     }
 }
 

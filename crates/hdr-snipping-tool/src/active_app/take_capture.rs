@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use thiserror::Error;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 
@@ -7,6 +9,9 @@ use super::ActiveApp;
 
 impl ActiveApp {
     pub fn take_capture(&mut self) -> Result<(), Error> {
+        log::info!("\n----- Taking Capture -----");
+        let capture_start = Instant::now();
+
         let active_capture = ActiveCapture::new(self.vk.clone(), &mut self.capture_provider)?;
 
         let size: PhysicalSize<u32> = active_capture.display.size.into();
@@ -25,6 +30,9 @@ impl ActiveApp {
         self.renderer
             .capture
             .load_capture(&self.vk, active_capture.texture.clone())?;
+
+        log::debug!("[TIMING TOTAL] {}ms", capture_start.elapsed().as_millis());
+        log::info!("----- Has Capture [{}] -----", active_capture.id);
 
         self.window.set_visible(true);
         self.window.focus_window();
