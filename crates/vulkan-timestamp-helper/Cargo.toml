@@ -1,0 +1,11 @@
+[package]
+name = "vulkan-timestamp-helper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vulkan-instance = { workspace = true }
+debug-helper = { workspace = true }
+
+log = { workspace = true }
+vulkano = { workspace = true }
