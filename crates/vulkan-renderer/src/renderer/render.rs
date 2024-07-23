@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
@@ -33,18 +33,12 @@ impl Renderer {
         let window_scale = window.scale_factor();
 
         if window_scale != self.window_scale {
-            self.window_scale = window_scale;
-
-            self.glyph_cache = GlyphCache::new(vk, BASE_FONT_SIZE * window_scale as f32)?;
-            self.parameters
-                .text
-                .update_glyph_cache(vk, &mut self.glyph_cache)?;
+            self.recreate_glyph_cache(window_scale, vk)?;
         }
 
-        // Checks if the previous frame future has finished, if so, releases its resources
-        // Non-blocking
-        if let Some(prev_frame) = self.previous_frame_end.as_mut() {
-            prev_frame.cleanup_finished();
+        // Cleanup finished resources
+        if let Some(v) = self.render_future.as_mut() {
+            v.cleanup_finished();
         }
 
         // Don't try to render a surface that isn't visible
@@ -54,49 +48,41 @@ impl Renderer {
 
         // Handle recreatin the swapchain
         if self.recreate_swapchain {
-            let (new_swapchain, new_images) = self
-                .swapchain
-                .recreate(SwapchainCreateInfo {
-                    image_extent: window_size,
-                    ..self.swapchain.create_info()
-                })
-                .map_err(Error::RecreateSwapchain)?;
-
-            self.swapchain = new_swapchain;
-
-            // Because the attachment views are for the old swapchain, they must be recreated
-            let attachment_views = window_size_dependent_setup(&new_images, &mut self.viewport)?;
-
-            self.attachment_views = attachment_views;
-            self.recreate_swapchain = false;
+            self.recreate_swapchain(window_size)?;
         }
 
-        // Get the next image index and future for when it is available
-        let (image_index, image_future) = {
-            // Returns a future that is cleared when the image is available
-            let next_image_result = match acquire_next_image(self.swapchain.clone(), None) {
-                Ok(v) => Ok(v),
-                Err(e) => match e {
-                    Validated::Error(_) => Err(Validated::unwrap(e)),
-                    Validated::ValidationError(_) => return Err(Error::AquireImage(e)),
-                },
-            };
+        let aquire_future = match self.aquire_future.take() {
+            Some(v) => v,
+            None => {
+                // Get the next image index and future for when it is available
+                let (_, suboptimal, acquire_future) =
+                    match acquire_next_image(self.swapchain.clone(), None) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            if matches!(e, Validated::Error(VulkanError::OutOfDate)) {
+                                self.recreate_swapchain = true;
+                                return Ok(());
+                            }
 
-            let (image_index, suboptimal, acquire_future) = match next_image_result {
-                Ok(r) => r,
-                Err(VulkanError::OutOfDate) => {
+                            return Err(Error::AquireImage(e));
+                        }
+                    };
+
+                if suboptimal {
                     self.recreate_swapchain = true;
-                    return Ok(());
                 }
-                Err(e) => return Err(Error::AquireImage(Validated::Error(e))),
-            };
 
-            if suboptimal {
-                self.recreate_swapchain = true;
+                acquire_future
             }
-
-            (image_index, acquire_future)
         };
+
+        // if the image is not aquired, don't draw
+        if aquire_future.wait(Some(Duration::from_secs(0))).is_err() {
+            self.aquire_future = Some(aquire_future);
+            return Ok(());
+        }
+
+        let image_index = aquire_future.image_index();
 
         let mut builder = AutoCommandBufferBuilder::primary(
             &vk.allocators.command,
@@ -104,6 +90,16 @@ impl Renderer {
             CommandBufferUsage::OneTimeSubmit,
         )
         .map_err(Error::CreateCommandBuffer)?;
+
+        let start = image_index * 2;
+        let delta_ms = self.timestamps.get_delta_ms_available(vk, start..start + 2);
+        if let Some(delta_ms) = delta_ms {
+            log::debug!("[render]\n  [GPU TIMING] {:.3}ms", delta_ms);
+        }
+        self.timestamps
+            .reset_timestamps(&mut builder, start..start + 2);
+        self.timestamps
+            .record_timestamp(&mut builder, start, sync::PipelineStage::TopOfPipe);
 
         builder
             .begin_rendering(RenderingInfo {
@@ -144,42 +140,69 @@ impl Renderer {
 
         builder.end_rendering()?;
 
+        self.timestamps.record_timestamp(
+            &mut builder,
+            start + 1,
+            sync::PipelineStage::BottomOfPipe,
+        );
+
         let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
 
-        let future = self
-            .previous_frame_end
+        let render_future = self
+            .render_future
             .take()
             .unwrap_or_else(|| sync::now(vk.device.clone()).boxed())
-            .join(image_future)
+            .join(aquire_future)
             .then_execute(vk.queue.clone(), command_buffer)?
             .then_swapchain_present(
                 vk.queue.clone(),
                 SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_index),
             )
+            .boxed()
             .then_signal_fence_and_flush();
 
-        let future_result = match future {
-            Ok(v) => Ok(v),
-            Err(e) => match e {
-                Validated::Error(_) => Err(Validated::unwrap(e)),
-                Validated::ValidationError(_) => return Err(Error::FailedToFlush(e)),
-            },
-        };
-
-        match future_result {
-            Ok(future) => {
-                self.previous_frame_end = Some(future.boxed());
-            }
-            Err(VulkanError::OutOfDate) => {
-                self.recreate_swapchain = true;
-                self.previous_frame_end = Some(sync::now(vk.device.clone()).boxed());
+        match render_future {
+            Ok(v) => {
+                self.render_future = Some(v.boxed());
             }
             Err(e) => {
-                self.previous_frame_end = Some(sync::now(vk.device.clone()).boxed());
-                return Err(Error::FailedToFlush(Validated::Error(e)));
+                if matches!(e, Validated::Error(VulkanError::OutOfDate)) {
+                    self.recreate_swapchain = true;
+                    self.render_future = Some(sync::now(vk.device.clone()).boxed());
+                } else {
+                    return Err(Error::FailedToFlush(e));
+                }
             }
         };
 
+        Ok(())
+    }
+
+    fn recreate_swapchain(&mut self, window_size: [u32; 2]) -> Result<(), Error> {
+        let (new_swapchain, new_images) = self
+            .swapchain
+            .recreate(SwapchainCreateInfo {
+                image_extent: window_size,
+                ..self.swapchain.create_info()
+            })
+            .map_err(Error::RecreateSwapchain)?;
+        self.swapchain = new_swapchain;
+        let attachment_views = window_size_dependent_setup(&new_images, &mut self.viewport)?;
+        self.attachment_views = attachment_views;
+        self.recreate_swapchain = false;
+        Ok(())
+    }
+
+    fn recreate_glyph_cache(
+        &mut self,
+        window_scale: f64,
+        vk: &VulkanInstance,
+    ) -> Result<(), Error> {
+        self.window_scale = window_scale;
+        self.glyph_cache = GlyphCache::new(vk, BASE_FONT_SIZE * window_scale as f32)?;
+        self.parameters
+            .text
+            .update_glyph_cache(vk, &mut self.glyph_cache)?;
         Ok(())
     }
 }

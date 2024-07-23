@@ -1,4 +1,7 @@
-use std::sync::mpsc::{channel, Receiver};
+use std::{
+    sync::mpsc::{channel, Receiver},
+    time::Instant,
+};
 
 use thiserror::Error;
 use windows::{
@@ -26,6 +29,8 @@ pub fn start_capture_session(
     ),
     Error,
 > {
+    let start = Instant::now();
+
     let capture_size = capture_item.Size().map_err(Error::CaptureSize)?;
 
     let framepool = Direct3D11CaptureFramePool::CreateFreeThreaded(
@@ -67,6 +72,12 @@ pub fn start_capture_session(
         .map_err(Error::FrameArrived)?;
 
     session.StartCapture().map_err(Error::StartCapture)?;
+
+    log::debug!(
+        "[start_capture_session]
+  [TIMING] {}ms",
+        start.elapsed().as_millis()
+    );
 
     Ok((framepool, session, receiver))
 }

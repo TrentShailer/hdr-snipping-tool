@@ -2,7 +2,7 @@ mod retrieve_capture;
 mod select_display;
 mod start_capture_session;
 
-use std::sync::mpsc::RecvError;
+use std::{sync::mpsc::RecvError, time::Instant};
 
 use select_display::select_display;
 use start_capture_session::start_capture_session;
@@ -24,10 +24,17 @@ pub struct Capture {
 impl WindowsCaptureProvider {
     /// Take a capture of the display the mouse is currently in.
     pub fn take_capture(&mut self) -> Result<Capture, Error> {
+        let capture_start = Instant::now();
+
         self.refresh_displays()?;
 
         // find the display the mouse is in
         let display = select_display(&self.displays)?;
+        log::debug!(
+            "[select_display]
+  {}",
+            display
+        );
 
         // get it's capture item
         let capture_item = self
@@ -40,7 +47,13 @@ impl WindowsCaptureProvider {
             start_capture_session(capture_item, &self.devices.d3d_device)?;
 
         // get the d3d_capture
+        let recv_start = Instant::now();
         let d3d11_capture = capture_receiver.recv()?;
+        log::debug!(
+            "[recv_capture]
+  [TIMING] {}ms",
+            recv_start.elapsed().as_millis()
+        );
 
         capture_session.Close().map_err(Error::CloseSession)?;
         framepool.Close().map_err(Error::CloseSession)?;
@@ -56,6 +69,12 @@ impl WindowsCaptureProvider {
         // free resources
         unsafe { self.devices.d3d11_context.ClearState() };
         self.devices.d3d_device.Trim().map_err(Error::Trim)?;
+
+        log::debug!(
+            "[take_capture]
+  [TIMING] {}ms",
+            capture_start.elapsed().as_millis()
+        );
 
         Ok(Capture {
             data: capture,

@@ -31,14 +31,6 @@ impl ActiveApp {
 
     fn pressed(&mut self, keycode: KeyCode) -> Result<(), Error> {
         match keycode {
-            KeyCode::Escape => self.clear_capture()?,
-            KeyCode::Enter => {
-                if let Some(capture) = self.active_capture.as_mut() {
-                    capture.save(&self.vk)?;
-                    self.clear_capture()?;
-                }
-            }
-
             KeyCode::ArrowUp | KeyCode::ArrowDown => {
                 let amount = if keycode == KeyCode::ArrowUp {
                     ScRGB::from_nits(10.0)
@@ -56,6 +48,14 @@ impl ActiveApp {
 
     fn released(&mut self, keycode: KeyCode) -> Result<(), Error> {
         match keycode {
+            KeyCode::Escape => self.clear_capture()?,
+            KeyCode::Enter => {
+                if let Some(capture) = self.active_capture.as_mut() {
+                    capture.save(&self.vk)?;
+                    self.clear_capture()?;
+                }
+            }
+
             KeyCode::Digit1 => self.set_whitepoint(Whitepoint::SdrReferenceWhite)?,
             KeyCode::Digit2 => self.set_whitepoint(Whitepoint::MaximumLuminance)?,
             KeyCode::Digit3 => self.set_whitepoint(Whitepoint::InputMaximum)?,

@@ -22,6 +22,9 @@ impl ActiveApp {
                 self.mouse_position.into(),
             )?;
             set_foreground_window(capture.formerly_focused_window);
+            log::info!("----- Closed Capture [{}] -----", capture.id);
+        } else {
+            log::info!("----- Closed Capture -----");
         }
 
         self.active_capture = None;

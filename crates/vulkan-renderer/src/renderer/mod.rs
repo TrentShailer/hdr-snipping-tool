@@ -6,10 +6,11 @@ use std::sync::Arc;
 
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
+use vulkan_timestamp_helper::TimestampPool;
 use vulkano::{
     image::{view::ImageView, ImageUsage},
     pipeline::graphics::{subpass::PipelineRenderingCreateInfo, viewport::Viewport},
-    swapchain::{CompositeAlpha, Swapchain, SwapchainCreateInfo},
+    swapchain::{CompositeAlpha, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo},
     sync::{self, GpuFuture},
     Validated, VulkanError,
 };
@@ -29,7 +30,8 @@ const BASE_FONT_SIZE: f32 = 17.0;
 
 pub struct Renderer {
     pub recreate_swapchain: bool,
-    pub previous_frame_end: Option<Box<dyn GpuFuture>>,
+    pub render_future: Option<Box<dyn GpuFuture>>,
+    pub aquire_future: Option<SwapchainAcquireFuture>,
     pub swapchain: Arc<Swapchain>,
     pub attachment_views: Vec<Arc<ImageView>>,
     pub viewport: Viewport,
@@ -40,6 +42,8 @@ pub struct Renderer {
     pub selection: Selection,
     pub mouse_guides: MouseGuides,
     pub parameters: Parameters,
+    //
+    pub timestamps: TimestampPool,
 }
 
 impl Renderer {
@@ -81,24 +85,22 @@ impl Renderer {
 
             let swapchain_image_count = surface_capabilities.min_image_count + 1;
 
-            let mailbox_score = if swapchain_image_count > 2 { 0 } else { 1 };
-            let immediate_score = if swapchain_image_count <= 2 { 0 } else { 1 };
-
-            // FIFO modes end up lagging behind to mailbox or immediate are preferred
-            // As mailbox acts like FIFO with 2 or fewer images, in that case we should use immediate
-            // Mailbox with > 2 images is preferred over immediate as it has less tearing
             let present_mode = present_modes
                 .min_by_key(|mode| match mode {
-                    vulkano::swapchain::PresentMode::Mailbox => mailbox_score,
-                    vulkano::swapchain::PresentMode::Immediate => immediate_score,
+                    vulkano::swapchain::PresentMode::Fifo => 0,
+                    vulkano::swapchain::PresentMode::Mailbox => 1,
                     vulkano::swapchain::PresentMode::FifoRelaxed => 2,
-                    vulkano::swapchain::PresentMode::Fifo => 3,
+                    vulkano::swapchain::PresentMode::Immediate => 3,
                     _ => 4,
                 })
                 .expect("Device has no present modes");
 
             log::debug!(
-                "Image format: {:?}\nSwapchain images: {}\nPresent mode: {:?}\nComposite Alpha: {:?}",
+                "[Renderer]
+  Surface format: {:?}
+  Swapchain images: {}
+  Present mode: {:?}
+  Composite alpha: {:?}",
                 image_format,
                 swapchain_image_count,
                 present_mode,
@@ -174,11 +176,13 @@ impl Renderer {
             border_pipeline,
         )?;
 
+        let timestamps = 2 * swapchain.image_count();
+
         Ok(Self {
             viewport,
             swapchain,
             attachment_views,
-            previous_frame_end: Some(sync::now(vk.device.clone()).boxed()),
+            aquire_future: None,
             recreate_swapchain: false,
             glyph_cache,
             window_scale: window.scale_factor(),
@@ -187,6 +191,9 @@ impl Renderer {
             selection,
             mouse_guides,
             parameters,
+            //
+            timestamps: TimestampPool::new(vk, timestamps),
+            render_future: Some(sync::now(vk.device.clone()).boxed()),
         })
     }
 }

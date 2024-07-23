@@ -1,3 +1,4 @@
+use debug_helper::is_debug;
 use thiserror::Error;
 use tray_icon::{
     menu::{Menu, MenuItem},
@@ -18,11 +19,7 @@ impl WinitApp {
         let tray_menu = Menu::with_items(&[&directory_item, &quit_item])?;
 
         let dev_tooltip = if IS_DEV { "-dev" } else { "" };
-        let debug_tooltip = if std::env::var("hdr-snipping-tool-debug").is_ok() {
-            "-debug"
-        } else {
-            ""
-        };
+        let debug_tooltip = if is_debug() { "-debug" } else { "" };
 
         let tooltip = format!(
             "HDR Snipping Tool v{}{}{}",

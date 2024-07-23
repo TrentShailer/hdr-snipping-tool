@@ -2,7 +2,7 @@ pub mod find_maximum;
 pub mod tonemap;
 pub mod whitepoint;
 
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc, time::Instant};
 
 use scrgb::ScRGB;
 use thiserror::Error;
@@ -10,6 +10,7 @@ use vulkan_instance::{
     copy_buffer::{self, copy_buffer_and_wait},
     VulkanInstance,
 };
+use vulkan_timestamp_helper::TimestampPool;
 use vulkano::{
     buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
@@ -44,6 +45,9 @@ pub struct ScrgbTonemapper {
 
     pipeline: Arc<ComputePipeline>,
     io_set: Arc<PersistentDescriptorSet>,
+
+    /// Debug timestamps
+    timestamps: TimestampPool,
 }
 
 impl ScrgbTonemapper {
@@ -53,6 +57,8 @@ impl ScrgbTonemapper {
         output_view: Arc<ImageView>,
         capture: &Capture,
     ) -> Result<Self, Error> {
+        let start = Instant::now();
+
         let staging_buffer: Subbuffer<[u8]> = Buffer::new_slice(
             vk.allocators.memory.clone(),
             BufferCreateInfo {
@@ -133,13 +139,17 @@ impl ScrgbTonemapper {
             brightest_component,
             io_set,
             pipeline,
+            timestamps: TimestampPool::new(vk, 2),
         };
 
         log::debug!(
-            "Tonemapper {{curve_target: {:?}, display: {:?}, brightest_component: {:?}}}",
+            "[new_tonemapper]
+  curve_target: {:?}
+  brightest_component: {:?}
+  [TIMING] {}ms",
             tonemapper.curve_target,
-            tonemapper.display.handle,
-            tonemapper.brightest_component
+            tonemapper.brightest_component,
+            start.elapsed().as_millis()
         );
 
         Ok(tonemapper)

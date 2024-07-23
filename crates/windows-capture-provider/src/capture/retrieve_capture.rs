@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use windows::{
     Graphics::Capture::Direct3D11CaptureFrame,
     Win32::{
@@ -18,6 +20,8 @@ pub fn retrieve_capture(
     d3d_device: &ID3D11Device,
     d3d_context: &ID3D11DeviceContext,
 ) -> Result<Box<[u8]>, WindowsError> {
+    let start = Instant::now();
+
     // Get the surface of the capture
     let surface = d3d_capture.Surface()?;
     let access: IDirect3DDxgiInterfaceAccess = surface.cast()?;
@@ -101,6 +105,14 @@ pub fn retrieve_capture(
     };
 
     unsafe { d3d_context.Unmap(Some(&staging_resource), 0) };
+
+    log::debug!(
+        "[retrieve_capture]
+  {} bytes
+  [TIMING] {}ms",
+        capture.len(),
+        start.elapsed().as_millis()
+    );
 
     Ok(capture)
 }
