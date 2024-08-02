@@ -1,4 +1,3 @@
-use scrgb::ScRGB;
 use thiserror::Error;
 use windows::Win32::Devices::Display::{
     DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes, QueryDisplayConfig,
@@ -9,16 +8,17 @@ use windows::Win32::Devices::Display::{
 use windows_core::HRESULT;
 use windows_result::{Error as WindowsError, Result as WindowsResult};
 
+/// Config for a given display.
 pub struct DisplayConfig {
     pub name: [u16; 32],
-    pub sdr_reference_white: ScRGB,
+    pub sdr_reference_white: f32,
 }
 
+/// Gets display config using the display config path infos.
 pub fn get_display_configs() -> Result<Box<[DisplayConfig]>, Error> {
-    let display_config_path_infos =
-        get_display_configh_path_infos().map_err(Error::DisplayInfos)?;
+    let display_config_path_infos = get_display_config_path_infos().map_err(Error::DisplayInfos)?;
 
-    let display_configs: Result<Box<[DisplayConfig]>, Error> = display_config_path_infos
+    let display_configs = display_config_path_infos
         .iter()
         .map(|path_info| {
             let name = get_device_name(path_info).map_err(Error::Name)?;
@@ -47,7 +47,7 @@ pub enum Error {
     ReferenceWhite(#[source] WindowsError),
 }
 
-fn get_display_configh_path_infos() -> WindowsResult<Box<[DISPLAYCONFIG_PATH_INFO]>> {
+fn get_display_config_path_infos() -> WindowsResult<Box<[DISPLAYCONFIG_PATH_INFO]>> {
     let mut path_elements = 0;
     let mut mode_info_elements = 0;
     unsafe {
@@ -94,7 +94,7 @@ fn get_device_name(path_info: &DISPLAYCONFIG_PATH_INFO) -> WindowsResult<[u16; 3
     Ok(device_name.viewGdiDeviceName)
 }
 
-fn get_sdr_reference_white(path_info: &DISPLAYCONFIG_PATH_INFO) -> WindowsResult<ScRGB> {
+fn get_sdr_reference_white(path_info: &DISPLAYCONFIG_PATH_INFO) -> WindowsResult<f32> {
     let mut sdr_white_level = DISPLAYCONFIG_SDR_WHITE_LEVEL::default();
 
     sdr_white_level.header.adapterId = path_info.targetInfo.adapterId;
@@ -107,7 +107,7 @@ fn get_sdr_reference_white(path_info: &DISPLAYCONFIG_PATH_INFO) -> WindowsResult
         windows_result_from_hresult(result, "SDR White Level")?;
     };
 
-    let sdr_reference_white = ScRGB(sdr_white_level.SDRWhiteLevel as f32 / 1000.0);
+    let sdr_reference_white = sdr_white_level.SDRWhiteLevel as f32 / 1000.0;
 
     Ok(sdr_reference_white)
 }

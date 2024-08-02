@@ -1,13 +1,9 @@
-pub mod get_current_displays;
-
 use std::fmt::Debug;
 
-use scrgb::ScRGB;
 use windows::{
     Graphics::Capture::GraphicsCaptureItem,
     Win32::{
-        Foundation::RECT,
-        Graphics::{Dxgi::DXGI_OUTPUT_DESC1, Gdi::HMONITOR},
+        Foundation::RECT, Graphics::Gdi::HMONITOR,
         System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop,
     },
 };
@@ -26,24 +22,19 @@ pub struct Display {
     /// The size of the display in pixels.
     pub size: [u32; 2],
 
-    /// The maximum luminance of the display.
-    pub luminance: ScRGB,
-
     /// The display's SDR reference white.
-    pub sdr_referece_white: ScRGB,
+    pub sdr_referece_white: f32,
 }
 
 impl Display {
-    /// Create a display object from a `DXGI_OUTPUT_DESC1` and sdr reference white.
-    pub fn from_desc1(desc: &DXGI_OUTPUT_DESC1, sdr_referece_white: ScRGB) -> Self {
-        let (position, size) = Self::position_size_from_rect(desc.DesktopCoordinates);
-        let luminance = ScRGB::from_nits(desc.MaxLuminance);
+    /// Create a new display.
+    pub fn new(handle: HMONITOR, rect: RECT, sdr_referece_white: f32) -> Self {
+        let (position, size) = Self::position_size_from_rect(rect);
 
         Self {
-            handle: desc.Monitor,
+            handle,
             position,
             size,
-            luminance,
             sdr_referece_white,
         }
     }
@@ -88,6 +79,10 @@ impl Eq for Display {}
 
 impl std::fmt::Display for Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Display {{handle: {:?}, position: {:?}, size: {:?}, luminance: {:?}, sdr_reference_white: {:?}}}", self.handle, self.position, self.size, self.luminance, self.sdr_referece_white)
+        write!(
+            f,
+            "Display {{handle: {:?}, position: {:?}, size: {:?}, sdr_reference_white: {:?}}}",
+            self.handle, self.position, self.size, self.sdr_referece_white
+        )
     }
 }

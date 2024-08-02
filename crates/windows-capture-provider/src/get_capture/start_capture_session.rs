@@ -11,16 +11,20 @@ use windows::{
             Direct3D11CaptureFrame, Direct3D11CaptureFramePool, GraphicsCaptureItem,
             GraphicsCaptureSession,
         },
-        DirectX::{Direct3D11::IDirect3DDevice, DirectXPixelFormat},
+        DirectX::DirectXPixelFormat,
     },
     Win32::UI::WindowsAndMessaging::WM_APP,
 };
 use windows_core::{IInspectable, HRESULT};
 use windows_result::Error as WindowsError;
 
+use crate::DirectXDevices;
+
+/// Start a capture session for a given capture item.\
+/// Returns the frame pool, the capture session, and a receiver for the capture frame.
 pub fn start_capture_session(
+    devices: &DirectXDevices,
     capture_item: &GraphicsCaptureItem,
-    d3d_device: &IDirect3DDevice,
 ) -> Result<
     (
         Direct3D11CaptureFramePool,
@@ -34,7 +38,7 @@ pub fn start_capture_session(
     let capture_size = capture_item.Size().map_err(Error::CaptureSize)?;
 
     let framepool = Direct3D11CaptureFramePool::CreateFreeThreaded(
-        d3d_device,
+        &devices.d3d_device,
         DirectXPixelFormat::R16G16B16A16Float,
         1,
         capture_size,

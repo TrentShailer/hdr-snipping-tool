@@ -4,9 +4,8 @@ use windows::{
     Graphics::Capture::Direct3D11CaptureFrame,
     Win32::{
         Graphics::Direct3D11::{
-            ID3D11Device, ID3D11DeviceContext, ID3D11Resource, ID3D11Texture2D,
-            D3D11_CPU_ACCESS_READ, D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ, D3D11_TEXTURE2D_DESC,
-            D3D11_USAGE_STAGING,
+            ID3D11Resource, ID3D11Texture2D, D3D11_CPU_ACCESS_READ, D3D11_MAPPED_SUBRESOURCE,
+            D3D11_MAP_READ, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
         },
         System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess,
         UI::WindowsAndMessaging::WM_APP,
@@ -15,10 +14,12 @@ use windows::{
 use windows_core::{Interface, HRESULT};
 use windows_result::Error as WindowsError;
 
+use crate::DirectXDevices;
+
+/// Retrieves the capture from the GPU.
 pub fn retrieve_capture(
+    devices: &DirectXDevices,
     d3d_capture: Direct3D11CaptureFrame,
-    d3d_device: &ID3D11Device,
-    d3d_context: &ID3D11DeviceContext,
 ) -> Result<Box<[u8]>, WindowsError> {
     let start = Instant::now();
 
@@ -41,7 +42,11 @@ pub fn retrieve_capture(
     // Create staging texture
     let staging_texture = {
         let mut texture = None;
-        unsafe { d3d_device.CreateTexture2D(&staging_desc, None, Some(&mut texture))? };
+        unsafe {
+            devices
+                .d3d11_device
+                .CreateTexture2D(&staging_desc, None, Some(&mut texture))?
+        };
 
         texture.ok_or(WindowsError::new(
             HRESULT::from_win32(WM_APP),
@@ -51,7 +56,7 @@ pub fn retrieve_capture(
 
     // Copy from to the staging texture
     unsafe {
-        d3d_context.CopyResource(
+        devices.d3d11_context.CopyResource(
             Some(&staging_texture.cast()?),
             Some(&source_texture.cast()?),
         )
@@ -61,7 +66,7 @@ pub fn retrieve_capture(
     let staging_resource: ID3D11Resource = staging_texture.cast()?;
     let mut mapped_resource = D3D11_MAPPED_SUBRESOURCE::default();
     unsafe {
-        d3d_context.Map(
+        devices.d3d11_context.Map(
             Some(&staging_resource),
             0,
             D3D11_MAP_READ,
@@ -104,7 +109,7 @@ pub fn retrieve_capture(
         raw_slice.to_vec().into_boxed_slice()
     };
 
-    unsafe { d3d_context.Unmap(Some(&staging_resource), 0) };
+    unsafe { devices.d3d11_context.Unmap(Some(&staging_resource), 0) };
 
     log::debug!(
         "[retrieve_capture]
