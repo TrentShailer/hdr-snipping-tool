@@ -23,18 +23,17 @@ pub mod shader {
     vulkano_shaders::shader! {ty: "compute", bytes: "src/shaders/maximum.spv"}
 }
 
-/// Performs a GPU reduction to find the largest value in the image
-///
-/// Staging buffer is a Transfer Source buffer that contains the f16 bytes to be reduced, it is unmodifed.
-///
-/// Bytecount is the number of bytes in the staging buffer
-pub fn find_maximum(
+/// Performs a GPU reduction to find the largest value in the image.\
+/// Staging buffer is a Transfer Source buffer that contains the f16 bytes to be reduced, it is unmodifed.\
+/// Bytecount is the number of bytes in the staging buffer.
+pub(crate) fn find_maximum(
     vk: &VulkanInstance,
     staging_buffer: Subbuffer<[u8]>,
     byte_count: u32,
 ) -> Result<f16, Error> {
     let start = Instant::now();
 
+    // Create pipline for maximum reduction
     let pipeline = {
         let shader = shader::load(vk.device.clone())
             .map_err(Error::LoadShader)?
@@ -46,11 +45,7 @@ pub fn find_maximum(
         let layout = PipelineLayout::new(
             vk.device.clone(),
             PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
-                .into_pipeline_layout_create_info(vk.device.clone())
-                .map_err(|e| Error::CreatePipelineLayoutInfo {
-                    set_num: e.set_num,
-                    error: e.error,
-                })?,
+                .into_pipeline_layout_create_info(vk.device.clone())?,
         )
         .map_err(Error::CreatePipelineLayout)?;
 
@@ -62,6 +57,7 @@ pub fn find_maximum(
         .map_err(Error::CreatePipeline)?
     };
 
+    // Query the subgroup size from the GPU
     let subgroup_size = vk
         .device
         .physical_device()
@@ -73,6 +69,7 @@ pub fn find_maximum(
     // This is how much the input gets reduced by on a single pass
     let compute_blocksize = 1024 * subgroup_size;
 
+    // Setup input buffer
     let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
         vk.allocators.memory.clone(),
         BufferCreateInfo {
@@ -87,7 +84,14 @@ pub fn find_maximum(
         },
         byte_count as u64,
     )?;
+    copy_buffer_and_wait(
+        vk,
+        staging_buffer.clone(),
+        input_buffer.clone(),
+        copy_buffer::Region::SmallestBuffer,
+    )?;
 
+    // Setup "output" buffer
     let output_buffer: Subbuffer<[u8]> = Buffer::new_slice(
         vk.allocators.memory.clone(),
         BufferCreateInfo {
@@ -101,7 +105,7 @@ pub fn find_maximum(
         (byte_count as u64).div_ceil(compute_blocksize as u64),
     )?;
 
-    // Because one pass gets us input_length / compute_blocksize values
+    // Because one pass returns us (input_length / compute_blocksize) values
     // multiple passes may be required, therefore two descriptor sets are used
     // to swap input and output buffer around
     let layout = &pipeline.layout().set_layouts()[0];
@@ -130,20 +134,13 @@ pub fn find_maximum(
     let mut input_length = byte_count / 2;
     let mut output_length = (byte_count / 2).div_ceil(compute_blocksize);
 
-    // copy data to input buffer
-    copy_buffer_and_wait(
-        vk,
-        staging_buffer.clone(),
-        input_buffer.clone(),
-        copy_buffer::Region::SmallestBuffer,
-    )?;
-
     // While there is multiple remaining candidates, do a pass
     // and swap the input and output buffer
     let mut use_inverse_set = false;
     while input_length > 1 {
         let workgroup_count = output_length;
 
+        // Setup command buffer
         let mut builder = AutoCommandBufferBuilder::primary(
             &vk.allocators.command,
             vk.queue.queue_family_index(),
@@ -151,12 +148,14 @@ pub fn find_maximum(
         )
         .map_err(Error::CreateCommandBuffer)?;
 
+        // decide what ds to use
         let set = if use_inverse_set {
             inverse_descriptor_set.clone()
         } else {
             descriptor_set.clone()
         };
 
+        // bind pipeline, ds, constants, and then dispatch
         builder
             .bind_pipeline_compute(pipeline.clone())?
             .bind_descriptor_sets(
@@ -168,6 +167,7 @@ pub fn find_maximum(
             .push_constants(pipeline.layout().clone(), 0, input_length)?
             .dispatch([workgroup_count, 1, 1])?;
 
+        // execute command buffer and wait for it to finish
         let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
         let future = sync::now(vk.device.clone())
             .then_execute(vk.queue.clone(), command_buffer)?
@@ -175,17 +175,20 @@ pub fn find_maximum(
             .map_err(Error::SignalFence)?;
         future.wait(None).map_err(Error::AwaitFence)?;
 
+        // swap the descriptor sets, calculate updated input and output lengths
         use_inverse_set = !use_inverse_set;
         input_length = output_length;
         output_length = input_length.div_ceil(compute_blocksize);
     }
 
+    // Find what buffer has the final result in it.
     let result_buffer = if use_inverse_set {
         output_buffer.clone()
     } else {
         input_buffer.clone()
     };
 
+    // Setup CPU staging buffer for GPU to write data to.
     let output_staging_buffer = Buffer::new_slice(
         vk.allocators.memory.clone(),
         BufferCreateInfo {
@@ -199,8 +202,6 @@ pub fn find_maximum(
         },
         4,
     )?;
-
-    // Copy from result to staging
     copy_buffer_and_wait(
         vk,
         result_buffer,
@@ -208,6 +209,7 @@ pub fn find_maximum(
         copy_buffer::Region::SmallestBuffer,
     )?;
 
+    // Read the data from the buffer
     let reader = &output_staging_buffer.read()?;
     let maximum = f16::from_le_bytes([reader[0], reader[1]]);
 
@@ -225,11 +227,8 @@ pub enum Error {
     #[error("Failed to load shader:\n{0:?}")]
     LoadShader(#[source] Validated<VulkanError>),
 
-    #[error("Failed to create pipline layout info:\nSet {set_num}\n{error:?}")]
-    CreatePipelineLayoutInfo {
-        set_num: u32,
-        error: Validated<VulkanError>,
-    },
+    #[error("Failed to create pipline layout info:\n{0:?}")]
+    CreatePipelineLayoutInfo(#[from] IntoPipelineLayoutCreateInfoError),
 
     #[error("Failed to create pipeline layout:\n{0:?}")]
     CreatePipelineLayout(#[source] Validated<VulkanError>),

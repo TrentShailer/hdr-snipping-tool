@@ -1,20 +1,19 @@
 pub mod find_maximum;
 pub mod tonemap;
-pub mod whitepoint;
 
-use std::{fmt::Debug, sync::Arc, time::Instant};
+use std::{fmt::Debug, time::Instant};
 
-use scrgb::ScRGB;
 use thiserror::Error;
+use tonemap::dispatch_tonemap;
 use vulkan_instance::{
+    capture_output::{self, CaptureOutput},
     copy_buffer::{self, copy_buffer_and_wait},
     VulkanInstance,
 };
-use vulkan_timestamp_helper::TimestampPool;
+
 use vulkano::{
     buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
-    image::view::ImageView,
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::{
         compute::ComputePipelineCreateInfo,
@@ -24,136 +23,127 @@ use vulkano::{
     sync::HostAccessError,
     Validated, VulkanError,
 };
-use windows_capture_provider::{capture::Capture, display::Display};
+use windows_capture_provider::capture::Capture;
 
-use crate::{find_maximum::find_maximum, whitepoint::Whitepoint};
+use crate::find_maximum::find_maximum;
 
 mod shader {
     vulkano_shaders::shader! {ty: "compute", bytes: "src/shaders/scRGB_to_sRGB.spv"}
 }
 
-/// A tonemapper setup to tonemap from the scRGB color space to the sRGB color space.
-pub struct ScrgbTonemapper {
-    /// The whitepoint to control the tonemapping curve.
-    pub curve_target: Whitepoint,
+/// Tonemaps a capture from the scRGB colorspace into the sRGB colorspace.\
+/// Returns a vulkan image containing the capture.
+pub fn tonemap(
+    vk: &VulkanInstance,
+    capture: &Capture,
+    hdr_whitepoint: f32,
+) -> Result<CaptureOutput, Error> {
+    let start = Instant::now();
 
-    /// The display metadata from the capture.
-    display: Display,
+    // Transfer capture to staging buffer
+    let staging_buffer: Subbuffer<[u8]> = Buffer::new_slice(
+        vk.allocators.memory.clone(),
+        BufferCreateInfo {
+            usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_SRC,
+            ..Default::default()
+        },
+        AllocationCreateInfo {
+            memory_type_filter: MemoryTypeFilter::PREFER_HOST
+                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+            ..Default::default()
+        },
+        capture.data.len() as u64,
+    )?;
+    staging_buffer.write()?.copy_from_slice(&capture.data);
 
-    /// The value of the brightest component in the capture.
-    brightest_component: ScRGB,
+    // find the brightest component in the capture.
+    let brightest_component =
+        find_maximum(vk, staging_buffer.clone(), capture.data.len() as u32)?.to_f32();
 
-    pipeline: Arc<ComputePipeline>,
-    io_set: Arc<PersistentDescriptorSet>,
+    // Transfer staging buffer to GPU
+    let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
+        vk.allocators.memory.clone(),
+        BufferCreateInfo {
+            usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST,
+            ..Default::default()
+        },
+        AllocationCreateInfo {
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+            ..Default::default()
+        },
+        capture.data.len() as u64,
+    )?;
+    copy_buffer_and_wait(
+        vk,
+        staging_buffer.clone(),
+        input_buffer.clone(),
+        vulkan_instance::copy_buffer::Region::SmallestBuffer,
+    )?;
 
-    /// Debug timestamps
-    timestamps: TimestampPool,
-}
+    // Create output image
+    let capture_output = CaptureOutput::new(vk, capture.display.size)?;
 
-impl ScrgbTonemapper {
-    /// Creates a new tonemapper for a given capture.
-    pub fn new(
-        vk: &VulkanInstance,
-        output_view: Arc<ImageView>,
-        capture: &Capture,
-    ) -> Result<Self, Error> {
-        let start = Instant::now();
+    // Setup compute pipline
+    let pipeline = {
+        let compute_shader = shader::load(vk.device.clone())
+            .map_err(Error::LoadShader)?
+            .entry_point("main")
+            .unwrap();
 
-        let staging_buffer: Subbuffer<[u8]> = Buffer::new_slice(
-            vk.allocators.memory.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_SRC,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            capture.data.len() as u64,
-        )?;
-        staging_buffer.write()?.copy_from_slice(&capture.data);
+        let stage = PipelineShaderStageCreateInfo::new(compute_shader);
 
-        // find the brightest component in the capture.
-        let brightest_component =
-            find_maximum(vk, staging_buffer.clone(), capture.data.len() as u32)?.to_f32();
-        let brightest_component = ScRGB(brightest_component);
-
-        let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
-            vk.allocators.memory.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
-            capture.data.len() as u64,
-        )?;
-
-        copy_buffer_and_wait(
-            vk,
-            staging_buffer.clone(),
-            input_buffer.clone(),
-            vulkan_instance::copy_buffer::Region::SmallestBuffer,
-        )?;
-
-        let pipeline = {
-            let compute_shader = shader::load(vk.device.clone())
-                .map_err(Error::LoadShader)?
-                .entry_point("main")
-                .unwrap();
-
-            let stage = PipelineShaderStageCreateInfo::new(compute_shader);
-
-            let layout = PipelineLayout::new(
-                vk.device.clone(),
-                PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
-                    .into_pipeline_layout_create_info(vk.device.clone())?,
-            )
-            .map_err(Error::CreatePipelineLayout)?;
-
-            ComputePipeline::new(
-                vk.device.clone(),
-                None,
-                ComputePipelineCreateInfo::stage_layout(stage, layout),
-            )
-            .map_err(Error::CreatePipeline)?
-        };
-        let io_layout = &pipeline.layout().set_layouts()[0];
-        let io_set = PersistentDescriptorSet::new(
-            &vk.allocators.descriptor,
-            io_layout.clone(),
-            [
-                WriteDescriptorSet::buffer(0, input_buffer.clone()),
-                WriteDescriptorSet::image_view(1, output_view.clone()),
-            ],
-            [],
+        let layout = PipelineLayout::new(
+            vk.device.clone(),
+            PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
+                .into_pipeline_layout_create_info(vk.device.clone())?,
         )
-        .map_err(Error::Descriptor)?;
+        .map_err(Error::CreatePipelineLayout)?;
 
-        let tonemapper = Self {
-            curve_target: Whitepoint::SdrReferenceWhite,
-            display: capture.display,
-            brightest_component,
-            io_set,
-            pipeline,
-            timestamps: TimestampPool::new(vk, 2),
-        };
+        ComputePipeline::new(
+            vk.device.clone(),
+            None,
+            ComputePipelineCreateInfo::stage_layout(stage, layout),
+        )
+        .map_err(Error::CreatePipeline)?
+    };
 
-        log::debug!(
-            "[new_tonemapper]
-  curve_target: {:?}
-  brightest_component: {:?}
-  [TIMING] {}ms",
-            tonemapper.curve_target,
-            tonemapper.brightest_component,
-            start.elapsed().as_millis()
-        );
+    // Setip descriptor set
+    let io_layout = &pipeline.layout().set_layouts()[0];
+    let io_set = PersistentDescriptorSet::new(
+        &vk.allocators.descriptor,
+        io_layout.clone(),
+        [
+            WriteDescriptorSet::buffer(0, input_buffer.clone()),
+            WriteDescriptorSet::image_view(1, capture_output.image_view.clone()),
+        ],
+        [],
+    )
+    .map_err(Error::Descriptor)?;
 
-        Ok(tonemapper)
-    }
+    // Dispatch tonemapper
+    dispatch_tonemap(
+        vk,
+        capture.display.size,
+        pipeline,
+        io_set,
+        capture.display.sdr_referece_white,
+        hdr_whitepoint,
+        brightest_component,
+    )?;
+
+    log::debug!(
+        "[tonemap]
+sdr_whitepoint: {:.2}
+hdr_whitepoint: {:.2}
+brightest_component: {:.2}
+[TIMING] {}ms",
+        capture.display.sdr_referece_white,
+        hdr_whitepoint,
+        brightest_component,
+        start.elapsed().as_millis()
+    );
+
+    Ok(capture_output)
 }
 
 #[derive(Debug, Error)]
@@ -184,4 +174,10 @@ pub enum Error {
 
     #[error("Failed to find capture maximum:\n{0}")]
     Maximum(#[from] find_maximum::Error),
+
+    #[error("Failed to create capture output texture:\n{0}")]
+    CaptureOutput(#[from] capture_output::Error),
+
+    #[error("Failed to tonemap:\n{0}")]
+    Tonemap(#[from] tonemap::Error),
 }

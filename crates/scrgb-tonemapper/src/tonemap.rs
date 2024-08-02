@@ -1,79 +1,77 @@
-use std::time::Instant;
+use std::{sync::Arc, time::Instant};
 
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage},
-    pipeline::Pipeline,
+    descriptor_set::PersistentDescriptorSet,
+    pipeline::{ComputePipeline, Pipeline},
     sync::{self, GpuFuture},
     Validated, ValidationError, VulkanError,
 };
 
-use crate::{shader::Metadata, ScrgbTonemapper};
+use crate::shader::Metadata;
 
-impl ScrgbTonemapper {
-    /// Tonemap the capture.
-    pub fn tonemap(&self, vk: &VulkanInstance) -> Result<(), Error> {
-        let start = Instant::now();
+/// Dispatches the tonemapper.
+pub(crate) fn dispatch_tonemap(
+    vk: &VulkanInstance,
+    size: [u32; 2],
+    pipeline: Arc<ComputePipeline>,
+    io_set: Arc<PersistentDescriptorSet>,
+    sdr_whitepoint: f32,
+    hdr_whitepoint: f32,
+    maximum: f32,
+) -> Result<(), Error> {
+    let start = Instant::now();
 
-        let whitepoint = self.get_whitepoint();
+    // Shader tonemaps a 32x32 area each dispatch
+    let workgroup_x = size[0].div_ceil(32);
+    let workgroup_y = size[1].div_ceil(32);
 
-        let workgroup_x = self.display.size[0].div_ceil(32);
-        let workgroup_y = self.display.size[1].div_ceil(32);
+    // Create command buffer for dispatch
+    let mut builder = AutoCommandBufferBuilder::primary(
+        &vk.allocators.command,
+        vk.queue.queue_family_index(),
+        CommandBufferUsage::OneTimeSubmit,
+    )
+    .map_err(Error::CreateCommandBuffer)?;
 
-        let mut builder = AutoCommandBufferBuilder::primary(
-            &vk.allocators.command,
-            vk.queue.queue_family_index(),
-            CommandBufferUsage::OneTimeSubmit,
-        )
-        .map_err(Error::CreateCommandBuffer)?;
+    // Bind pipline, ds, push constants
+    // then dispatch enough workers in the x and y axis to cover the capture
+    builder
+        .bind_pipeline_compute(pipeline.clone())?
+        .bind_descriptor_sets(
+            vulkano::pipeline::PipelineBindPoint::Compute,
+            pipeline.layout().clone(),
+            0,
+            io_set.clone(),
+        )?
+        .push_constants(
+            pipeline.layout().clone(),
+            0,
+            Metadata {
+                sdr_whitepoint,
+                hdr_whitepoint,
+                maximum,
+            },
+        )?
+        .dispatch([workgroup_x, workgroup_y, 1])?;
 
-        self.timestamps.reset_timestamps(&mut builder, 0..2);
-        self.timestamps
-            .record_timestamp(&mut builder, 0, sync::PipelineStage::TopOfPipe);
+    // Build and execute the command buffer, then wait for it to finish.
+    let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
+    let future = sync::now(vk.device.clone())
+        .then_execute(vk.queue.clone(), command_buffer)?
+        .then_signal_fence_and_flush()
+        .map_err(Error::SignalFenceAndFlush)?;
+    future.wait(None).map_err(Error::AwaitFence)?;
 
-        builder
-            .bind_pipeline_compute(self.pipeline.clone())?
-            .bind_descriptor_sets(
-                vulkano::pipeline::PipelineBindPoint::Compute,
-                self.pipeline.layout().clone(),
-                0,
-                self.io_set.clone(),
-            )?
-            .push_constants(
-                self.pipeline.layout().clone(),
-                0,
-                Metadata {
-                    whitepoint: whitepoint.0,
-                },
-            )?
-            .dispatch([workgroup_x, workgroup_y, 1])?;
-
-        self.timestamps
-            .record_timestamp(&mut builder, 1, sync::PipelineStage::BottomOfPipe);
-        let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
-        let future = sync::now(vk.device.clone())
-            .then_execute(vk.queue.clone(), command_buffer)?
-            .then_signal_fence_and_flush()
-            .map_err(Error::SignalFenceAndFlush)?;
-        future.wait(None).map_err(Error::AwaitFence)?;
-
-        let gpu_time = self.timestamps.get_delta_ms_wait(vk, 0..2);
-
-        log::debug!(
-            "[tonemap]
-  target: {:?}
-  whitepoint: {:?}
-  [GPU TIMING] {:.2}ms,
+    log::debug!(
+        "[dispatch_tonemap]
   [CPU TIMING] {}ms",
-            self.curve_target,
-            whitepoint,
-            gpu_time,
-            start.elapsed().as_millis(),
-        );
+        start.elapsed().as_millis(),
+    );
 
-        Ok(())
-    }
+    Ok(())
 }
 
 #[derive(Debug, Error)]

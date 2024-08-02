@@ -7,7 +7,9 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(push_constant) uniform Metadata
 {
-	float whitepoint;
+	float sdr_whitepoint;
+	float hdr_whitepoint;
+	float maximum;
 };
 
 layout(set = 0, binding = 0) buffer InputLayout
@@ -42,15 +44,21 @@ vec4 get_pixel_color(uint index) {
 // Performs gamma correction to tonemap linear RGB to sRGB
 // From https://en.wikipedia.org/wiki/SRGB#Transformation
 float scRGB_to_sRGB(float value) {
-	float ratio = value / whitepoint;
 	float gamma_decode = 1.0 / 2.4;
 
+	float whitepoint = sdr_whitepoint;
+	if (maximum > sdr_whitepoint) {
+		whitepoint = hdr_whitepoint;
+	}
+
+	float ratio = value / whitepoint;
 	if (ratio <= 0.0031308) {
 		return clamp(12.92 * ratio, 0.0, 1.0);
 	}
 	else {
 		return clamp(1.055 * pow(ratio, gamma_decode) - 0.055, 0.0, 1.0);
 	}
+
 }
 
 void main() {
