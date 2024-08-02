@@ -1,6 +1,5 @@
 pub mod allocators;
 pub mod copy_buffer;
-pub mod texture;
 pub mod vulkan_instance;
 
 use std::sync::Arc;
@@ -11,6 +10,7 @@ use vulkano::{
     swapchain::Surface,
 };
 
+/// Bundled variables required to work with vulkan.
 pub struct VulkanInstance {
     pub physical_device: Arc<PhysicalDevice>,
     pub device: Arc<Device>,
