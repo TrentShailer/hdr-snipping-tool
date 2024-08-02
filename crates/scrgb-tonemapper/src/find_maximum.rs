@@ -12,7 +12,8 @@ use vulkano::{
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::{
-        compute::ComputePipelineCreateInfo, layout::PipelineDescriptorSetLayoutCreateInfo,
+        compute::ComputePipelineCreateInfo,
+        layout::{IntoPipelineLayoutCreateInfoError, PipelineDescriptorSetLayoutCreateInfo},
         ComputePipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
     },
     sync::{self, GpuFuture, HostAccessError},

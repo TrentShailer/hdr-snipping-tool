@@ -1,12 +1,13 @@
 pub mod find_maximum;
 pub mod tonemap;
+pub mod tonemap_output;
 
 use std::{fmt::Debug, time::Instant};
 
 use thiserror::Error;
 use tonemap::dispatch_tonemap;
+use tonemap_output::TonemapOutput;
 use vulkan_instance::{
-    capture_output::{self, CaptureOutput},
     copy_buffer::{self, copy_buffer_and_wait},
     VulkanInstance,
 };
@@ -37,7 +38,7 @@ pub fn tonemap(
     vk: &VulkanInstance,
     capture: &Capture,
     hdr_whitepoint: f32,
-) -> Result<CaptureOutput, Error> {
+) -> Result<TonemapOutput, Error> {
     let start = Instant::now();
 
     // Transfer capture to staging buffer
@@ -81,7 +82,7 @@ pub fn tonemap(
     )?;
 
     // Create output image
-    let capture_output = CaptureOutput::new(vk, capture.display.size)?;
+    let capture_output = TonemapOutput::new(vk, capture.display.size)?;
 
     // Setup compute pipline
     let pipeline = {
@@ -175,8 +176,8 @@ pub enum Error {
     #[error("Failed to find capture maximum:\n{0}")]
     Maximum(#[from] find_maximum::Error),
 
-    #[error("Failed to create capture output texture:\n{0}")]
-    CaptureOutput(#[from] capture_output::Error),
+    #[error("Failed to create tonemap output image:\n{0}")]
+    TonemapOutput(#[from] tonemap_output::Error),
 
     #[error("Failed to tonemap:\n{0}")]
     Tonemap(#[from] tonemap::Error),
