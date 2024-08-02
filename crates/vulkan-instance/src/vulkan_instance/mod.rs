@@ -20,13 +20,12 @@ impl VulkanInstance {
         let surface =
             Surface::from_window(instance.clone(), window.clone()).map_err(Error::NewSurface)?;
 
-        let (physical_device, queue_family_index, supported_optional_features, feature_extensions) =
+        let (physical_device, queue_family_index, feature_extensions) =
             get_physical_device(instance.clone(), surface.clone())?;
 
         let (device, mut queues) = get_logical_device(
             physical_device.clone(),
             queue_family_index,
-            supported_optional_features,
             feature_extensions,
         )
         .map_err(Error::LogicalDevice)?;
@@ -41,36 +40,22 @@ impl VulkanInstance {
             device,
             queue,
             surface,
-            supported_optional_features,
         };
-
-        let supports_timestamps = vk.supports_timestamps();
 
         log::debug!(
             "[Vulkan]
   v{}
   {} ({:?})
   Queue Index: {}
-  Supports timestamps: {}
-  Supported optional features: {:?}
   Feature extensions: {:?}",
             instance.api_version(),
             vk.physical_device.properties().device_name,
             vk.physical_device.properties().device_type,
             queue_family_index,
-            supports_timestamps,
-            supported_optional_features,
             feature_extensions,
         );
 
         Ok(vk)
-    }
-
-    pub fn supports_timestamps(&self) -> bool {
-        self.physical_device.queue_family_properties()[self.queue.queue_family_index() as usize]
-            .timestamp_valid_bits
-            .is_some()
-            && self.device.enabled_features().host_query_reset
     }
 }
 

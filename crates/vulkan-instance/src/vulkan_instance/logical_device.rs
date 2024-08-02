@@ -13,7 +13,6 @@ use super::requirements::{QUEUE_COUNT, REQUIRED_EXTENSIONS, REQUIRED_FEATURES};
 pub fn get_logical_device(
     physical_device: Arc<PhysicalDevice>,
     queue_family_index: u32,
-    supported_optional_features: Features,
     feature_extensions: DeviceExtensions,
 ) -> Result<(Arc<Device>, impl ExactSizeIterator<Item = Arc<Queue>>), Validated<VulkanError>> {
     let required_features = REQUIRED_FEATURES
@@ -24,7 +23,7 @@ pub fn get_logical_device(
 
     let device_create_info = DeviceCreateInfo {
         enabled_extensions: REQUIRED_EXTENSIONS | feature_extensions,
-        enabled_features: required_features | supported_optional_features,
+        enabled_features: required_features,
         queue_create_infos: vec![QueueCreateInfo {
             queue_family_index,
             queues: vec![0.5; QUEUE_COUNT as usize],

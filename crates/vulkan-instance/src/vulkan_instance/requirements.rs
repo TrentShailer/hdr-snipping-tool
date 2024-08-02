@@ -25,6 +25,7 @@ pub const REQUIRED_FEATURES: [FeatureSet; 4] = [
             ..DeviceExtensions::empty()
         },
     },
+    //
     FeatureSet {
         features: Features {
             storage_buffer16_bit_access: true,
@@ -37,6 +38,7 @@ pub const REQUIRED_FEATURES: [FeatureSet; 4] = [
             ..DeviceExtensions::empty()
         },
     },
+    //
     FeatureSet {
         features: Features {
             shader_subgroup_extended_types: true,
@@ -48,6 +50,7 @@ pub const REQUIRED_FEATURES: [FeatureSet; 4] = [
             ..DeviceExtensions::empty()
         },
     },
+    //
     FeatureSet {
         features: Features {
             dynamic_rendering: true,
@@ -56,31 +59,6 @@ pub const REQUIRED_FEATURES: [FeatureSet; 4] = [
         version: Some(Version::V1_3),
         extensions: DeviceExtensions {
             khr_dynamic_rendering: true,
-            ..DeviceExtensions::empty()
-        },
-    },
-];
-
-pub const OPTIONAL_FEATURES: [FeatureSet; 2] = [
-    FeatureSet {
-        features: Features {
-            pageable_device_local_memory: true,
-            ..Features::empty()
-        },
-        version: None,
-        extensions: DeviceExtensions {
-            ext_pageable_device_local_memory: true,
-            ..DeviceExtensions::empty()
-        },
-    },
-    FeatureSet {
-        features: Features {
-            host_query_reset: true,
-            ..Features::empty()
-        },
-        version: Some(Version::V1_2),
-        extensions: DeviceExtensions {
-            ext_host_query_reset: true,
             ..DeviceExtensions::empty()
         },
     },
