@@ -134,10 +134,10 @@ pub fn tonemap(
 
     log::debug!(
         "[tonemap]
-	sdr_whitepoint: {:.2}
-	hdr_whitepoint: {:.2}
-	brightest_component: {:.2}
-	[TIMING] {}ms",
+  sdr_whitepoint: {:.2}
+  hdr_whitepoint: {:.2}
+  brightest_component: {:.2}
+  [TIMING] {}ms",
         capture.display.sdr_referece_white,
         hdr_whitepoint,
         brightest_component,
