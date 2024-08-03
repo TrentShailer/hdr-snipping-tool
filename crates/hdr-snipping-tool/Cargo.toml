@@ -1,6 +1,6 @@
 [package]
 name = "hdr-snipping-tool"
-version = "3.1.3"
+version = "3.2.0"
 edition = "2021"
 
 build = "build.rs"
@@ -9,9 +9,7 @@ build = "build.rs"
 vulkan-instance = { workspace = true }
 vulkan-renderer = { workspace = true }
 scrgb-tonemapper = { workspace = true }
-scrgb = { workspace = true }
 windows-capture-provider = { workspace = true }
-debug-helper = { workspace = true }
 
 log = { workspace = true }
 thiserror = { workspace = true }

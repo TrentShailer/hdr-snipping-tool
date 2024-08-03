@@ -8,11 +8,12 @@ use crate::active_capture::{self, ActiveCapture};
 use super::ActiveApp;
 
 impl ActiveApp {
-    pub fn take_capture(&mut self) -> Result<(), Error> {
+    pub fn take_capture(&mut self, hdr_whitepoint: f32) -> Result<ActiveCapture, Error> {
         log::info!("\n----- Taking Capture -----");
         let capture_start = Instant::now();
 
-        let active_capture = ActiveCapture::new(self.vk.clone(), &mut self.capture_provider)?;
+        let active_capture =
+            ActiveCapture::new(&self.vk, &self.dx, &self.display_cache, hdr_whitepoint)?;
 
         let size: PhysicalSize<u32> = active_capture.display.size.into();
         let _ = self.window.request_inner_size(size);
@@ -20,16 +21,9 @@ impl ActiveApp {
         let position: PhysicalPosition<i32> = active_capture.display.position.into();
         self.window.set_outer_position(position);
 
-        self.renderer.parameters.set_parameters(
-            &self.vk,
-            &mut self.renderer.glyph_cache,
-            active_capture.tonemapper.curve_target,
-            active_capture.display.sdr_referece_white,
-        )?;
-
         self.renderer
             .capture
-            .load_capture(&self.vk, active_capture.texture.clone())?;
+            .load_capture(&self.vk, active_capture.tonemap_output.clone())?;
 
         log::debug!("[TIMING TOTAL] {}ms", capture_start.elapsed().as_millis());
         log::info!("----- Has Capture [{}] -----", active_capture.id);
@@ -37,9 +31,7 @@ impl ActiveApp {
         self.window.set_visible(true);
         self.window.focus_window();
 
-        self.active_capture = Some(active_capture);
-
-        Ok(())
+        Ok(active_capture)
     }
 }
 
@@ -50,7 +42,4 @@ pub enum Error {
 
     #[error("Failed to load capture into renderer:\n{0}")]
     LoadCapture(#[from] vulkan_renderer::capture::load::Error),
-
-    #[error("Failed to update UI text:\n{0}")]
-    UpdateText(#[from] vulkan_renderer::text::set_text::Error),
 }

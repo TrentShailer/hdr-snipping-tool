@@ -3,38 +3,47 @@
 mod active_app;
 mod active_capture;
 mod logger;
+mod report_error;
 mod settings;
 mod windows_helpers;
 mod winit_app;
 
 use std::{fs, path::PathBuf};
 
-use debug_helper::{enable_debug, enable_verbose, IS_DEV};
 use directories::ProjectDirs;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use logger::init_fern;
+use report_error::report_app_error;
 use settings::Settings;
 use thiserror::Error;
 use windows::{
     Graphics::Capture::GraphicsCaptureSession,
     Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_ICONWARNING},
 };
-use windows_capture_provider::Error;
 use windows_helpers::{display_message, ensure_only_instance};
-use winit::{
-    error::EventLoopError, event_loop::EventLoop, platform::run_on_demand::EventLoopExtRunOnDemand,
-};
+use winit::{error::EventLoopError, event_loop::EventLoop};
 use winit_app::WinitApp;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg(debug_assertions)]
+pub const IS_DEV: bool = true;
+#[cfg(not(debug_assertions))]
+pub const IS_DEV: bool = false;
+
+pub const DEBUG_ENV_VAR: &str = "hdr-snipping-tool-debug";
+
+pub fn is_debug() -> bool {
+    std::env::var(DEBUG_ENV_VAR).is_ok()
+}
+
+pub fn enable_debug() {
+    std::env::set_var(DEBUG_ENV_VAR, "true");
+}
+
 fn main() {
     if std::env::args().any(|arg| arg.eq("--debug")) {
-        if std::env::args().any(|arg| arg.eq("--verbose")) {
-            enable_verbose();
-        } else {
-            enable_debug();
-        }
+        enable_debug();
     }
 
     if let Err(e) = fs::create_dir_all(project_directory()) {
@@ -60,70 +69,8 @@ fn main() {
     }
 
     if let Err(e) = init() {
-        log::error!("{e}");
-
-        match e {
-            AppError::OnlyInstance(_) => display_message(
-                "We encountered an error while checking that there were no other instances running.\nMore details are in the logs.",
-                MB_ICONERROR,
-            ),
-            AppError::GraphicsCaptureSupport(_) => display_message(
-                "We encountered an error while checking if your devices support graphics capture.\nMore details are in the logs.",
-                MB_ICONERROR,
-            ),
-            AppError::NoCaptureSupport => display_message(
-                "Your device does not support graphics capture.",
-                MB_ICONERROR,
-            ),
-            AppError::LoadSettings(_) => display_message(
-                "We encountered an error while loading your settings.\nMore details are in the logs.",
-                MB_ICONERROR,
-            ),
-            AppError::SaveSettings(_) => display_message(
-                "We encountered an error while saving your settings.\nMore details are in the logs.",
-                MB_ICONERROR,
-            ),
-            AppError::EventLoop(_) => display_message(
-                "We encountered an error in the event loop.\nMore details are in the logs.",
-                MB_ICONERROR,
-            ),
-            AppError::Hotkey(_) => display_message(
-                "We encountered an error while registering your hotkey.\nMore details are in the logs.",
-                MB_ICONERROR,
-            ),
-            AppError::WindowsCaptureProvider(_) => display_message(
-                "We encountered an error while setting up the windows capture provider.\nMore details are in the logs.",
-                MB_ICONERROR,
-            ),
-        }
+        report_app_error(e);
     };
-}
-
-#[derive(Debug, Error)]
-enum AppError {
-    #[error("Failed to ensure only one instance:\n{0}")]
-    OnlyInstance(#[from] windows_helpers::only_instance::Error),
-
-    #[error("Failed to check if graphics capture is supported:\n{0}")]
-    GraphicsCaptureSupport(#[source] windows_result::Error),
-
-    #[error("Graphics capture is not supported on your device.")]
-    NoCaptureSupport,
-
-    #[error("Failed to load settings:\n{0}")]
-    LoadSettings(#[from] settings::LoadError),
-
-    #[error("Failed to save settings:\n{0}")]
-    SaveSettings(#[from] settings::SaveError),
-
-    #[error("Failed to build event loop:\n{0}")]
-    EventLoop(#[from] EventLoopError),
-
-    #[error("Failed to register screenshot hotkey:\n{0}")]
-    Hotkey(#[from] global_hotkey::Error),
-
-    #[error("Failed to create windows capture provider:\n{0}")]
-    WindowsCaptureProvider(#[from] Error),
 }
 
 fn init() -> Result<(), AppError> {
@@ -158,10 +105,10 @@ fn init() -> Result<(), AppError> {
             _ => return Err(AppError::LoadSettings(e)),
         },
     };
-    log::debug!("{:?}", &settings);
+    log::debug!("\n{:?}", &settings);
 
     // Create event loop
-    let mut event_loop: EventLoop<()> = EventLoop::with_user_event().build()?;
+    let event_loop: EventLoop<()> = EventLoop::with_user_event().build()?;
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Wait);
 
     // Register screenshot hotkey
@@ -169,6 +116,7 @@ fn init() -> Result<(), AppError> {
     let hotkey = HotKey::new(None, settings.screenshot_key);
     hotkey_manager.register(hotkey)?;
     let proxy = event_loop.create_proxy();
+
     GlobalHotKeyEvent::set_event_handler(Some(move |event: GlobalHotKeyEvent| {
         if event.state == HotKeyState::Pressed {
             if let Err(e) = proxy.send_event(()) {
@@ -183,10 +131,10 @@ fn init() -> Result<(), AppError> {
     }));
 
     // Create the app
-    let mut app = WinitApp::new();
+    let mut app = WinitApp::new(settings);
 
     // run the app
-    event_loop.run_app_on_demand(&mut app)?;
+    event_loop.run_app(&mut app)?;
     Ok(())
 }
 
@@ -200,4 +148,28 @@ pub fn project_directory() -> PathBuf {
     };
 
     dir.data_dir().to_path_buf()
+}
+
+#[derive(Debug, Error)]
+enum AppError {
+    #[error("Failed to ensure only one instance:\n{0}")]
+    OnlyInstance(#[from] windows_helpers::only_instance::Error),
+
+    #[error("Failed to check if graphics capture is supported:\n{0}")]
+    GraphicsCaptureSupport(#[source] windows_result::Error),
+
+    #[error("Graphics capture is not supported on your device.")]
+    NoCaptureSupport,
+
+    #[error("Failed to load settings:\n{0}")]
+    LoadSettings(#[from] settings::LoadError),
+
+    #[error("Failed to save settings:\n{0}")]
+    SaveSettings(#[from] settings::SaveError),
+
+    #[error("Failed to build event loop:\n{0}")]
+    EventLoop(#[from] EventLoopError),
+
+    #[error("Failed to register screenshot hotkey:\n{0}")]
+    Hotkey(#[from] global_hotkey::Error),
 }

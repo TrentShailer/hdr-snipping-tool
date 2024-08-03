@@ -1,15 +1,13 @@
-use scrgb::ScRGB;
-use scrgb_tonemapper::whitepoint::Whitepoint;
 use winit::{
     event::{DeviceId, ElementState, KeyEvent},
     keyboard::{KeyCode, PhysicalKey},
 };
 
-use crate::active_app::ActiveApp;
+use crate::winit_app::WinitApp;
 
 use super::Error;
 
-impl ActiveApp {
+impl WinitApp {
     pub fn keyboard_input(
         &mut self,
         _device_id: DeviceId,
@@ -29,36 +27,23 @@ impl ActiveApp {
         Ok(())
     }
 
-    fn pressed(&mut self, keycode: KeyCode) -> Result<(), Error> {
-        match keycode {
-            KeyCode::ArrowUp | KeyCode::ArrowDown => {
-                let amount = if keycode == KeyCode::ArrowUp {
-                    ScRGB::from_nits(10.0)
-                } else {
-                    ScRGB::from_nits(-10.0)
-                };
-                self.adjust_whitepoint(amount)?;
-            }
-
-            _ => {}
-        }
-
+    fn pressed(&mut self, _keycode: KeyCode) -> Result<(), Error> {
         Ok(())
     }
 
     fn released(&mut self, keycode: KeyCode) -> Result<(), Error> {
+        let Some(app) = self.app.as_mut() else {
+            return Ok(());
+        };
+
         match keycode {
             KeyCode::Escape => self.clear_capture()?,
             KeyCode::Enter => {
-                if let Some(capture) = self.active_capture.as_mut() {
-                    capture.save(&self.vk)?;
+                if let Some(capture) = self.capture.as_mut() {
+                    capture.save(&app.vk)?;
                     self.clear_capture()?;
                 }
             }
-
-            KeyCode::Digit1 => self.set_whitepoint(Whitepoint::SdrReferenceWhite)?,
-            KeyCode::Digit2 => self.set_whitepoint(Whitepoint::MaximumLuminance)?,
-            KeyCode::Digit3 => self.set_whitepoint(Whitepoint::InputMaximum)?,
 
             _ => {}
         }

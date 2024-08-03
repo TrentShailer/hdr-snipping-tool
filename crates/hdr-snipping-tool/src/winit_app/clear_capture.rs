@@ -2,33 +2,36 @@ use thiserror::Error;
 
 use crate::windows_helpers::foreground_window::set_foreground_window;
 
-use super::ActiveApp;
+use super::WinitApp;
 
-impl ActiveApp {
+impl WinitApp {
     pub fn clear_capture(&mut self) -> Result<(), Error> {
-        self.scroll = 0.0;
-        self.renderer.capture.unload_capture();
-        self.renderer
-            .parameters
-            .clear_parameters(&self.vk, &mut self.renderer.glyph_cache)?;
+        let Some(app) = self.app.as_mut() else {
+            return Ok(());
+        };
 
-        if let Some(capture) = self.active_capture.as_ref() {
+        app.renderer.capture.unload_capture();
+
+        if let Some(capture) = self.capture.as_ref() {
             let selection = capture.selection.as_pos_size();
-            self.renderer.render(
-                &self.vk,
-                self.window.clone(),
+
+            app.renderer.render(
+                &app.vk,
+                app.window.clone(),
                 selection.0.into(),
                 selection.1.into(),
                 self.mouse_position.into(),
+                true,
             )?;
+
             set_foreground_window(capture.formerly_focused_window);
             log::info!("----- Closed Capture [{}] -----", capture.id);
         } else {
             log::info!("----- Closed Capture -----");
         }
 
-        self.active_capture = None;
-        self.window.set_visible(false);
+        self.capture = None;
+        app.window.set_visible(false);
 
         Ok(())
     }
@@ -38,7 +41,4 @@ impl ActiveApp {
 pub enum Error {
     #[error("Failed to clear renderer:\n{0}")]
     Render(#[from] vulkan_renderer::renderer::render::Error),
-
-    #[error("Failed to reset renderer text:\n{0}")]
-    Text(#[from] vulkan_renderer::text::set_text::Error),
 }

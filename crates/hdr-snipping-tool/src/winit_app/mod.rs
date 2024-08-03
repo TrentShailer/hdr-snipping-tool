@@ -1,69 +1,66 @@
-mod resumed;
+mod clear_capture;
+mod report_error;
 mod window_event;
 
-use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
+use report_error::{report_new_app_error, report_take_capture_error, report_window_event_error};
 use winit::{
-    application::ApplicationHandler, event::WindowEvent, event_loop::ActiveEventLoop,
-    window::WindowId,
+    application::ApplicationHandler, dpi::PhysicalPosition, event::WindowEvent,
+    event_loop::ActiveEventLoop, window::WindowId,
 };
 
-use crate::{
-    active_app::{self, take_capture, ActiveApp},
-    windows_helpers::display_message,
-};
+use crate::{active_app::ActiveApp, active_capture::ActiveCapture, settings::Settings};
 
 pub struct WinitApp {
     pub app: Option<ActiveApp>,
+    pub capture: Option<ActiveCapture>,
+    pub settings: Settings,
+    pub mouse_position: PhysicalPosition<u32>,
 }
 
 impl WinitApp {
-    pub fn new() -> Self {
-        Self { app: None }
+    pub fn new(settings: Settings) -> Self {
+        Self {
+            app: None,
+            capture: None,
+            settings,
+            mouse_position: PhysicalPosition::default(),
+        }
     }
 }
 
 impl ApplicationHandler<()> for WinitApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if let Err(e) = self.on_resume(event_loop) {
-            log::error!("{e}");
-            let message = match e {
-                resumed::Error::Window(_) =>
-                    "We encountered an error while creating the window.\nMore details are in the logs.",
-                resumed::Error::TrayIcon(_) =>
-                    "We encountered an error while creating the tray icon.\nMore details are in the logs.",
-                resumed::Error::TrayIconVisible(_) =>
-                    "We encountered an error while changing the tray icon visibility.\nMore details are in the logs.",
-                resumed::Error::VulkanInstance(_) =>
-                    "We encountered an error while creating the Vulkan instance.\nMore details are in the logs.",
-                resumed::Error::Renderer(_) =>
-                    "We encountered an error while creating the renderer.\nMore details are in the logs.",
-				resumed::Error::CaptureProvider(_) =>
-					"We encountered an error while creating the capture provider.\nMore details are in the logs.",
-            };
-            display_message(message, MB_ICONERROR);
-            event_loop.exit();
-        }
+        let app = match ActiveApp::new(event_loop) {
+            Ok(app) => app,
+            Err(error) => {
+                report_new_app_error(error);
+                event_loop.exit();
+                return;
+            }
+        };
+
+        self.app = Some(app);
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, _event: ()) {
         let Some(app) = self.app.as_mut() else { return };
-        if let Err(e) = app.take_capture() {
-            log::error!("{e}");
-            let message = match e {
-				take_capture::Error::ActiveCapture(_) => "We encountered an error while getting the capture.\nMore details are in the logs.",
-				take_capture::Error::LoadCapture(_) => "We encountered an error while loading the capture.\nMore details are in the logs.",
-				take_capture::Error::UpdateText(_) => "We encoutnered an error while updating the text.\nMore details are in the logs.",
-            };
-            display_message(message, MB_ICONERROR);
-            event_loop.exit();
-        }
+
+        let capture = match app.take_capture(self.settings.hdr_whitepoint) {
+            Ok(capture) => capture,
+            Err(error) => {
+                report_take_capture_error(error);
+                event_loop.exit();
+                return;
+            }
+        };
+
+        self.capture = Some(capture);
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        let Some(app) = self.app.as_mut() else { return };
+        let Some(app) = self.app.as_ref() else { return };
 
         app.handle_tray_icon(event_loop);
-
         app.window.request_redraw();
     }
 
@@ -73,16 +70,9 @@ impl ApplicationHandler<()> for WinitApp {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        if let Err(e) = self.on_window_event(event_loop, window_id, event) {
-            log::error!("{e}");
-            let message = match e {
-                active_app::window_event::Error::Render(_) => "We encountered an error while rendering.\nMore details are in the logs.",
-				active_app::window_event::Error::AdjustTonemapSettings(_) => "We encountered an error while adjusting the tonemapping settings.\nMore details are in the logs.",
-				active_app::window_event::Error::SaveCapture(_) => "We encountered an error while saving the capture.\nMore details are in the logs.",
-				active_app::window_event::Error::ClearCapture(_) => "We encountered an error while clearing the capture.\nMore details are in the logs."
-            };
-            display_message(message, MB_ICONERROR);
+        if let Err(error) = self.on_window_event(event_loop, window_id, event) {
+            report_window_event_error(error);
             event_loop.exit();
-        };
+        }
     }
 }

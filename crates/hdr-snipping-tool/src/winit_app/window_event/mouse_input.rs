@@ -1,17 +1,21 @@
 use winit::event::{DeviceId, ElementState, MouseButton};
 
-use crate::active_app::ActiveApp;
+use crate::winit_app::WinitApp;
 
 use super::Error;
 
-impl ActiveApp {
+impl WinitApp {
     pub fn mouse_input(
         &mut self,
         _device_id: DeviceId,
         state: ElementState,
         button: MouseButton,
     ) -> Result<(), Error> {
-        let Some(capture) = self.active_capture.as_mut() else {
+        let Some(app) = self.app.as_mut() else {
+            return Ok(());
+        };
+
+        let Some(capture) = self.capture.as_mut() else {
             return Ok(());
         };
 
@@ -26,7 +30,7 @@ impl ActiveApp {
             winit::event::ElementState::Released => {
                 let should_save = capture.selection.end_selection();
                 if should_save {
-                    capture.save(&self.vk)?;
+                    capture.save(&app.vk)?;
                     self.clear_capture()?;
                 }
             }

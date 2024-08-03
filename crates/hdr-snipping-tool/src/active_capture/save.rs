@@ -17,19 +17,24 @@ use super::ActiveCapture;
 impl ActiveCapture {
     pub fn save(&mut self, vk: &VulkanInstance) -> Result<(), Error> {
         log::info!("----- Saving Capture [{}] -----", self.id);
-        let raw_capture = self.texture.copy_to_vec(vk)?;
+
+        let raw_capture = self.tonemap_output.copy_to_box(vk)?;
         let raw_capture_len = raw_capture.len();
-        let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-            match ImageBuffer::from_raw(self.texture.size[0], self.texture.size[1], raw_capture) {
-                Some(v) => v,
-                None => {
-                    return Err(Error::ImageBuffer(
-                        self.texture.size[0],
-                        self.texture.size[1],
-                        raw_capture_len,
-                    ))
-                }
-            };
+
+        let img: ImageBuffer<Rgba<u8>, Box<[u8]>> = match ImageBuffer::from_raw(
+            self.tonemap_output.size[0],
+            self.tonemap_output.size[1],
+            raw_capture,
+        ) {
+            Some(img) => img,
+            None => {
+                return Err(Error::ImageBuffer(
+                    self.tonemap_output.size[0],
+                    self.tonemap_output.size[1],
+                    raw_capture_len,
+                ))
+            }
+        };
 
         // Get selection view
         let (selection_pos, selection_size) = self.selection.as_pos_size();
@@ -66,8 +71,8 @@ impl ActiveCapture {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to copy texture to CPU:\n{0}")]
-    VecCopy(#[from] vulkan_instance::texture::copy_to_vec::Error),
+    #[error("Failed to copy tonemap output to CPU:\n{0}")]
+    BoxCopy(#[from] scrgb_tonemapper::tonemap_output::copy_to_box::Error),
 
     #[error("Failed to create image buffer:\nTexture Size: {0}, {1}\nCapture Data: {2}")]
     ImageBuffer(u32, u32, usize),
