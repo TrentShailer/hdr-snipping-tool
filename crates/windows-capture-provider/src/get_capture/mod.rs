@@ -45,7 +45,7 @@ pub fn get_capture(
 
     log::debug!(
         "[take_capture]
-  [TIMING] {}ms",
+  [TIMING TOTAL] {}ms",
         capture_start.elapsed().as_millis()
     );
 
