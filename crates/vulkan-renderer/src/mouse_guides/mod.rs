@@ -34,7 +34,7 @@ impl MouseGuides {
         pipeline: Arc<GraphicsPipeline>,
         line_size: f32,
     ) -> Result<Self, crate::vertex_index_buffer::Error> {
-        let color = [255, 255, 255, 255];
+        let color = [128, 128, 128, 64];
         let verticies = vec![
             Vertex {
                 position: [0.0, -1.0],

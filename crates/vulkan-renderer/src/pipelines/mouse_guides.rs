@@ -5,7 +5,7 @@ use vulkano::{
     buffer::BufferContents,
     pipeline::{
         graphics::{
-            color_blend::{AttachmentBlend, BlendFactor, BlendOp},
+            color_blend::AttachmentBlend,
             subpass::PipelineRenderingCreateInfo,
             vertex_input::{Vertex as VkVertex, VertexDefinition},
         },
@@ -70,14 +70,7 @@ pub fn create_pipeline(
         subpass,
         vertex_input_state,
         stages,
-        Some(AttachmentBlend {
-            src_color_blend_factor: BlendFactor::OneMinusDstColor,
-            dst_color_blend_factor: BlendFactor::OneMinusSrcColor,
-            color_blend_op: BlendOp::Add,
-            src_alpha_blend_factor: BlendFactor::OneMinusDstColor,
-            dst_alpha_blend_factor: BlendFactor::OneMinusSrcColor,
-            alpha_blend_op: BlendOp::Add,
-        }),
+        Some(AttachmentBlend::alpha()),
     )?;
 
     Ok(pipeline)

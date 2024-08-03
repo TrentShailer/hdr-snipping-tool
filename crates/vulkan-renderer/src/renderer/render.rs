@@ -13,12 +13,7 @@ use vulkano::{
 };
 use winit::window::Window;
 
-use crate::{
-    glyph_cache::{self, GlyphCache},
-    text,
-};
-
-use super::{window_size_dependent_setup, Renderer, BASE_FONT_SIZE};
+use super::{window_size_dependent_setup, Renderer};
 
 impl Renderer {
     pub fn render(
@@ -28,13 +23,10 @@ impl Renderer {
         selection_top_left: [u32; 2],
         selection_size: [u32; 2],
         mouse_position: [u32; 2],
+        should_wait: bool,
     ) -> Result<(), Error> {
         let window_size: [u32; 2] = window.inner_size().into();
         let window_scale = window.scale_factor();
-
-        if window_scale != self.window_scale {
-            self.recreate_glyph_cache(window_scale, vk)?;
-        }
 
         // Cleanup finished resources
         if let Some(v) = self.render_future.as_mut() {
@@ -76,8 +68,8 @@ impl Renderer {
             }
         };
 
-        // if the image is not aquired, don't draw
-        if aquire_future.wait(Some(Duration::from_secs(0))).is_err() {
+        // if we shouldn't wait for the image and the image is not aquired, don't draw
+        if !should_wait && aquire_future.wait(Some(Duration::from_secs(0))).is_err() {
             self.aquire_future = Some(aquire_future);
             return Ok(());
         }
@@ -90,16 +82,6 @@ impl Renderer {
             CommandBufferUsage::OneTimeSubmit,
         )
         .map_err(Error::CreateCommandBuffer)?;
-
-        let start = image_index * 2;
-        let delta_ms = self.timestamps.get_delta_ms_available(vk, start..start + 2);
-        if let Some(delta_ms) = delta_ms {
-            log::debug!("[render]\n  [GPU TIMING] {:.3}ms", delta_ms);
-        }
-        self.timestamps
-            .reset_timestamps(&mut builder, start..start + 2);
-        self.timestamps
-            .record_timestamp(&mut builder, start, sync::PipelineStage::TopOfPipe);
 
         builder
             .begin_rendering(RenderingInfo {
@@ -116,35 +98,26 @@ impl Renderer {
             .set_viewport(0, [self.viewport.clone()].into_iter().collect())?;
 
         if self.capture.capture.is_some() {
-            self.capture.render(&mut builder)?;
+            self.capture
+                .render(&mut builder)
+                .map_err(|e| Error::Render(e, "capture"))?;
 
             self.mouse_guides
-                .render(&mut builder, mouse_position, window_size, window_scale)?;
+                .render(&mut builder, mouse_position, window_size, window_scale)
+                .map_err(|e| Error::Render(e, "mouse_guides"))?;
 
-            self.selection.render(
-                &mut builder,
-                selection_top_left,
-                selection_size,
-                window_size,
-                window_scale,
-            )?;
-
-            self.parameters.render(
-                &mut builder,
-                &self.glyph_cache,
-                mouse_position,
-                window_size,
-                window_scale,
-            )?;
+            self.selection
+                .render(
+                    &mut builder,
+                    selection_top_left,
+                    selection_size,
+                    window_size,
+                    window_scale,
+                )
+                .map_err(|e| Error::Render(e, "selection"))?;
         }
 
         builder.end_rendering()?;
-
-        self.timestamps.record_timestamp(
-            &mut builder,
-            start + 1,
-            sync::PipelineStage::BottomOfPipe,
-        );
 
         let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
 
@@ -187,34 +160,19 @@ impl Renderer {
             })
             .map_err(Error::RecreateSwapchain)?;
         self.swapchain = new_swapchain;
+
         let attachment_views = window_size_dependent_setup(&new_images, &mut self.viewport)?;
         self.attachment_views = attachment_views;
-        self.recreate_swapchain = false;
-        Ok(())
-    }
 
-    fn recreate_glyph_cache(
-        &mut self,
-        window_scale: f64,
-        vk: &VulkanInstance,
-    ) -> Result<(), Error> {
-        self.window_scale = window_scale;
-        self.glyph_cache = GlyphCache::new(vk, BASE_FONT_SIZE * window_scale as f32)?;
-        self.parameters
-            .text
-            .update_glyph_cache(vk, &mut self.glyph_cache)?;
+        self.aquire_future = None;
+
+        self.recreate_swapchain = false;
         Ok(())
     }
 }
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to recreate glyph cache:\n{0}")]
-    GlyphCache(#[from] glyph_cache::Error),
-
-    #[error("Failed to update glyph cache text:\n{0}")]
-    UpdateGlyphCache(#[from] text::update_glyph_cache::Error),
-
     #[error("Failed to recreate swapchain:\n{0:?}")]
     RecreateSwapchain(#[source] Validated<VulkanError>),
 
@@ -229,6 +187,9 @@ pub enum Error {
 
     #[error("Failed to write to command buffer:\n{0}")]
     UseCommandBuffer(#[from] Box<ValidationError>),
+
+    #[error("Failed to render {1}:\n{0}")]
+    Render(#[source] Box<ValidationError>, &'static str),
 
     #[error("Failed to build command buffer:\n{0:?}")]
     BuildCommandBuffer(#[source] Validated<VulkanError>),

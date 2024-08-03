@@ -1,9 +1,7 @@
 pub mod border;
 pub mod capture;
 pub mod mouse_guides;
-pub mod rect;
 pub mod selection_shading;
-pub mod text;
 
 use std::sync::Arc;
 

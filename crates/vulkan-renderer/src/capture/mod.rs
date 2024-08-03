@@ -3,7 +3,8 @@ pub mod render;
 
 use std::sync::Arc;
 
-use vulkan_instance::{texture::Texture, VulkanInstance};
+use scrgb_tonemapper::tonemap_output::TonemapOutput;
+use vulkan_instance::VulkanInstance;
 use vulkano::{
     buffer::Subbuffer, descriptor_set::PersistentDescriptorSet, pipeline::GraphicsPipeline,
 };
@@ -14,7 +15,7 @@ pub struct Capture {
     pub vertex_buffer: Subbuffer<[Vertex]>,
     pub index_buffer: Subbuffer<[u32]>,
     pub pipeline: Arc<GraphicsPipeline>,
-    pub capture: Option<Arc<Texture>>,
+    pub capture: Option<Arc<TonemapOutput>>,
     pub capture_ds: Option<Arc<PersistentDescriptorSet>>,
 }
 

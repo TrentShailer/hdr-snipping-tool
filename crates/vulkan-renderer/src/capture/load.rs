@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use scrgb_tonemapper::tonemap_output::TonemapOutput;
 use thiserror::Error;
-use vulkan_instance::{texture::Texture, VulkanInstance};
+use vulkan_instance::VulkanInstance;
 use vulkano::{
     descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     pipeline::Pipeline,
@@ -14,7 +15,7 @@ impl Capture {
     pub fn load_capture(
         &mut self,
         vk: &VulkanInstance,
-        texture: Arc<Texture>,
+        texture: Arc<TonemapOutput>,
     ) -> Result<(), Error> {
         let ds_layout = self.pipeline.layout().set_layouts()[0].clone();
 

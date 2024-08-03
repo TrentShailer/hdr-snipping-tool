@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
-use vulkan_timestamp_helper::TimestampPool;
 use vulkano::{
     image::{view::ImageView, ImageUsage},
     pipeline::graphics::{subpass::PipelineRenderingCreateInfo, viewport::Viewport},
@@ -17,16 +16,7 @@ use vulkano::{
 use window_size_dependent_setup::window_size_dependent_setup;
 use winit::window::Window;
 
-use crate::{
-    capture::Capture,
-    glyph_cache::{self, GlyphCache},
-    mouse_guides::MouseGuides,
-    parameters::{self, Parameters},
-    pipelines,
-    selection::Selection,
-};
-
-const BASE_FONT_SIZE: f32 = 17.0;
+use crate::{capture::Capture, mouse_guides::MouseGuides, pipelines, selection::Selection};
 
 pub struct Renderer {
     pub recreate_swapchain: bool,
@@ -35,15 +25,10 @@ pub struct Renderer {
     pub swapchain: Arc<Swapchain>,
     pub attachment_views: Vec<Arc<ImageView>>,
     pub viewport: Viewport,
-    pub glyph_cache: GlyphCache,
-    pub window_scale: f64,
     //
     pub capture: Capture,
     pub selection: Selection,
     pub mouse_guides: MouseGuides,
-    pub parameters: Parameters,
-    //
-    pub timestamps: TimestampPool,
 }
 
 impl Renderer {
@@ -150,14 +135,6 @@ impl Renderer {
         let mouse_guides_pipeline = pipelines::mouse_guides::create_pipeline(vk, subpass.clone())
             .map_err(|e| Error::Pipeline(e, "mouse guide"))?;
 
-        let rect_pipeline = pipelines::rect::create_pipeline(vk, subpass.clone())
-            .map_err(|e| Error::Pipeline(e, "rect"))?;
-
-        let text_pipeline = pipelines::text::create_pipeline(vk, subpass.clone())
-            .map_err(|e| Error::Pipeline(e, "text"))?;
-
-        let glyph_cache = GlyphCache::new(vk, BASE_FONT_SIZE * window.scale_factor() as f32)?;
-
         // Objects
         let capture =
             Capture::new(vk, capture_pipeline).map_err(|e| Error::Object(e, "capture"))?;
@@ -168,31 +145,17 @@ impl Renderer {
         let mouse_guides = MouseGuides::new(vk, mouse_guides_pipeline, 1.0)
             .map_err(|e| Error::Object(e, "mouse guides"))?;
 
-        let parameters = Parameters::new(
-            vk,
-            &glyph_cache,
-            text_pipeline,
-            rect_pipeline,
-            border_pipeline,
-        )?;
-
-        let timestamps = 2 * swapchain.image_count();
-
         Ok(Self {
             viewport,
             swapchain,
             attachment_views,
             aquire_future: None,
             recreate_swapchain: false,
-            glyph_cache,
-            window_scale: window.scale_factor(),
             //
             capture,
             selection,
             mouse_guides,
-            parameters,
             //
-            timestamps: TimestampPool::new(vk, timestamps),
             render_future: Some(sync::now(vk.device.clone()).boxed()),
         })
     }
@@ -230,10 +193,4 @@ pub enum Error {
 
     #[error("Failed to create {1} render object:\n{0}")]
     Object(#[source] crate::vertex_index_buffer::Error, &'static str),
-
-    #[error("Failed to create glyph cache:\n{0}")]
-    GlyphCache(#[from] glyph_cache::Error),
-
-    #[error("Failed to create parameters render object:\n{0}")]
-    Parameters(#[from] parameters::Error),
 }

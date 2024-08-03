@@ -1,11 +1,7 @@
 pub mod border;
 pub mod capture;
-pub mod glyph_cache;
 pub mod mouse_guides;
-pub mod parameters;
 pub mod pipelines;
-pub mod rect;
 pub mod renderer;
 pub mod selection;
-pub mod text;
 pub mod vertex_index_buffer;
