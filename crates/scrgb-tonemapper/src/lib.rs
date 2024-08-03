@@ -4,6 +4,7 @@ pub mod tonemap_output;
 
 use std::{fmt::Debug, time::Instant};
 
+use half::f16;
 use thiserror::Error;
 use tonemap::dispatch_tonemap;
 use tonemap_output::TonemapOutput;
@@ -58,8 +59,14 @@ pub fn tonemap(
     staging_buffer.write()?.copy_from_slice(&capture.data);
 
     // find the brightest component in the capture.
-    let brightest_component =
-        find_maximum(vk, staging_buffer.clone(), capture.data.len() as u32)?.to_f32();
+    let max = find_maximum(vk, staging_buffer.clone(), capture.data.len() as u32)?;
+    // Sometimes the maximum is increased by an f16 step over the sdr_reference_white
+    // Check for this case and use the sdr reference white if it is
+    let max = if f16::from_bits(max.to_bits() - 1).to_f32() == capture.display.sdr_referece_white {
+        capture.display.sdr_referece_white
+    } else {
+        max.to_f32()
+    };
 
     // Transfer staging buffer to GPU
     let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
@@ -129,18 +136,18 @@ pub fn tonemap(
         io_set,
         capture.display.sdr_referece_white,
         hdr_whitepoint,
-        brightest_component,
+        max,
     )?;
 
     log::debug!(
         "[tonemap]
   sdr_whitepoint: {:.2}
   hdr_whitepoint: {:.2}
-  brightest_component: {:.2}
-  [TIMING] {}ms",
+  maximum: {:.2}
+  [TIMING TOTAL] {}ms",
         capture.display.sdr_referece_white,
         hdr_whitepoint,
-        brightest_component,
+        max,
         start.elapsed().as_millis()
     );
 

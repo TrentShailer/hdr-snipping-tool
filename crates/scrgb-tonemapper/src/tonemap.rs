@@ -67,7 +67,7 @@ pub(crate) fn dispatch_tonemap(
 
     log::debug!(
         "[dispatch_tonemap]
-  [CPU TIMING] {}ms",
+  [TIMING] {}ms",
         start.elapsed().as_millis(),
     );
 
