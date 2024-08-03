@@ -12,10 +12,7 @@ pub fn get_output_descriptors(devices: &DirectXDevices) -> WindowsResult<Box<[DX
     while let Ok(output) = unsafe { devices.dxgi_adapter.EnumOutputs(i) } {
         let output_6: IDXGIOutput6 = output.cast()?;
 
-        let mut output_desc_1: DXGI_OUTPUT_DESC1 = Default::default();
-        unsafe {
-            output_6.GetDesc1(&mut output_desc_1)?;
-        };
+        let output_desc_1 = unsafe { output_6.GetDesc1()? };
 
         output_descs.push(output_desc_1);
 

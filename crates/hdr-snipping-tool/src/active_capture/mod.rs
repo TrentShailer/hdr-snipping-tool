@@ -10,7 +10,7 @@ use uuid::Uuid;
 use vulkan_instance::VulkanInstance;
 use windows::Win32::Foundation::HWND;
 use windows_capture_provider::{
-    get_capture::get_capture, hovered, DirectXDevices, Display, DisplayCache,
+    display_cache, get_capture::get_capture, hovered, DirectXDevices, Display, DisplayCache,
 };
 use winit::dpi::PhysicalPosition;
 
@@ -28,7 +28,7 @@ impl ActiveCapture {
     pub fn new(
         vk: &VulkanInstance,
         dx: &DirectXDevices,
-        display_cache: &DisplayCache,
+        display_cache: &mut DisplayCache,
         hdr_whitepoint: f32,
     ) -> Result<Self, Error> {
         let id = Uuid::new_v4();
@@ -40,12 +40,17 @@ impl ActiveCapture {
 
         let formerly_focused_window = get_foreground_window();
 
+        display_cache.refresh(dx)?;
+
         let display = match display_cache.hovered()? {
             Some(display) => display,
             None => return Err(Error::NoDisplay),
         };
 
-        let capture_item = match display_cache.capture_items.get(&display.handle.0) {
+        let capture_item = match display_cache
+            .capture_items
+            .get(&(display.handle.0 as isize))
+        {
             Some(capture_item) => capture_item,
             None => return Err(Error::NoCaptureItem(display)),
         };
@@ -72,6 +77,9 @@ impl ActiveCapture {
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Failed to refresh display cache:\n{0}")]
+    RefreshCache(#[from] display_cache::Error),
+
     #[error("Failed to get hovered display:\n{0}")]
     HoveredDisplay(#[from] hovered::Error),
 

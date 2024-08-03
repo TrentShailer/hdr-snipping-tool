@@ -24,7 +24,7 @@ pub fn get_foreground_window() -> HWND {
 pub fn set_foreground_window(handle: HWND) -> bool {
     let start = Instant::now();
 
-    if handle.0 == 0 {
+    if handle.0.is_null() {
         return false;
     }
 

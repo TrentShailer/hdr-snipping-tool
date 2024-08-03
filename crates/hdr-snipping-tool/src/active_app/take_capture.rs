@@ -13,7 +13,7 @@ impl ActiveApp {
         let capture_start = Instant::now();
 
         let active_capture =
-            ActiveCapture::new(&self.vk, &self.dx, &self.display_cache, hdr_whitepoint)?;
+            ActiveCapture::new(&self.vk, &self.dx, &mut self.display_cache, hdr_whitepoint)?;
 
         let size: PhysicalSize<u32> = active_capture.display.size.into();
         let _ = self.window.request_inner_size(size);

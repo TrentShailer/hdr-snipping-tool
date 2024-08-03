@@ -10,19 +10,22 @@ impl DisplayCache {
     pub fn refresh(&mut self, devices: &DirectXDevices) -> Result<(), Error> {
         let display_start = Instant::now();
 
-        let displays = get_displays(devices)?;
+        let current_displays = get_displays(devices)?;
 
         // Remove inactive displays from the capture item hashmap
-        let keys: Box<[isize]> = self.capture_items.keys().cloned().collect();
-        for handle in keys.iter() {
-            if !displays.iter().any(|d| d.handle.0 == *handle) {
-                self.capture_items.remove(handle);
+        let old_displays: Box<[isize]> = self.capture_items.keys().cloned().collect();
+        for old_handle in old_displays.iter() {
+            if !current_displays
+                .iter()
+                .any(|display| display.handle.0 as isize == *old_handle)
+            {
+                self.capture_items.remove(old_handle);
             }
         }
 
         // Insert new displays into the hashmap
-        for display in displays.iter() {
-            if let Entry::Vacant(entry) = self.capture_items.entry(display.handle.0) {
+        for display in current_displays.iter() {
+            if let Entry::Vacant(entry) = self.capture_items.entry(display.handle.0 as isize) {
                 let capture_item = display
                     .create_capture_item()
                     .map_err(Error::CreateCaputreItem)?;
@@ -31,7 +34,7 @@ impl DisplayCache {
             }
         }
 
-        self.displays = displays;
+        self.displays = current_displays;
 
         log::debug!(
             "[refresh_displays]

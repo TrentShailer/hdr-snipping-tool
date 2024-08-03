@@ -9,9 +9,9 @@ smallvec = "1.13"
 thiserror = "1.0"
 vulkano = { version = "0.34" }
 vulkano-shaders = { version = "0.34" }
-windows = { version = "0.57" }
-windows-core = { version = "0.57" }
-windows-result = { version = "0.1" }
+windows = { version = "0.58" }
+windows-core = { version = "0.58" }
+windows-result = { version = "0.2" }
 winit = { version = "0.30", default-features = false }
 
 vulkan-instance = { path = "crates/vulkan-instance" }
