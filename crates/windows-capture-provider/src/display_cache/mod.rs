@@ -32,7 +32,6 @@ impl DisplayCache {
                 .create_capture_item()
                 .map_err(Error::CreateCaputreItem)?;
 
-            // TODO ensure correct key
             capture_items.insert(display.handle.0 as isize, capture_item);
         }
 
