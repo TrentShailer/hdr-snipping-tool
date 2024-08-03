@@ -31,12 +31,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "allocator-api2"
-version = "0.2.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
-
-[[package]]
 name = "android-activity"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -365,12 +359,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "convert_case"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
-
-[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -473,23 +461,6 @@ name = "cursor-icon"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
-
-[[package]]
-name = "debug-helper"
-version = "0.1.0"
-
-[[package]]
-name = "derive_more"
-version = "0.99.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f33878137e4dafd7fa914ad4e259e18a4e8e532b9617a2d0150262bf53abfce"
-dependencies = [
- "convert_case",
- "proc-macro2",
- "quote",
- "rustc_version",
- "syn 2.0.71",
-]
 
 [[package]]
 name = "directories"
@@ -620,16 +591,6 @@ checksum = "5f54427cfd1c7829e2a139fcefea601bf088ebca651d2bf53ebc600eac295dae"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
-]
-
-[[package]]
-name = "fontdue"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efe23d02309319171d00d794c9ff48d4f903c0e481375b1b04b017470838af04"
-dependencies = [
- "hashbrown",
- "ttf-parser",
 ]
 
 [[package]]
@@ -976,25 +937,19 @@ name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
-dependencies = [
- "ahash",
- "allocator-api2",
-]
 
 [[package]]
 name = "hdr-snipping-tool"
-version = "3.1.3"
+version = "3.2.0"
 dependencies = [
  "arboard",
  "chrono",
- "debug-helper",
  "directories",
  "embed-resource",
  "fern",
  "global-hotkey",
  "image",
  "log",
- "scrgb",
  "scrgb-tonemapper",
  "serde",
  "thiserror",
@@ -1951,27 +1906,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
-name = "scrgb"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "windows",
-]
-
-[[package]]
 name = "scrgb-tonemapper"
-version = "2.0.1"
+version = "3.0.0"
 dependencies = [
  "half",
  "log",
- "scrgb",
  "thiserror",
  "vulkan-instance",
- "vulkan-timestamp-helper",
  "vulkano",
  "vulkano-shaders",
  "windows-capture-provider",
- "winit",
 ]
 
 [[package]]
@@ -2234,12 +2178,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ttf-parser"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c591d83f69777866b9126b24c6dd9a18351f177e49d625920d19f989fd31cf8"
-
-[[package]]
 name = "unicode-ident"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2304,7 +2242,7 @@ dependencies = [
 
 [[package]]
 name = "vulkan-instance"
-version = "2.0.1"
+version = "3.0.0"
 dependencies = [
  "log",
  "smallvec",
@@ -2315,29 +2253,16 @@ dependencies = [
 
 [[package]]
 name = "vulkan-renderer"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
- "fontdue",
  "log",
- "scrgb",
  "scrgb-tonemapper",
  "smallvec",
  "thiserror",
  "vulkan-instance",
- "vulkan-timestamp-helper",
  "vulkano",
  "vulkano-shaders",
  "winit",
-]
-
-[[package]]
-name = "vulkan-timestamp-helper"
-version = "0.1.0"
-dependencies = [
- "debug-helper",
- "log",
- "vulkan-instance",
- "vulkano",
 ]
 
 [[package]]
@@ -2548,10 +2473,9 @@ dependencies = [
 
 [[package]]
 name = "windows-capture-provider"
-version = "3.0.2"
+version = "4.0.0"
 dependencies = [
  "log",
- "scrgb",
  "thiserror",
  "windows",
  "windows-core 0.57.0",
