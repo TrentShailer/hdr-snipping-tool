@@ -5,12 +5,9 @@
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
-layout(push_constant) uniform Metadata
-{
-	float sdr_whitepoint;
-	float hdr_whitepoint;
-	float maximum;
-};
+layout(constant_id = 0) const float sdr_whitepoint = 3.5;
+layout(constant_id = 1) const float hdr_whitepoint = 6.25;
+layout(constant_id = 2) const float maximum = 12.5;
 
 layout(set = 0, binding = 0) buffer InputLayout
 {

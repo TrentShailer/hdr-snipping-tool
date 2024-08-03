@@ -23,7 +23,7 @@ use vulkano::{
         ComputePipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
     },
     sync::HostAccessError,
-    Validated, VulkanError,
+    Validated, ValidationError, VulkanError,
 };
 use windows_capture_provider::capture::Capture;
 
@@ -57,17 +57,13 @@ pub fn tonemap(
         capture.data.len() as u64,
     )?;
     staging_buffer.write()?.copy_from_slice(&capture.data);
+    log::debug!(
+        "[tonemap::staging]
+  [TIMING] {}ms",
+        start.elapsed().as_millis()
+    );
 
-    // find the brightest component in the capture.
-    let max = find_maximum(vk, staging_buffer.clone(), capture.data.len() as u32)?;
-    // Sometimes the maximum is increased by an f16 step over the sdr_reference_white
-    // Check for this case and use the sdr reference white if it is
-    let max = if f16::from_bits(max.to_bits() - 1).to_f32() == capture.display.sdr_referece_white {
-        capture.display.sdr_referece_white
-    } else {
-        max.to_f32()
-    };
-
+    let input_start = Instant::now();
     // Transfer staging buffer to GPU
     let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
         vk.allocators.memory.clone(),
@@ -87,6 +83,21 @@ pub fn tonemap(
         input_buffer.clone(),
         vulkan_instance::copy_buffer::Region::SmallestBuffer,
     )?;
+    log::debug!(
+        "[tonemap::input_write]
+  [TIMING] {}ms",
+        input_start.elapsed().as_millis()
+    );
+
+    // find the brightest component in the capture.
+    let max = find_maximum(vk, input_buffer.clone(), capture.data.len() as u32)?;
+    // Sometimes the maximum is increased by an f16 step over the sdr_reference_white
+    // Check for this case and use the sdr reference white if it is
+    let max = if f16::from_bits(max.to_bits() - 1).to_f32() == capture.display.sdr_referece_white {
+        capture.display.sdr_referece_white
+    } else {
+        max.to_f32()
+    };
 
     // Create output image
     let capture_output = TonemapOutput::new(vk, capture.display.size)?;
@@ -95,6 +106,16 @@ pub fn tonemap(
     let pipeline = {
         let compute_shader = shader::load(vk.device.clone())
             .map_err(Error::LoadShader)?
+            .specialize(
+                [
+                    (0, capture.display.sdr_referece_white.into()),
+                    (1, hdr_whitepoint.into()),
+                    (2, max.into()),
+                ]
+                .into_iter()
+                .collect(),
+            )
+            .map_err(Error::Specialize)?
             .entry_point("main")
             .unwrap();
 
@@ -129,15 +150,7 @@ pub fn tonemap(
     .map_err(Error::Descriptor)?;
 
     // Dispatch tonemapper
-    dispatch_tonemap(
-        vk,
-        capture.display.size,
-        pipeline,
-        io_set,
-        capture.display.sdr_referece_white,
-        hdr_whitepoint,
-        max,
-    )?;
+    dispatch_tonemap(vk, capture.display.size, pipeline, io_set)?;
 
     log::debug!(
         "[tonemap]
@@ -167,6 +180,9 @@ pub enum Error {
 
     #[error("Failed to load shader:\n{0:?}")]
     LoadShader(#[source] Validated<VulkanError>),
+
+    #[error("Failed to specialize shader:\n{0:?}")]
+    Specialize(#[source] Box<ValidationError>),
 
     #[error("Failed to create pipeline layout info:\n{0:?}")]
     CreatePipelineLayoutInfo(#[from] IntoPipelineLayoutCreateInfoError),

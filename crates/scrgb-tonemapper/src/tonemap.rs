@@ -10,17 +10,12 @@ use vulkano::{
     Validated, ValidationError, VulkanError,
 };
 
-use crate::shader::Metadata;
-
 /// Dispatches the tonemapper.
 pub(crate) fn dispatch_tonemap(
     vk: &VulkanInstance,
     size: [u32; 2],
     pipeline: Arc<ComputePipeline>,
     io_set: Arc<PersistentDescriptorSet>,
-    sdr_whitepoint: f32,
-    hdr_whitepoint: f32,
-    maximum: f32,
 ) -> Result<(), Error> {
     let start = Instant::now();
 
@@ -45,15 +40,6 @@ pub(crate) fn dispatch_tonemap(
             pipeline.layout().clone(),
             0,
             io_set.clone(),
-        )?
-        .push_constants(
-            pipeline.layout().clone(),
-            0,
-            Metadata {
-                sdr_whitepoint,
-                hdr_whitepoint,
-                maximum,
-            },
         )?
         .dispatch([workgroup_x, workgroup_y, 1])?;
 

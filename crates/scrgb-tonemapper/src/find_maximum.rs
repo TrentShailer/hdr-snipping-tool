@@ -1,6 +1,7 @@
-use std::time::Instant;
+use std::{sync::Arc, time::Instant};
 
 use half::f16;
+use shader::PushConstants;
 use thiserror::Error;
 use vulkan_instance::{
     copy_buffer::{self, copy_buffer_and_wait},
@@ -9,7 +10,7 @@ use vulkan_instance::{
 use vulkano::{
     buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage},
-    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
+    descriptor_set::{layout::DescriptorSetLayout, PersistentDescriptorSet, WriteDescriptorSet},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::{
         compute::ComputePipelineCreateInfo,
@@ -25,11 +26,11 @@ pub mod shader {
 }
 
 /// Performs a GPU reduction to find the largest value in the image.\
-/// Staging buffer is a Transfer Source buffer that contains the f16 bytes to be reduced, it is unmodifed.\
+/// `input_buffer` is unmodifed.\
 /// Bytecount is the number of bytes in the staging buffer.
 pub(crate) fn find_maximum(
     vk: &VulkanInstance,
-    staging_buffer: Subbuffer<[u8]>,
+    input_buffer: Subbuffer<[u8]>,
     byte_count: u32,
 ) -> Result<f16, Error> {
     let start = Instant::now();
@@ -59,41 +60,14 @@ pub(crate) fn find_maximum(
     };
 
     // Query the subgroup size from the GPU
-    let subgroup_size = vk
-        .device
-        .physical_device()
-        .properties()
-        .subgroup_size
-        .unwrap_or(1);
+    let subgroup_size = vk.physical_device.properties().subgroup_size.unwrap_or(1);
 
     // 1024 threads * sugroup_size
     // This is how much the input gets reduced by on a single pass
     let compute_blocksize = 1024 * subgroup_size;
 
-    // Setup input buffer
-    let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
-        vk.allocators.memory.clone(),
-        BufferCreateInfo {
-            usage: BufferUsage::STORAGE_BUFFER
-                | BufferUsage::TRANSFER_DST
-                | BufferUsage::TRANSFER_SRC,
-            ..Default::default()
-        },
-        AllocationCreateInfo {
-            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-            ..Default::default()
-        },
-        byte_count as u64,
-    )?;
-    copy_buffer_and_wait(
-        vk,
-        staging_buffer.clone(),
-        input_buffer.clone(),
-        copy_buffer::Region::SmallestBuffer,
-    )?;
-
-    // Setup "output" buffer
-    let output_buffer: Subbuffer<[u8]> = Buffer::new_slice(
+    // Setup "read" buffer
+    let read_buffer: Subbuffer<[u8]> = Buffer::new_slice(
         vk.allocators.memory.clone(),
         BufferCreateInfo {
             usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_SRC,
@@ -103,90 +77,91 @@ pub(crate) fn find_maximum(
             memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
             ..Default::default()
         },
-        (byte_count as u64).div_ceil(compute_blocksize as u64),
+        (byte_count as u64).div_ceil(compute_blocksize as u64) + 3,
     )?;
 
-    // Because one pass returns us (input_length / compute_blocksize) values
-    // multiple passes may be required, therefore two descriptor sets are used
-    // to swap input and output buffer around
-    let layout = &pipeline.layout().set_layouts()[0];
-    let descriptor_set = PersistentDescriptorSet::new(
-        &vk.allocators.descriptor,
-        layout.clone(),
-        [
-            WriteDescriptorSet::buffer(0, input_buffer.clone()),
-            WriteDescriptorSet::buffer(1, output_buffer.clone()),
-        ],
-        [],
-    )
-    .map_err(Error::CreateDescriptorSet)?;
+    // Setup "write" buffer
+    let write_buffer: Subbuffer<[u8]> = Buffer::new_slice(
+        vk.allocators.memory.clone(),
+        BufferCreateInfo {
+            usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_SRC,
+            ..Default::default()
+        },
+        AllocationCreateInfo {
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
+            ..Default::default()
+        },
+        (byte_count as u64)
+            .div_ceil(compute_blocksize as u64)
+            .div_ceil(compute_blocksize as u64)
+            + 3,
+    )?;
 
-    let inverse_descriptor_set = PersistentDescriptorSet::new(
-        &vk.allocators.descriptor,
-        layout.clone(),
-        [
-            WriteDescriptorSet::buffer(0, output_buffer.clone()),
-            WriteDescriptorSet::buffer(1, input_buffer.clone()),
-        ],
-        [],
-    )
-    .map_err(Error::CreateDescriptorSet)?;
+    // Create descriptor sets
+    let layout = &pipeline.layout().set_layouts()[0];
+    let descriptor_sets = create_descriptor_sets(
+        vk,
+        layout,
+        input_buffer.clone(),
+        read_buffer.clone(),
+        write_buffer.clone(),
+    )?;
 
     let mut input_length = byte_count / 2;
     let mut output_length = (byte_count / 2).div_ceil(compute_blocksize);
+    let mut ds_index = 0;
 
-    // While there is multiple remaining candidates, do a pass
-    // and swap the input and output buffer
-    let mut use_inverse_set = false;
     while input_length > 1 {
         let workgroup_count = output_length;
 
-        // Setup command buffer
-        let mut builder = AutoCommandBufferBuilder::primary(
-            &vk.allocators.command,
-            vk.queue.queue_family_index(),
-            CommandBufferUsage::OneTimeSubmit,
-        )
-        .map_err(Error::CreateCommandBuffer)?;
+        // Perform reduction pass
+        {
+            let mut builder = AutoCommandBufferBuilder::primary(
+                &vk.allocators.command,
+                vk.queue.queue_family_index(),
+                CommandBufferUsage::OneTimeSubmit,
+            )
+            .map_err(Error::CreateCommandBuffer)?;
 
-        // decide what ds to use
-        let set = if use_inverse_set {
-            inverse_descriptor_set.clone()
-        } else {
-            descriptor_set.clone()
-        };
+            builder
+                .bind_pipeline_compute(pipeline.clone())?
+                .bind_descriptor_sets(
+                    vulkano::pipeline::PipelineBindPoint::Compute,
+                    pipeline.layout().clone(),
+                    0,
+                    descriptor_sets[ds_index].clone(),
+                )?
+                .push_constants(pipeline.layout().clone(), 0, PushConstants { input_length })?
+                .dispatch([workgroup_count, 1, 1])?;
 
-        // bind pipeline, ds, constants, and then dispatch
-        builder
-            .bind_pipeline_compute(pipeline.clone())?
-            .bind_descriptor_sets(
-                vulkano::pipeline::PipelineBindPoint::Compute,
-                pipeline.layout().clone(),
-                0,
-                set,
-            )?
-            .push_constants(pipeline.layout().clone(), 0, input_length)?
-            .dispatch([workgroup_count, 1, 1])?;
+            // execute command buffer and wait for it to finish
+            let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
+            let future = sync::now(vk.device.clone())
+                .then_execute(vk.queue.clone(), command_buffer)?
+                .then_signal_fence_and_flush()
+                .map_err(Error::SignalFence)?;
+            future.wait(None).map_err(Error::AwaitFence)?;
+        }
 
-        // execute command buffer and wait for it to finish
-        let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
-        let future = sync::now(vk.device.clone())
-            .then_execute(vk.queue.clone(), command_buffer)?
-            .then_signal_fence_and_flush()
-            .map_err(Error::SignalFence)?;
-        future.wait(None).map_err(Error::AwaitFence)?;
-
-        // swap the descriptor sets, calculate updated input and output lengths
-        use_inverse_set = !use_inverse_set;
+        // calculate updated input and output lengths
         input_length = output_length;
         output_length = input_length.div_ceil(compute_blocksize);
+
+        // Swap the read and write buffers if there is a next run.
+        if input_length > 1 {
+            ds_index += 1;
+
+            if ds_index > 2 {
+                ds_index = 1;
+            }
+        }
     }
 
     // Find what buffer has the final result in it.
-    let result_buffer = if use_inverse_set {
-        output_buffer.clone()
-    } else {
-        input_buffer.clone()
+    let result_buffer = match ds_index {
+        1 => write_buffer.clone(),
+        2 => read_buffer.clone(),
+        _ => input_buffer.clone(),
     };
 
     // Setup CPU staging buffer for GPU to write data to.
@@ -221,6 +196,53 @@ pub(crate) fn find_maximum(
     );
 
     Ok(maximum)
+}
+
+fn create_descriptor_sets(
+    vk: &VulkanInstance,
+    layout: &Arc<DescriptorSetLayout>,
+    input_buffer: Subbuffer<[u8]>,
+    read_buffer: Subbuffer<[u8]>,
+    write_buffer: Subbuffer<[u8]>,
+) -> Result<[Arc<PersistentDescriptorSet>; 3], Error> {
+    let first_pass_descriptor_set = PersistentDescriptorSet::new(
+        &vk.allocators.descriptor,
+        layout.clone(),
+        [
+            WriteDescriptorSet::buffer(0, input_buffer.clone()),
+            WriteDescriptorSet::buffer(1, read_buffer.clone()),
+        ],
+        [],
+    )
+    .map_err(Error::CreateDescriptorSet)?;
+
+    let rw_descriptor_set = PersistentDescriptorSet::new(
+        &vk.allocators.descriptor,
+        layout.clone(),
+        [
+            WriteDescriptorSet::buffer(0, read_buffer.clone()),
+            WriteDescriptorSet::buffer(1, write_buffer.clone()),
+        ],
+        [],
+    )
+    .map_err(Error::CreateDescriptorSet)?;
+
+    let wr_descriptor_set = PersistentDescriptorSet::new(
+        &vk.allocators.descriptor,
+        layout.clone(),
+        [
+            WriteDescriptorSet::buffer(0, write_buffer.clone()),
+            WriteDescriptorSet::buffer(1, read_buffer.clone()),
+        ],
+        [],
+    )
+    .map_err(Error::CreateDescriptorSet)?;
+
+    Ok([
+        first_pass_descriptor_set,
+        rw_descriptor_set,
+        wr_descriptor_set,
+    ])
 }
 
 #[derive(Debug, Error)]
