@@ -3,6 +3,7 @@ pub mod copy_to_box;
 use std::sync::Arc;
 
 use thiserror::Error;
+use tracing::info_span;
 use vulkano::{
     format::Format,
     image::{
@@ -28,6 +29,8 @@ pub struct TonemapOutput {
 impl TonemapOutput {
     /// Create an empty tonemap output.
     pub fn new(vk: &VulkanInstance, size: [u32; 2]) -> Result<Self, Error> {
+        let _span = info_span!("TonemapOutput::new").entered();
+
         let extent = [size[0], size[1], 1];
 
         let image = Image::new(

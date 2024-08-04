@@ -1,6 +1,5 @@
-use std::time::Instant;
-
 use thiserror::Error;
+use tracing::info_span;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 
 use crate::active_capture::{self, ActiveCapture};
@@ -9,8 +8,7 @@ use super::ActiveApp;
 
 impl ActiveApp {
     pub fn take_capture(&mut self, hdr_whitepoint: f32) -> Result<ActiveCapture, Error> {
-        log::info!("\n----- Taking Capture -----");
-        let capture_start = Instant::now();
+        let _span = info_span!("ActiveApp::take_capture").entered();
 
         let active_capture =
             ActiveCapture::new(&self.vk, &self.dx, &mut self.display_cache, hdr_whitepoint)?;
@@ -24,9 +22,6 @@ impl ActiveApp {
         self.renderer
             .capture
             .load_capture(&self.vk, active_capture.tonemap_output.clone())?;
-
-        log::debug!("[TIMING TOTAL] {}ms", capture_start.elapsed().as_millis());
-        log::info!("----- Has Capture [{}] -----", active_capture.id);
 
         self.window.set_visible(true);
         self.window.focus_window();

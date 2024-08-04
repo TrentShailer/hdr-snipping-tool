@@ -2,12 +2,13 @@ pub mod find_maximum;
 pub mod tonemap;
 pub mod tonemap_output;
 
-use std::{fmt::Debug, time::Instant};
+use std::fmt::Debug;
 
 use half::f16;
 use thiserror::Error;
 use tonemap::dispatch_tonemap;
 use tonemap_output::TonemapOutput;
+use tracing::{info, info_span};
 use vulkan_instance::{
     copy_buffer::{self, copy_buffer_and_wait},
     VulkanInstance,
@@ -40,9 +41,10 @@ pub fn tonemap(
     capture: &Capture,
     hdr_whitepoint: f32,
 ) -> Result<TonemapOutput, Error> {
-    let start = Instant::now();
+    let _span = info_span!("tonemap").entered();
 
     // Transfer capture to staging buffer
+    let staging_span = info_span!("write_staging").entered();
     let staging_buffer: Subbuffer<[u8]> = Buffer::new_slice(
         vk.allocators.memory.clone(),
         BufferCreateInfo {
@@ -57,14 +59,10 @@ pub fn tonemap(
         capture.data.len() as u64,
     )?;
     staging_buffer.write()?.copy_from_slice(&capture.data);
-    log::debug!(
-        "[tonemap::staging]
-  [TIMING] {}ms",
-        start.elapsed().as_millis()
-    );
+    staging_span.exit();
 
-    let input_start = Instant::now();
     // Transfer staging buffer to GPU
+    let input_span = info_span!("write_input").entered();
     let input_buffer: Subbuffer<[u8]> = Buffer::new_slice(
         vk.allocators.memory.clone(),
         BufferCreateInfo {
@@ -83,11 +81,7 @@ pub fn tonemap(
         input_buffer.clone(),
         vulkan_instance::copy_buffer::Region::SmallestBuffer,
     )?;
-    log::debug!(
-        "[tonemap::input_write]
-  [TIMING] {}ms",
-        input_start.elapsed().as_millis()
-    );
+    input_span.exit();
 
     // find the brightest component in the capture.
     let max = find_maximum(vk, input_buffer.clone(), capture.data.len() as u32)?;
@@ -149,20 +143,14 @@ pub fn tonemap(
     )
     .map_err(Error::Descriptor)?;
 
+    info!(
+        sdr_white = capture.display.sdr_referece_white,
+        hdr_white = hdr_whitepoint,
+        maximum = max
+    );
+
     // Dispatch tonemapper
     dispatch_tonemap(vk, capture.display.size, pipeline, io_set)?;
-
-    log::debug!(
-        "[tonemap]
-  sdr_whitepoint: {:.2}
-  hdr_whitepoint: {:.2}
-  maximum: {:.2}
-  [TIMING TOTAL] {}ms",
-        capture.display.sdr_referece_white,
-        hdr_whitepoint,
-        max,
-        start.elapsed().as_millis()
-    );
 
     Ok(capture_output)
 }

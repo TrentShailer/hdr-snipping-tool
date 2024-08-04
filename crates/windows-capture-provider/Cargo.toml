@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-log = { workspace = true }
 thiserror = { workspace = true }
 windows = { workspace = true, features = [
 	"Foundation",
@@ -25,3 +24,4 @@ windows = { workspace = true, features = [
 ] }
 windows-core = { workspace = true }
 windows-result = { workspace = true }
+tracing = { workspace = true }

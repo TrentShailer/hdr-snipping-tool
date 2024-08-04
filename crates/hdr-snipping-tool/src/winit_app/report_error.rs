@@ -1,3 +1,4 @@
+use tracing::error;
 use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
 use super::window_event;
 
 pub fn report_new_app_error(error: active_app::Error) {
-    log::error!("{error}");
+    error!("{error}");
     let message = match error {
         active_app::Error::Window(_) => make_message("creating the window"),
         active_app::Error::TrayIcon(_) => make_message("creating the tray icon"),
@@ -22,7 +23,7 @@ pub fn report_new_app_error(error: active_app::Error) {
 }
 
 pub fn report_take_capture_error(error: take_capture::Error) {
-    log::error!("{error}");
+    error!("{error}");
     let message = match error {
         take_capture::Error::ActiveCapture(_) => make_message("creating the capture"),
         take_capture::Error::LoadCapture(_) => {
@@ -33,7 +34,7 @@ pub fn report_take_capture_error(error: take_capture::Error) {
 }
 
 pub fn report_window_event_error(error: window_event::Error) {
-    log::error!("{error}");
+    error!("{error}");
     let message = match error {
         window_event::Error::Render(_) => make_message("rendering"),
         window_event::Error::SaveCapture(_) => make_message("saving the capture"),

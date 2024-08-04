@@ -1,6 +1,7 @@
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
 
 use thiserror::Error;
+use tracing::info_span;
 use vulkan_instance::VulkanInstance;
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage},
@@ -17,7 +18,7 @@ pub(crate) fn dispatch_tonemap(
     pipeline: Arc<ComputePipeline>,
     io_set: Arc<PersistentDescriptorSet>,
 ) -> Result<(), Error> {
-    let start = Instant::now();
+    let _span = info_span!("dispatch").entered();
 
     // Shader tonemaps a 32x32 area each dispatch
     let workgroup_x = size[0].div_ceil(32);
@@ -50,12 +51,6 @@ pub(crate) fn dispatch_tonemap(
         .then_signal_fence_and_flush()
         .map_err(Error::SignalFenceAndFlush)?;
     future.wait(None).map_err(Error::AwaitFence)?;
-
-    log::debug!(
-        "[dispatch_tonemap]
-  [TIMING] {}ms",
-        start.elapsed().as_millis(),
-    );
 
     Ok(())
 }

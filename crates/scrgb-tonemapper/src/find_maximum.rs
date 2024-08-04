@@ -1,8 +1,9 @@
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
 
 use half::f16;
 use shader::PushConstants;
 use thiserror::Error;
+use tracing::info_span;
 use vulkan_instance::{
     copy_buffer::{self, copy_buffer_and_wait},
     VulkanInstance,
@@ -33,7 +34,7 @@ pub(crate) fn find_maximum(
     input_buffer: Subbuffer<[u8]>,
     byte_count: u32,
 ) -> Result<f16, Error> {
-    let start = Instant::now();
+    let _span = info_span!("find_maximum").entered();
 
     // Create pipline for maximum reduction
     let pipeline = {
@@ -112,6 +113,7 @@ pub(crate) fn find_maximum(
     let mut ds_index = 0;
 
     while input_length > 1 {
+        let _span = info_span!("pass").entered();
         let workgroup_count = output_length;
 
         // Perform reduction pass
@@ -188,12 +190,6 @@ pub(crate) fn find_maximum(
     // Read the data from the buffer
     let reader = &output_staging_buffer.read()?;
     let maximum = f16::from_le_bytes([reader[0], reader[1]]);
-
-    log::debug!(
-        "[find_maximum]
-  [TIMING] {}ms",
-        start.elapsed().as_millis()
-    );
 
     Ok(maximum)
 }

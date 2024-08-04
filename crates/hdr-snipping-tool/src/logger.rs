@@ -1,53 +1,44 @@
-use log::LevelFilter;
+use tracing::{
+    level_filters::LevelFilter,
+    subscriber::{set_global_default, SetGlobalDefaultError},
+};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::{fmt::format::FmtSpan, layer::SubscriberExt};
 
 use crate::{is_debug, project_directory};
 
-pub fn init_fern() -> Result<(), fern::InitError> {
-    if is_debug() {
-        init_debug_logger()?;
+pub fn init_tracing() -> Result<WorkerGuard, SetGlobalDefaultError> {
+    let level = if is_debug() {
+        LevelFilter::TRACE
     } else {
-        init_default_logger()?;
+        LevelFilter::ERROR
     };
 
-    Ok(())
-}
+    let filter = tracing_subscriber::filter::Targets::new()
+        .with_default(level)
+        .with_target("winit", LevelFilter::OFF);
 
-fn error_logger() -> fern::Dispatch {
-    fern::Dispatch::new()
-        .format(move |out, message, record| {
-            let time = chrono::Local::now().format("%F %r %:z");
-            let level = record.level();
-            let target = record.target();
+    let file_appender =
+        tracing_appender::rolling::never(project_directory(), "hdr-snipping-tool.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-            out.finish(format_args!("[{time}] [{level}] [{target}]\n{message}\n",))
-        })
-        .level(LevelFilter::Warn)
-}
+    let file_logger = tracing_subscriber::fmt::layer()
+        .with_writer(non_blocking)
+        .with_span_events(FmtSpan::CLOSE | FmtSpan::ENTER)
+        .with_ansi(false)
+        .with_target(false);
 
-fn debug_logger() -> fern::Dispatch {
-    fern::Dispatch::new()
-        .format(move |out, message, _record| out.finish(format_args!("{message}")))
-        .level(LevelFilter::Debug)
-}
+    let std_logger = tracing_subscriber::fmt::layer()
+        .with_span_events(FmtSpan::CLOSE | FmtSpan::ENTER)
+        .with_ansi(false)
+        .with_target(false);
 
-fn init_default_logger() -> Result<(), fern::InitError> {
-    error_logger()
-        .chain(std::io::stdout())
-        .chain(fern::log_file(project_directory().join("error.log"))?)
-        .apply()?;
+    let collector = tracing_subscriber::registry()
+        .with(file_logger)
+        .with(std_logger)
+        .with(filter);
 
-    Ok(())
-}
+    set_global_default(collector)?;
 
-fn init_debug_logger() -> Result<(), fern::InitError> {
-    fern::Dispatch::new()
-        .chain(error_logger().chain(fern::log_file(project_directory().join("error.log"))?))
-        .chain(
-            debug_logger()
-                .chain(std::io::stdout())
-                .chain(fern::log_file(project_directory().join("debug.log"))?),
-        )
-        .apply()?;
-
-    Ok(())
+    Ok(_guard)
 }

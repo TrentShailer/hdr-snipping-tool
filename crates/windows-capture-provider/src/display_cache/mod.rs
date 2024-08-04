@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use get_displays::get_displays;
 use thiserror::Error;
+use tracing::info_span;
 use windows::Graphics::Capture::GraphicsCaptureItem;
 use windows_result::Error as WindowsError;
 
@@ -24,6 +25,8 @@ pub struct DisplayCache {
 impl DisplayCache {
     /// Create a new display cache and populate it.
     pub fn new(devices: &DirectXDevices) -> Result<Self, Error> {
+        let _span = info_span!("DisplayCache::new").entered();
+
         let displays = get_displays(devices)?;
         let mut capture_items = HashMap::new();
 

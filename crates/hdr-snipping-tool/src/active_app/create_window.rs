@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use thiserror::Error;
+use tracing::info;
 use winit::{
     dpi::PhysicalSize,
     error::OsError,
@@ -22,11 +23,7 @@ pub fn create_window(event_loop: &ActiveEventLoop) -> Result<Arc<Window>, Error>
 
     let window = Arc::from(event_loop.create_window(window_attributes)?);
 
-    log::debug!(
-        "[create_window]
-	{:?}",
-        window.window_handle()
-    );
+    info!("Window handle: {:?}", window.window_handle());
 
     Ok(window)
 }

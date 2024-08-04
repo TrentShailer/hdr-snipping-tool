@@ -2,6 +2,7 @@ mod create_devices;
 
 use create_devices::{d3d11_context, d3d11_device, d3d_device, dxgi_adapter};
 use thiserror::Error;
+use tracing::info_span;
 use windows::{
     Graphics::DirectX::Direct3D11::IDirect3DDevice,
     Win32::Graphics::{
@@ -30,6 +31,8 @@ pub struct DirectXDevices {
 impl DirectXDevices {
     /// Creates a new set of directX devices.
     pub fn new() -> Result<Self, Error> {
+        let _span = info_span!("DirectXDevices::new").entered();
+
         let d3d11_device = d3d11_device().map_err(Error::D3D11Device)?;
         let d3d11_context = d3d11_context(&d3d11_device).map_err(Error::D3D11Context)?;
 

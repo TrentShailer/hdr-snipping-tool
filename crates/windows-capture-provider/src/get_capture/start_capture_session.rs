@@ -1,9 +1,7 @@
-use std::{
-    sync::mpsc::{channel, Receiver},
-    time::Instant,
-};
+use std::sync::mpsc::{channel, Receiver};
 
 use thiserror::Error;
+use tracing::info_span;
 use windows::{
     Foundation::TypedEventHandler,
     Graphics::{
@@ -33,7 +31,7 @@ pub fn start_capture_session(
     ),
     Error,
 > {
-    let start = Instant::now();
+    let _span = info_span!("start_capture_session").entered();
 
     let capture_size = capture_item.Size().map_err(Error::CaptureSize)?;
 
@@ -76,12 +74,6 @@ pub fn start_capture_session(
         .map_err(Error::FrameArrived)?;
 
     session.StartCapture().map_err(Error::StartCapture)?;
-
-    log::debug!(
-        "[start_capture_session]
-  [TIMING] {}ms",
-        start.elapsed().as_millis()
-    );
 
     Ok((framepool, session, receiver))
 }

@@ -11,7 +11,7 @@ vulkan-renderer = { workspace = true }
 scrgb-tonemapper = { workspace = true }
 windows-capture-provider = { workspace = true }
 
-log = { workspace = true }
+tracing = { workspace = true }
 thiserror = { workspace = true }
 windows = { workspace = true, features = [
 	"Foundation",
@@ -24,13 +24,15 @@ windows = { workspace = true, features = [
 windows-result = { workspace = true }
 winit = { workspace = true, features = ["rwh_05", "rwh_06"] }
 
+
+tracing-subscriber = "0.3"
+tracing-appender = "0.2"
 arboard = "3.4"
 chrono = { version = "0.4", features = [
 	"clock",
 	"std",
 ], default-features = false }
 directories = "5.0"
-fern = "0.6"
 global-hotkey = "0.5"
 image = { version = "0.25", features = [
 	"rayon",
@@ -39,7 +41,6 @@ image = { version = "0.25", features = [
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 tray-icon = "0.14"
-uuid = { version = "1.10", features = ["v4", "fast-rng"] }
 
 [build-dependencies]
 embed-resource = "2.4"

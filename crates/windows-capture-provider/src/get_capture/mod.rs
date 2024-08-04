@@ -1,9 +1,10 @@
 mod retrieve_capture;
 mod start_capture_session;
 
-use std::{sync::mpsc::RecvError, time::Instant};
+use std::sync::mpsc::RecvError;
 
 use thiserror::Error;
+use tracing::info_span;
 use windows::Graphics::Capture::GraphicsCaptureItem;
 use windows_result::Error as WindowsError;
 
@@ -18,20 +19,16 @@ pub fn get_capture(
     display: &Display,
     capture_item: &GraphicsCaptureItem,
 ) -> Result<Capture, Error> {
-    let capture_start = Instant::now();
+    let _span = info_span!("get_capture").entered();
 
     // get the framepool, capture session, and captuire receiver
     let (framepool, capture_session, capture_receiver) =
         start_capture_session(devices, capture_item)?;
 
     // get the d3d_capture
-    let recv_start = Instant::now();
+    let recv_span = info_span!("recv").entered();
     let d3d11_capture = capture_receiver.recv()?;
-    log::debug!(
-        "[recv_capture]
-  [TIMING] {}ms",
-        recv_start.elapsed().as_millis()
-    );
+    recv_span.exit();
 
     capture_session.Close().map_err(Error::CloseSession)?;
     framepool.Close().map_err(Error::CloseSession)?;
@@ -42,12 +39,6 @@ pub fn get_capture(
     // free resources
     unsafe { devices.d3d11_context.ClearState() };
     devices.d3d_device.Trim().map_err(Error::Trim)?;
-
-    log::debug!(
-        "[take_capture]
-  [TIMING TOTAL] {}ms",
-        capture_start.elapsed().as_millis()
-    );
 
     Ok(Capture {
         data: capture,

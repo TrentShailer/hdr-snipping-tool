@@ -6,6 +6,7 @@ pub mod take_capture;
 use std::sync::Arc;
 
 use thiserror::Error;
+use tracing::info_span;
 use tray_icon::TrayIcon;
 use vulkan_instance::VulkanInstance;
 use vulkan_renderer::renderer::Renderer;
@@ -29,6 +30,8 @@ pub struct ActiveApp {
 
 impl ActiveApp {
     pub fn new(event_loop: &ActiveEventLoop) -> Result<Self, Error> {
+        let _span = info_span!("ActiveApp::new").entered();
+
         let focused = get_foreground_window();
         let window = create_window(event_loop)?;
         set_foreground_window(focused);
@@ -36,15 +39,11 @@ impl ActiveApp {
         let tray_icon = create_tray_icon()?;
         tray_icon.set_visible(true)?;
 
-        log::debug!("");
         let vk = VulkanInstance::new(window.clone(), event_loop)?;
-        log::debug!("");
         let renderer = Renderer::new(&vk, window.clone())?;
-        log::debug!("");
 
         let dx = DirectXDevices::new()?;
         let display_cache = DisplayCache::new(&dx)?;
-        log::debug!("");
 
         Ok(ActiveApp {
             window,

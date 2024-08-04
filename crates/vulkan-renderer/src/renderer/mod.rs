@@ -5,6 +5,7 @@ pub mod window_size_dependent_setup;
 use std::sync::Arc;
 
 use thiserror::Error;
+use tracing::{info, info_span};
 use vulkan_instance::VulkanInstance;
 use vulkano::{
     image::{view::ImageView, ImageUsage},
@@ -33,6 +34,8 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new(vk: &VulkanInstance, window: Arc<Window>) -> Result<Self, Error> {
+        let _span = info_span!("Renderer::new").entered();
+
         let (swapchain, images) = {
             // Querying the capabilities of the surface. When we create the swapchain we can only pass
             // values that are allowed by the capabilities.
@@ -80,17 +83,9 @@ impl Renderer {
                 })
                 .expect("Device has no present modes");
 
-            log::debug!(
-                "[Renderer]
-  Surface format: {:?}
-  Swapchain images: {}
-  Present mode: {:?}
-  Composite alpha: {:?}",
-                image_format,
-                swapchain_image_count,
-                present_mode,
-                composite_alpha
-            );
+            info!("Surface format: {:?}", image_format);
+            info!("Swapchain images: {}", swapchain_image_count);
+            info!("Present mode: {:?}", present_mode);
 
             Swapchain::new(
                 vk.device.clone(),

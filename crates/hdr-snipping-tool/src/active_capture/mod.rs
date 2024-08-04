@@ -6,7 +6,7 @@ use std::sync::Arc;
 use scrgb_tonemapper::{tonemap, tonemap_output::TonemapOutput};
 use selection::Selection;
 use thiserror::Error;
-use uuid::Uuid;
+use tracing::info_span;
 use vulkan_instance::VulkanInstance;
 use windows::Win32::Foundation::HWND;
 use windows_capture_provider::{
@@ -21,7 +21,6 @@ pub struct ActiveCapture {
     pub tonemap_output: Arc<TonemapOutput>,
     pub selection: Selection,
     pub formerly_focused_window: HWND,
-    pub id: Uuid,
 }
 
 impl ActiveCapture {
@@ -31,12 +30,7 @@ impl ActiveCapture {
         display_cache: &mut DisplayCache,
         hdr_whitepoint: f32,
     ) -> Result<Self, Error> {
-        let id = Uuid::new_v4();
-        log::info!(
-            "[capture_id]
-  {}",
-            id
-        );
+        let _span = info_span!("ActiveCapture::new").entered();
 
         let formerly_focused_window = get_foreground_window();
 
@@ -70,7 +64,6 @@ impl ActiveCapture {
             selection,
             tonemap_output,
             formerly_focused_window,
-            id,
         })
     }
 }

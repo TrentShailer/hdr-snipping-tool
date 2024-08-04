@@ -1,5 +1,6 @@
 use std::process::Command;
 
+use tracing::error;
 use tray_icon::menu::MenuEvent;
 use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use winit::event_loop::ActiveEventLoop;
@@ -17,7 +18,7 @@ impl ActiveApp {
         match event.id.0.as_str() {
             "0" => {
                 if let Err(e) = Command::new("explorer").arg(project_directory()).spawn() {
-                    log::error!("{e}");
+                    error!("{e}");
                     display_message("We encountered an error while opening file explor\nMore details are in the logs.", MB_ICONERROR);
                     event_loop.exit();
                 }

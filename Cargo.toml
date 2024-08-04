@@ -4,7 +4,6 @@ members = ["crates/*"]
 
 [workspace.dependencies]
 half = { version = "2.4" }
-log = "0.4"
 smallvec = "1.13"
 thiserror = "1.0"
 vulkano = { version = "0.34" }
@@ -13,6 +12,7 @@ windows = { version = "0.58" }
 windows-core = { version = "0.58" }
 windows-result = { version = "0.2" }
 winit = { version = "0.30", default-features = false }
+tracing = "0.1"
 
 vulkan-instance = { path = "crates/vulkan-instance" }
 vulkan-renderer = { path = "crates/vulkan-renderer" }

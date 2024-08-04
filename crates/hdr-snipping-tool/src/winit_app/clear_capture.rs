@@ -1,4 +1,5 @@
 use thiserror::Error;
+use tracing::info_span;
 
 use crate::windows_helpers::foreground_window::set_foreground_window;
 
@@ -6,6 +7,8 @@ use super::WinitApp;
 
 impl WinitApp {
     pub fn clear_capture(&mut self) -> Result<(), Error> {
+        let _span = info_span!("WinitApp::clear_capture").entered();
+
         let Some(app) = self.app.as_mut() else {
             return Ok(());
         };
@@ -25,9 +28,6 @@ impl WinitApp {
             )?;
 
             set_foreground_window(capture.formerly_focused_window);
-            log::info!("----- Closed Capture [{}] -----", capture.id);
-        } else {
-            log::info!("----- Closed Capture -----");
         }
 
         self.capture = None;

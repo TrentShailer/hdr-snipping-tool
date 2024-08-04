@@ -8,6 +8,7 @@ use arboard::{Clipboard, ImageData};
 use chrono::Local;
 use image::{codecs::png::PngEncoder, GenericImageView, ImageBuffer, ImageError, Rgba};
 use thiserror::Error;
+use tracing::info_span;
 use vulkan_instance::VulkanInstance;
 
 use crate::project_directory;
@@ -16,7 +17,7 @@ use super::ActiveCapture;
 
 impl ActiveCapture {
     pub fn save(&mut self, vk: &VulkanInstance) -> Result<(), Error> {
-        log::info!("----- Saving Capture [{}] -----", self.id);
+        let _span = info_span!("ActiveCapture::save").entered();
 
         let raw_capture = self.tonemap_output.copy_to_box(vk)?;
         let raw_capture_len = raw_capture.len();

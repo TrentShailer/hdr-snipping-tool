@@ -1,3 +1,4 @@
+use tracing::info;
 use winit::{
     event::{DeviceId, ElementState, KeyEvent},
     keyboard::{KeyCode, PhysicalKey},
@@ -37,8 +38,12 @@ impl WinitApp {
         };
 
         match keycode {
-            KeyCode::Escape => self.clear_capture()?,
+            KeyCode::Escape => {
+                info!("Escape pressed");
+                self.clear_capture()?;
+            }
             KeyCode::Enter => {
+                info!("Enter pressed");
                 if let Some(capture) = self.capture.as_mut() {
                     capture.save(&app.vk)?;
                     self.clear_capture()?;

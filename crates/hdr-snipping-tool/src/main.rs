@@ -12,10 +12,11 @@ use std::{fs, path::PathBuf};
 
 use directories::ProjectDirs;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
-use logger::init_fern;
+use logger::init_tracing;
 use report_error::report_app_error;
 use settings::Settings;
 use thiserror::Error;
+use tracing::{error, info, warn};
 use windows::{
     Graphics::Capture::GraphicsCaptureSession,
     Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_ICONWARNING},
@@ -54,18 +55,21 @@ fn main() {
         return;
     };
 
-    if let Err(e) = init_fern() {
-        display_message(
-            &format!("We encountered an error while setting up the logger.\n{e}"),
-            MB_ICONERROR,
-        );
-        return;
+    let _guard = match init_tracing() {
+        Ok(guard) => guard,
+        Err(e) => {
+            display_message(
+                &format!("We encountered an error while initialising the logger.\n{e}"),
+                MB_ICONERROR,
+            );
+            return;
+        }
     };
 
     {
-        log::info!("\n----- Application Opened -----");
+        info!("Application Opened");
         let dev_tooltip = if IS_DEV { "-dev" } else { "" };
-        log::debug!("HDR Snipping Tool v{}{}-debug", VERSION, dev_tooltip,);
+        info!("HDR Snipping Tool v{}{}-debug", VERSION, dev_tooltip);
     }
 
     if let Err(e) = init() {
@@ -76,7 +80,7 @@ fn main() {
 fn init() -> Result<(), AppError> {
     // Ensure no other instances of this app are running
     if !ensure_only_instance()? {
-        log::warn!("Another instance is already running.");
+        warn!("Another instance is already running.");
         display_message("Another instance is already running.", MB_ICONWARNING);
         return Ok(());
     }
@@ -93,7 +97,7 @@ fn init() -> Result<(), AppError> {
             // If the settings file is invalid then tell the user and replace
             // it with a default one
             settings::LoadError::Deserialize(e) => {
-                log::warn!("{e}");
+                warn!("{e}");
                 display_message(
                     "Invalid settings file, it will be replaced with a new one.",
                     MB_ICONWARNING,
@@ -105,7 +109,7 @@ fn init() -> Result<(), AppError> {
             _ => return Err(AppError::LoadSettings(e)),
         },
     };
-    log::debug!("\n{:?}", &settings);
+    info!("{:?}", settings);
 
     // Create event loop
     let event_loop: EventLoop<()> = EventLoop::with_user_event().build()?;
@@ -119,8 +123,9 @@ fn init() -> Result<(), AppError> {
 
     GlobalHotKeyEvent::set_event_handler(Some(move |event: GlobalHotKeyEvent| {
         if event.state == HotKeyState::Pressed {
+            info!("Hotkey pressed");
             if let Err(e) = proxy.send_event(()) {
-                log::error!("Failed to send event to event loop:\n{e}");
+                error!("Failed to send event to event loop:\n{e}");
                 display_message(
                     "We encountered an error while handling your hotkey.\nMore details are in the logs.",
                     MB_ICONERROR,

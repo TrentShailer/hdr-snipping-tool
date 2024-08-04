@@ -1,5 +1,4 @@
-use std::time::Instant;
-
+use tracing::{info, info_span};
 use windows::{
     Graphics::Capture::Direct3D11CaptureFrame,
     Win32::{
@@ -21,7 +20,7 @@ pub fn retrieve_capture(
     devices: &DirectXDevices,
     d3d_capture: Direct3D11CaptureFrame,
 ) -> Result<Box<[u8]>, WindowsError> {
-    let start = Instant::now();
+    let _span = info_span!("retrieve_capture").entered();
 
     // Get the surface of the capture
     let surface = d3d_capture.Surface()?;
@@ -54,7 +53,7 @@ pub fn retrieve_capture(
         ))?
     };
 
-    // Copy from to the staging texture
+    // Copy from source to the staging texture
     unsafe {
         devices.d3d11_context.CopyResource(
             Some(&staging_texture.cast()?),
@@ -88,9 +87,12 @@ pub fn retrieve_capture(
     // DirectX may add padding onto the width of the image for better alignment
     // To remove this, we copy the relevant data we want from each row to a new vec
     let capture = if capture_width != staging_desc.Width {
+        let _span = info_span!("trim_capture").entered();
+
         let bytes_per_pixel = 8; // RGBAF16 = 8 bpp
         let width = staging_desc.Width as usize;
         let height = staging_desc.Height as usize;
+
         let mut output_vec = vec![0u8; width * height * bytes_per_pixel];
 
         let output_row_length = width * bytes_per_pixel;
@@ -106,18 +108,12 @@ pub fn retrieve_capture(
 
         output_vec.into_boxed_slice()
     } else {
-        raw_slice.to_vec().into_boxed_slice()
+        Box::from(raw_slice)
     };
 
     unsafe { devices.d3d11_context.Unmap(Some(&staging_resource), 0) };
 
-    log::debug!(
-        "[retrieve_capture]
-  {} bytes
-  [TIMING] {}ms",
-        capture.len(),
-        start.elapsed().as_millis()
-    );
+    info!(bytes = capture.len(), "Capture");
 
     Ok(capture)
 }

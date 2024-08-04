@@ -1,9 +1,10 @@
+use tracing::error;
 use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 
 use crate::{windows_helpers::display_message, AppError};
 
 pub fn report_app_error(error: AppError) {
-    log::error!("{error}");
+    error!("{error}");
 
     let message = match error {
         AppError::OnlyInstance(_) => {

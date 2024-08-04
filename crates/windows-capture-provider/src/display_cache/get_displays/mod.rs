@@ -1,19 +1,18 @@
 mod config_path_info;
 mod descriptors;
 
-use std::time::Instant;
-
 use config_path_info::get_display_configs;
 use descriptors::get_output_descriptors;
 
 use thiserror::Error;
+use tracing::{info, info_span};
 use windows_result::Error as WindowsError;
 
 use crate::{DirectXDevices, Display};
 
 /// Gets the currently attached displays.
 pub fn get_displays(devices: &DirectXDevices) -> Result<Box<[Display]>, Error> {
-    let start = Instant::now();
+    let _span = info_span!("get_displays").entered();
 
     // Descriptors provide most of the information about the display.
     let descriptors = get_output_descriptors(devices).map_err(Error::GetDescriptors)?;
@@ -29,23 +28,17 @@ pub fn get_displays(devices: &DirectXDevices) -> Result<Box<[Display]>, Error> {
                 .iter()
                 .find(|config| config.name == descriptor.DeviceName)?;
 
-            Some(Display::new(
+            let found_display = Display::new(
                 descriptor.Monitor,
                 descriptor.DesktopCoordinates,
                 config.sdr_reference_white,
-            ))
+            );
+
+            info!("{}", found_display);
+
+            Some(found_display)
         })
         .collect();
-
-    log::debug!(
-        "[get_displays]{}
-  [TIMING] {}ms",
-        displays.iter().fold(String::new(), |acc, display| format!(
-            "{}\n  {}",
-            acc, display
-        )),
-        start.elapsed().as_millis()
-    );
 
     Ok(displays)
 }
