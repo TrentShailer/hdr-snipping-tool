@@ -24,12 +24,12 @@ pub fn init_tracing() -> Result<WorkerGuard, SetGlobalDefaultError> {
 
     let file_logger = tracing_subscriber::fmt::layer()
         .with_writer(non_blocking)
-        .with_span_events(FmtSpan::CLOSE | FmtSpan::ENTER)
+        .with_span_events(FmtSpan::CLOSE)
         .with_ansi(false)
         .with_target(false);
 
     let std_logger = tracing_subscriber::fmt::layer()
-        .with_span_events(FmtSpan::CLOSE | FmtSpan::ENTER)
+        .with_span_events(FmtSpan::CLOSE)
         .with_ansi(false)
         .with_target(false);
 
