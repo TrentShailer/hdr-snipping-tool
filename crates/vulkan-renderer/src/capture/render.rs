@@ -9,6 +9,8 @@ use vulkano::{
     ValidationError,
 };
 
+use crate::pipelines::capture::fragment_shader::PushConstants;
+
 use super::Capture;
 
 impl Capture {
@@ -33,6 +35,13 @@ impl Capture {
                 self.pipeline.layout().clone(),
                 0,
                 capture_ds.clone(),
+            )?
+            .push_constants(
+                self.pipeline.layout().clone(),
+                0,
+                PushConstants {
+                    whitepoint: self.whitepoint,
+                },
             )?
             .draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0)?;
 

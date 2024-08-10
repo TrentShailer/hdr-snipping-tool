@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 use vulkano::{
-    instance::{Instance, InstanceCreateInfo},
+    instance::{Instance, InstanceCreateInfo, InstanceExtensions},
     swapchain::Surface,
     LoadingError, Validated, VulkanError, VulkanLibrary,
 };
@@ -20,11 +20,15 @@ pub enum Error {
 pub fn aquire_instance(event_loop: &ActiveEventLoop) -> Result<Arc<Instance>, Error> {
     let library = VulkanLibrary::new()?;
 
-    let required_extensions = Surface::required_extensions(&event_loop);
+    let surface_required_extensions = Surface::required_extensions(&event_loop);
+    let additional_extensions = InstanceExtensions {
+        ext_swapchain_colorspace: true,
+        ..Default::default()
+    };
 
     let instance_create_info = InstanceCreateInfo {
         // flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
-        enabled_extensions: required_extensions,
+        enabled_extensions: additional_extensions.union(&surface_required_extensions),
         ..Default::default()
     };
     Ok(Instance::new(library, instance_create_info)?)

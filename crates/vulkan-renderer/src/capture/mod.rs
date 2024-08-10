@@ -3,10 +3,14 @@ pub mod render;
 
 use std::sync::Arc;
 
-use scrgb_tonemapper::tonemap_output::TonemapOutput;
+use thiserror::Error;
 use vulkan_instance::VulkanInstance;
 use vulkano::{
-    buffer::Subbuffer, descriptor_set::PersistentDescriptorSet, pipeline::GraphicsPipeline,
+    buffer::Subbuffer,
+    descriptor_set::PersistentDescriptorSet,
+    image::sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
+    pipeline::GraphicsPipeline,
+    Validated, VulkanError,
 };
 
 use crate::{pipelines::capture::Vertex, vertex_index_buffer::create_vertex_and_index_buffer};
@@ -15,15 +19,13 @@ pub struct Capture {
     pub vertex_buffer: Subbuffer<[Vertex]>,
     pub index_buffer: Subbuffer<[u32]>,
     pub pipeline: Arc<GraphicsPipeline>,
-    pub capture: Option<Arc<TonemapOutput>>,
+    pub sampler: Arc<Sampler>,
     pub capture_ds: Option<Arc<PersistentDescriptorSet>>,
+    pub whitepoint: f32,
 }
 
 impl Capture {
-    pub fn new(
-        vk: &VulkanInstance,
-        pipeline: Arc<GraphicsPipeline>,
-    ) -> Result<Self, crate::vertex_index_buffer::Error> {
+    pub fn new(vk: &VulkanInstance, pipeline: Arc<GraphicsPipeline>) -> Result<Self, Error> {
         let verticies = vec![
             Vertex {
                 position: [-1.0, -1.0],
@@ -48,12 +50,33 @@ impl Capture {
         let (vertex_buffer, index_buffer) =
             create_vertex_and_index_buffer(vk, verticies, indicies)?;
 
+        let sampler = Sampler::new(
+            vk.device.clone(),
+            SamplerCreateInfo {
+                mag_filter: Filter::Linear,
+                min_filter: Filter::Linear,
+                address_mode: [SamplerAddressMode::Repeat; 3],
+                ..Default::default()
+            },
+        )
+        .map_err(Error::Sampler)?;
+
         Ok(Self {
             vertex_buffer,
             index_buffer,
             pipeline,
-            capture: None,
+            sampler,
             capture_ds: None,
+            whitepoint: 0.0,
         })
     }
+}
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Failed to create vertex and index buffer:\n{0}")]
+    CreateVertexIndexBuffer(#[from] crate::vertex_index_buffer::Error),
+
+    #[error("Failed to create sampler:\n{0:?}")]
+    Sampler(#[source] Validated<VulkanError>),
 }

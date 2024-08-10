@@ -8,16 +8,24 @@ use thiserror::Error;
 use tracing::{info, info_span};
 use vulkan_instance::VulkanInstance;
 use vulkano::{
+    format::Format,
     image::{view::ImageView, ImageUsage},
     pipeline::graphics::{subpass::PipelineRenderingCreateInfo, viewport::Viewport},
-    swapchain::{CompositeAlpha, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo},
+    swapchain::{
+        ColorSpace, CompositeAlpha, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
+    },
     sync::{self, GpuFuture},
     Validated, VulkanError,
 };
 use window_size_dependent_setup::window_size_dependent_setup;
 use winit::window::Window;
 
-use crate::{capture::Capture, mouse_guides::MouseGuides, pipelines, selection::Selection};
+use crate::{
+    capture::{self, Capture},
+    mouse_guides::MouseGuides,
+    pipelines,
+    selection::Selection,
+};
 
 pub struct Renderer {
     pub recreate_swapchain: bool,
@@ -46,12 +54,22 @@ impl Renderer {
                 .map_err(Error::GetSurfaceCapabilites)?;
 
             // Choosing the internal format that the images will have.
-            let image_format = vk
+            let (image_format, image_space) = vk
                 .device
                 .physical_device()
                 .surface_formats(&vk.surface, Default::default())
-                .map_err(Error::GetSurfaceFormats)?[0]
-                .0;
+                .map_err(Error::GetSurfaceFormats)?
+                .into_iter()
+                .min_by_key(|(format, color_space)| match format {
+                    Format::R16G16B16A16_SFLOAT => 0,
+                    _ => 1,
+                }
+				+
+				match color_space {
+                    ColorSpace::ExtendedSrgbLinear => 0,
+                    _ => 1,
+                }
+			).unwrap();
 
             let composite_alpha = surface_capabilities
                 .supported_composite_alpha
@@ -84,6 +102,7 @@ impl Renderer {
                 .expect("Device has no present modes");
 
             info!("Surface format: {:?}", image_format);
+            info!("Surface space: {:?}", image_space);
             info!("Swapchain images: {}", swapchain_image_count);
             info!("Present mode: {:?}", present_mode);
 
@@ -93,6 +112,7 @@ impl Renderer {
                 SwapchainCreateInfo {
                     min_image_count: swapchain_image_count,
                     image_format,
+                    image_color_space: image_space,
                     image_extent: window.inner_size().into(),
                     image_usage: ImageUsage::COLOR_ATTACHMENT,
                     composite_alpha,
@@ -131,8 +151,7 @@ impl Renderer {
             .map_err(|e| Error::Pipeline(e, "mouse guide"))?;
 
         // Objects
-        let capture =
-            Capture::new(vk, capture_pipeline).map_err(|e| Error::Object(e, "capture"))?;
+        let capture = Capture::new(vk, capture_pipeline)?;
 
         let selection = Selection::new(vk, selection_shading_pipeline, border_pipeline.clone())
             .map_err(|e| Error::Object(e, "selection"))?;
@@ -188,4 +207,7 @@ pub enum Error {
 
     #[error("Failed to create {1} render object:\n{0}")]
     Object(#[source] crate::vertex_index_buffer::Error, &'static str),
+
+    #[error("Failed to create capture render object:\n{0}")]
+    CaptureObject(#[from] capture::Error),
 }

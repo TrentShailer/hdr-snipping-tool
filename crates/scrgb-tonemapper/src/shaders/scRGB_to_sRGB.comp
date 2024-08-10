@@ -5,68 +5,31 @@
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
-layout(constant_id = 0) const float sdr_whitepoint = 3.5;
-layout(constant_id = 1) const float hdr_whitepoint = 6.25;
-layout(constant_id = 2) const float maximum = 12.5;
+layout(constant_id = 0) const float whitepoint = 3.5;
 
-layout(set = 0, binding = 0) buffer InputLayout
-{
-    float16_t input_buffer[];
-};
+layout(set = 0, binding = 0, rgba16f) uniform image2D input_image;
 layout(set = 0, binding = 1, rgba8) uniform image2D output_image;
-
-/// Helper functions
-
-const uint INDEX_OUT_OF_BOUNDS = 0xffffffff;
-uint get_1d_pixel_index(ivec2 pixel) {
-	ivec2 image_size = imageSize(output_image);
-
-	if (pixel.x > image_size.x || pixel.y > image_size.y) {
-		return INDEX_OUT_OF_BOUNDS;
-	}
-
-	uint pixel_index_1d = (pixel.y * image_size.x + pixel.x) * 4;
-	return pixel_index_1d;
-}
-
-vec4 get_pixel_color(uint index) {
-	float r = float(input_buffer[index]);
-	float g = float(input_buffer[index + 1]);
-	float b = float(input_buffer[index + 2]);
-	float a = float(input_buffer[index + 3]);
-
-	return vec4(r, g, b, a);
-}
 
 // Performs gamma correction to tonemap linear RGB to sRGB
 // From https://en.wikipedia.org/wiki/SRGB#Transformation
 float scRGB_to_sRGB(float value) {
 	float gamma_decode = 1.0 / 2.4;
 
-	float whitepoint = sdr_whitepoint;
-	if (maximum > sdr_whitepoint) {
-		whitepoint = hdr_whitepoint;
-	}
+	float clamped_value = clamp(value, 0.0, whitepoint);
+	float scaled_value = clamped_value / whitepoint;
 
-	float ratio = value / whitepoint;
-	if (ratio <= 0.0031308) {
-		return clamp(12.92 * ratio, 0.0, 1.0);
+	if (scaled_value <= 0.0031308) {
+		return clamp(12.92 * scaled_value, 0.0, 1.0);
 	}
 	else {
-		return clamp(1.055 * pow(ratio, gamma_decode) - 0.055, 0.0, 1.0);
+		return clamp(1.055 * pow(scaled_value, gamma_decode) - 0.055, 0.0, 1.0);
 	}
-
 }
 
 void main() {
 	ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
 
-	uint index = get_1d_pixel_index(pixel);
-	if (index == INDEX_OUT_OF_BOUNDS) {
-		return;
-	}
-
-	vec4 scRGB = get_pixel_color(index);
+	vec4 scRGB = imageLoad(input_image, pixel);
 
 	vec4 sRGB = vec4(
 		scRGB_to_sRGB(scRGB.r),

@@ -16,7 +16,7 @@ use logger::init_tracing;
 use report_error::report_app_error;
 use settings::Settings;
 use thiserror::Error;
-use tracing::{error, info, warn};
+use tracing::{error, info, info_span, warn};
 use windows::{
     Graphics::Capture::GraphicsCaptureSession,
     Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_ICONWARNING},
@@ -78,6 +78,12 @@ fn main() {
 }
 
 fn init() -> Result<(), AppError> {
+    let _span = if IS_DEV {
+        Some(info_span!("dev_build").entered())
+    } else {
+        None
+    };
+
     // Ensure no other instances of this app are running
     if !ensure_only_instance()? {
         warn!("Another instance is already running.");

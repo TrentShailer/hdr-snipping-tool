@@ -23,6 +23,8 @@ windows = { workspace = true, features = [
 ] }
 windows-result = { workspace = true }
 winit = { workspace = true, features = ["rwh_05", "rwh_06"] }
+vulkano = { workspace = true }
+half = { workspace = true }
 
 
 tracing-subscriber = "0.3"

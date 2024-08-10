@@ -7,6 +7,7 @@ use std::{
 use arboard::{Clipboard, ImageData};
 use chrono::Local;
 use image::{codecs::png::PngEncoder, GenericImageView, ImageBuffer, ImageError, Rgba};
+use scrgb_tonemapper::tonemap;
 use thiserror::Error;
 use tracing::info_span;
 use vulkan_instance::VulkanInstance;
@@ -18,24 +19,17 @@ use super::ActiveCapture;
 impl ActiveCapture {
     pub fn save(&mut self, vk: &VulkanInstance) -> Result<(), Error> {
         let _span = info_span!("ActiveCapture::save").entered();
+        let size = self.display.size;
+        let tonemapped_image = tonemap(vk, self.capture_image.clone(), size, self.whitepoint)?;
+        let raw_capture = tonemapped_image.copy_to_box(vk)?;
 
-        let raw_capture = self.tonemap_output.copy_to_box(vk)?;
         let raw_capture_len = raw_capture.len();
 
-        let img: ImageBuffer<Rgba<u8>, Box<[u8]>> = match ImageBuffer::from_raw(
-            self.tonemap_output.size[0],
-            self.tonemap_output.size[1],
-            raw_capture,
-        ) {
-            Some(img) => img,
-            None => {
-                return Err(Error::ImageBuffer(
-                    self.tonemap_output.size[0],
-                    self.tonemap_output.size[1],
-                    raw_capture_len,
-                ))
-            }
-        };
+        let img: ImageBuffer<Rgba<u8>, Box<[u8]>> =
+            match ImageBuffer::from_raw(size[0], size[1], raw_capture) {
+                Some(img) => img,
+                None => return Err(Error::ImageBuffer(size[0], size[1], raw_capture_len)),
+            };
 
         // Get selection view
         let (selection_pos, selection_size) = self.selection.as_pos_size();
@@ -72,6 +66,9 @@ impl ActiveCapture {
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Failed to tonemap capture:\n{0}")]
+    Tonemape(#[from] scrgb_tonemapper::Error),
+
     #[error("Failed to copy tonemap output to CPU:\n{0}")]
     BoxCopy(#[from] scrgb_tonemapper::tonemap_output::copy_to_box::Error),
 

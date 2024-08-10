@@ -6,11 +6,7 @@ use thiserror::Error;
 use tracing::info_span;
 use vulkano::{
     format::Format,
-    image::{
-        sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
-        view::ImageView,
-        AllocateImageError, Image, ImageCreateInfo, ImageType, ImageUsage,
-    },
+    image::{view::ImageView, AllocateImageError, Image, ImageCreateInfo, ImageType, ImageUsage},
     memory::allocator::AllocationCreateInfo,
     Validated, VulkanError,
 };
@@ -22,7 +18,6 @@ use crate::VulkanInstance;
 pub struct TonemapOutput {
     pub image: Arc<Image>,
     pub image_view: Arc<ImageView>,
-    pub sampler: Arc<Sampler>,
     pub size: [u32; 2],
 }
 
@@ -39,10 +34,7 @@ impl TonemapOutput {
                 image_type: ImageType::Dim2d,
                 format: Format::R8G8B8A8_UNORM,
                 extent,
-                usage: ImageUsage::TRANSFER_SRC
-                    | ImageUsage::TRANSFER_DST
-                    | ImageUsage::SAMPLED
-                    | ImageUsage::STORAGE,
+                usage: ImageUsage::TRANSFER_SRC | ImageUsage::TRANSFER_DST | ImageUsage::STORAGE,
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -50,21 +42,9 @@ impl TonemapOutput {
 
         let image_view = ImageView::new_default(image.clone()).map_err(Error::ImageView)?;
 
-        let sampler = Sampler::new(
-            vk.device.clone(),
-            SamplerCreateInfo {
-                mag_filter: Filter::Linear,
-                min_filter: Filter::Linear,
-                address_mode: [SamplerAddressMode::Repeat; 3],
-                ..Default::default()
-            },
-        )
-        .map_err(Error::Sampler)?;
-
         Ok(Self {
             image,
             image_view,
-            sampler,
             size,
         })
     }

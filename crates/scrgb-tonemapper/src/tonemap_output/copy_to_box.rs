@@ -19,7 +19,7 @@ impl TonemapOutput {
         let staging_buffer: Subbuffer<[u8]> = Buffer::new_slice(
             vk.allocators.memory.clone(),
             BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST,
+                usage: BufferUsage::TRANSFER_DST,
                 ..Default::default()
             },
             AllocationCreateInfo {

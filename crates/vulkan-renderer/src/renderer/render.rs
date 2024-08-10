@@ -97,7 +97,7 @@ impl Renderer {
             })?
             .set_viewport(0, [self.viewport.clone()].into_iter().collect())?;
 
-        if self.capture.capture.is_some() {
+        if self.capture.capture_ds.is_some() {
             self.capture
                 .render(&mut builder)
                 .map_err(|e| Error::Render(e, "capture"))?;

@@ -19,9 +19,11 @@ impl ActiveApp {
         let position: PhysicalPosition<i32> = active_capture.display.position.into();
         self.window.set_outer_position(position);
 
-        self.renderer
-            .capture
-            .load_capture(&self.vk, active_capture.tonemap_output.clone())?;
+        self.renderer.capture.load_capture(
+            &self.vk,
+            active_capture.capture_image.clone(),
+            active_capture.whitepoint,
+        )?;
 
         self.window.set_visible(true);
         self.window.focus_window();

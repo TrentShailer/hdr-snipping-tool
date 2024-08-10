@@ -1,13 +1,16 @@
+mod capture_image;
 pub mod save;
 pub mod selection;
 
 use std::sync::Arc;
 
-use scrgb_tonemapper::{tonemap, tonemap_output::TonemapOutput};
+use half::f16;
+use scrgb_tonemapper::maximum::{self, find_maximum};
 use selection::Selection;
 use thiserror::Error;
-use tracing::info_span;
+use tracing::{info, info_span};
 use vulkan_instance::VulkanInstance;
+use vulkano::image::view::ImageView;
 use windows::Win32::Foundation::HWND;
 use windows_capture_provider::{
     display_cache, get_capture::get_capture, hovered, DirectXDevices, Display, DisplayCache,
@@ -18,9 +21,10 @@ use crate::windows_helpers::foreground_window::get_foreground_window;
 
 pub struct ActiveCapture {
     pub display: Display,
-    pub tonemap_output: Arc<TonemapOutput>,
+    pub capture_image: Arc<ImageView>,
     pub selection: Selection,
     pub formerly_focused_window: HWND,
+    pub whitepoint: f32,
 }
 
 impl ActiveCapture {
@@ -50,7 +54,26 @@ impl ActiveCapture {
         };
 
         let capture = get_capture(dx, &display, capture_item)?;
-        let tonemap_output = Arc::new(tonemap(vk, &capture, hdr_whitepoint)?);
+        let capture_image = Self::image_from_capture(vk, &capture)?;
+
+        let maximum = find_maximum(vk, capture_image.clone(), display.size)?;
+        let maximum = if f16::from_bits(maximum.to_bits() - 1).to_f32()
+            == capture.display.sdr_referece_white
+        {
+            capture.display.sdr_referece_white
+        } else {
+            maximum.to_f32()
+        };
+
+        info!("Maximum: {:.2}", maximum);
+
+        let whitepoint = if maximum > display.sdr_referece_white {
+            hdr_whitepoint
+        } else {
+            display.sdr_referece_white
+        };
+
+        info!("Whitepoint: {:.2}", whitepoint);
 
         let selection = Selection::new(
             PhysicalPosition::new(0, 0),
@@ -62,7 +85,8 @@ impl ActiveCapture {
         Ok(Self {
             display,
             selection,
-            tonemap_output,
+            capture_image,
+            whitepoint,
             formerly_focused_window,
         })
     }
@@ -85,6 +109,9 @@ pub enum Error {
     #[error("Failed to get capture:\n{0}")]
     GetCapture(#[from] windows_capture_provider::get_capture::Error),
 
-    #[error("Failed to tonemap:\n{0}")]
-    Tonemap(#[from] scrgb_tonemapper::Error),
+    #[error("Failed to create capture image:\n{0}")]
+    CaptureImage(#[from] capture_image::Error),
+
+    #[error("Failed to find maximum capture luminance:\n{0}")]
+    Maximum(#[from] maximum::Error),
 }

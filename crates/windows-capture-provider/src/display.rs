@@ -24,11 +24,14 @@ pub struct Display {
 
     /// The display's SDR reference white.
     pub sdr_referece_white: f32,
+
+    /// The display's maximum HDR luminance.
+    pub hdr_luminance: f32,
 }
 
 impl Display {
     /// Create a new display.
-    pub fn new(handle: HMONITOR, rect: RECT, sdr_referece_white: f32) -> Self {
+    pub fn new(handle: HMONITOR, rect: RECT, sdr_referece_white: f32, hdr_luminance: f32) -> Self {
         let (position, size) = Self::position_size_from_rect(rect);
 
         Self {
@@ -36,6 +39,7 @@ impl Display {
             position,
             size,
             sdr_referece_white,
+            hdr_luminance,
         }
     }
 
@@ -81,8 +85,8 @@ impl std::fmt::Display for Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Display {{handle: {:?}, position: {:?}, size: {:?}, sdr_reference_white: {:?}}}",
-            self.handle, self.position, self.size, self.sdr_referece_white
+            "Display {{handle: {:?}, position: {:?}, size: {:?}, sdr_reference_white: {:?}, hdr_luminance: {:?}}}",
+            self.handle, self.position, self.size, self.sdr_referece_white, self.hdr_luminance
         )
     }
 }

@@ -32,6 +32,7 @@ pub fn get_displays(devices: &DirectXDevices) -> Result<Box<[Display]>, Error> {
                 descriptor.Monitor,
                 descriptor.DesktopCoordinates,
                 config.sdr_reference_white,
+                descriptor.MaxLuminance,
             );
 
             info!("{}", found_display);
