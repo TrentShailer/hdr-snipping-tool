@@ -3,16 +3,28 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.dependencies]
+thiserror = "1.0"
+tracing = "0.1"
+
 half = { version = "2.4" }
 smallvec = "1.13"
-thiserror = "1.0"
+
 vulkano = { version = "0.34" }
 vulkano-shaders = { version = "0.34" }
+
 windows = { version = "0.58" }
 windows-core = { version = "0.58" }
 windows-result = { version = "0.2" }
-winit = { version = "0.30", default-features = false }
-tracing = "0.1"
+
+winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
+raw-window-handle = "0.6"
+
+ash = { version = "0.38.0", default-features = false, features = [
+	"debug",
+	"std",
+	"loaded",
+] }
+ash-window = { version = "0.13.0" }
 
 vulkan-instance = { path = "crates/vulkan-instance" }
 vulkan-renderer = { path = "crates/vulkan-renderer" }

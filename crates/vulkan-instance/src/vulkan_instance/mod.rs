@@ -1,77 +1,107 @@
-mod aquire_instance;
+mod debug;
+mod drop;
+mod instance;
 mod logical_device;
-mod physical_device;
-mod requirements;
+pub(crate) mod physical_device;
 
 use std::sync::Arc;
 
+use ash::{
+    khr::surface,
+    vk::{self},
+    Entry, LoadingError,
+};
+use debug::setup_debug;
+use instance::aquire_instance;
 use logical_device::get_logical_device;
 use physical_device::get_physical_device;
 use thiserror::Error;
 use tracing::{info, info_span};
-use vulkano::{swapchain::Surface, Validated, VulkanError};
-use winit::{event_loop::ActiveEventLoop, window::Window};
+use winit::{
+    raw_window_handle::{HandleError, HasDisplayHandle, HasWindowHandle},
+    window::Window,
+};
 
-use crate::{allocators::Allocators, VulkanInstance};
+use crate::VulkanInstance;
 
 impl VulkanInstance {
-    pub fn new(window: Arc<Window>, event_loop: &ActiveEventLoop) -> Result<Self, Error> {
+    pub fn new(window: Arc<Window>, debug: bool) -> Result<Self, Error> {
         let _span = info_span!("VulkanInstance::new").entered();
 
-        let instance = aquire_instance::aquire_instance(event_loop)?;
-        info!("API v{:?}", instance.api_version());
+        // Load vk library
+        let entry = unsafe { Entry::load()? };
 
-        let surface =
-            Surface::from_window(instance.clone(), window.clone()).map_err(Error::NewSurface)?;
-
-        let (physical_device, queue_family_index, feature_extensions) =
-            get_physical_device(instance.clone(), surface.clone())?;
-
+        // api_version
         {
-            info!(
-                "{} ({:?})",
-                physical_device.properties().device_name,
-                physical_device.properties().device_type
-            );
+            let api_version = unsafe { entry.try_enumerate_instance_version() }
+                .map_err(|e| Error::Vulkan(e, "enumerating instance version"))?
+                .unwrap_or(vk::make_api_version(0, 1, 0, 0));
 
-            info!("Queue family: {}", queue_family_index);
-            info!("Feature extensions: {:?}", feature_extensions);
+            let major = vk::api_version_major(api_version);
+            let minor = vk::api_version_minor(api_version);
+            let patch = vk::api_version_patch(api_version);
+
+            // min-supported api version: 1.3.x
+            if major != 1 || minor < 3 {
+                return Err(Error::UnsupportedVulkanVersion(major, minor, patch));
+            }
+            info!("Vulkan API v{major}.{minor}.{patch}");
         }
 
-        let (device, mut queues) = get_logical_device(
-            physical_device.clone(),
-            queue_family_index,
-            feature_extensions,
-        )
-        .map_err(Error::LogicalDevice)?;
+        let instance = aquire_instance(&entry, window.clone(), debug)?;
 
-        let allocators = Arc::new(Allocators::new(device.clone()));
+        let (debug_utils_loader, debug_messenger) = setup_debug(&entry, &instance)?;
 
-        let queue = queues.next().unwrap();
-
-        let vk = Self {
-            allocators,
-            physical_device,
-            device,
-            queue,
-            surface,
+        let surface = unsafe {
+            ash_window::create_surface(
+                &entry,
+                &instance,
+                window.display_handle()?.as_raw(),
+                window.window_handle()?.as_raw(),
+                None,
+            )
+            .map_err(|e| Error::Vulkan(e, "creating surface"))?
         };
+        let surface_loader = surface::Instance::new(&entry, &instance);
 
-        Ok(vk)
+        let (physical_device, queue_family_index) =
+            get_physical_device(&instance, surface, &surface_loader)?;
+
+        let (device, queue) = get_logical_device(&instance, physical_device, queue_family_index)?;
+
+        Ok(Self {
+            entry,
+            instance,
+            //
+            device,
+            physical_device,
+            //
+            queue,
+            queue_family_index,
+            //
+            surface_loader,
+            surface,
+            //
+            debug_utils_loader,
+            debug_messenger,
+        })
     }
 }
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to aquire vulkan instance:\n{0}")]
-    AquireInstance(#[from] aquire_instance::Error),
+    #[error("Failed to load vulkan library:\n{0}")]
+    Entry(#[from] LoadingError),
 
-    #[error("Failed to create surface:\n{0:?}")]
-    NewSurface(#[source] Validated<VulkanError>),
+    #[error("Failed to get window/display handle:\n{0}")]
+    Handle(#[from] HandleError),
 
-    #[error("Failed to find suitable physical device:\n{0}")]
-    PhysicalDevice(#[from] physical_device::Error),
+    #[error("Vulkan error while {1}:\n{0}")]
+    Vulkan(#[source] vk::Result, &'static str),
 
-    #[error("Failed to create logical device:\n{0:?}")]
-    LogicalDevice(#[source] Validated<VulkanError>),
+    #[error("Vulkan api version {0}.{1}.{2} is unsupported, only v1.3.x is supported.")]
+    UnsupportedVulkanVersion(u32, u32, u32),
+
+    #[error("No suitable devices")]
+    NoSuitableDevices,
 }

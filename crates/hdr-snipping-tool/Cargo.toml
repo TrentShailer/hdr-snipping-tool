@@ -22,7 +22,7 @@ windows = { workspace = true, features = [
 	"Win32_UI_WindowsAndMessaging",
 ] }
 windows-result = { workspace = true }
-winit = { workspace = true, features = ["rwh_05", "rwh_06"] }
+winit = { workspace = true }
 vulkano = { workspace = true }
 half = { workspace = true }
 
