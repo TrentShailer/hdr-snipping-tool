@@ -10,5 +10,5 @@ windows-capture-provider = { workspace = true }
 half = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
-vulkano = { workspace = true }
-vulkano-shaders = { workspace = true }
+ash = { workspace = true }
+smallvec = { workspace = true }

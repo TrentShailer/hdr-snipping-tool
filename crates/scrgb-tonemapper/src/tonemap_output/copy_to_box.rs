@@ -1,57 +1,156 @@
-use thiserror::Error;
-use vulkano::{
-    buffer::{AllocateBufferError, Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage, CopyImageToBufferInfo,
-    },
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
-    sync::{self, GpuFuture, HostAccessError},
-    Validated, ValidationError, VulkanError,
+use ash::vk::{
+    self, AccessFlags2, BufferCreateInfo, BufferImageCopy2, BufferUsageFlags,
+    CopyImageToBufferInfo2, DependencyFlags, DependencyInfo, Extent2D, ImageAspectFlags,
+    ImageLayout, ImageMemoryBarrier2, ImageSubresourceLayers, ImageSubresourceRange,
+    MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, Offset3D, PipelineStageFlags2,
+    SharingMode, QUEUE_FAMILY_IGNORED, WHOLE_SIZE,
 };
-
-use crate::VulkanInstance;
+use smallvec::{smallvec, SmallVec};
+use thiserror::Error;
+use vulkan_instance::{CommandBufferUsage, VulkanInstance};
 
 use super::TonemapOutput;
 
 impl TonemapOutput {
     /// Copies the contents of the image to a box.
     pub fn copy_to_box(&self, vk: &VulkanInstance) -> Result<Box<[u8]>, Error> {
-        let staging_buffer: Subbuffer<[u8]> = Buffer::new_slice(
-            vk.allocators.memory.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_DST,
+        let data_length = self.size[0] as u64 * self.size[1] as u64 * 4;
+        let (staging_buffer, staging_buffer_memory) = unsafe {
+            let buffer_create_info = BufferCreateInfo {
+                size: data_length,
+                usage: BufferUsageFlags::TRANSFER_DST,
+                sharing_mode: SharingMode::EXCLUSIVE,
                 ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST
-                    | MemoryTypeFilter::HOST_RANDOM_ACCESS,
+            };
+
+            let staging_buffer = vk
+                .device
+                .create_buffer(&buffer_create_info, None)
+                .map_err(|e| Error::Vulkan(e, "creating staging buffer"))?;
+
+            let staging_buffer_memory_requirements =
+                vk.device.get_buffer_memory_requirements(staging_buffer);
+
+            let staging_buffer_memory_index = vk
+                .find_memorytype_index(
+                    &staging_buffer_memory_requirements,
+                    MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+                )
+                .ok_or(Error::NoSuitableMemoryType)?;
+
+            let staging_buffer_allocate_info = MemoryAllocateInfo {
+                allocation_size: staging_buffer_memory_requirements.size,
+                memory_type_index: staging_buffer_memory_index,
                 ..Default::default()
+            };
+
+            let staging_buffer_memory = vk
+                .device
+                .allocate_memory(&staging_buffer_allocate_info, None)
+                .map_err(|e| Error::Vulkan(e, "allocating staging buffer"))?;
+
+            vk.device
+                .bind_buffer_memory(staging_buffer, staging_buffer_memory, 0)
+                .map_err(|e| Error::Vulkan(e, "binding staging memory"))?;
+
+            (staging_buffer, staging_buffer_memory)
+        };
+
+        vk.record_submit_command_buffer(
+            CommandBufferUsage::Setup,
+            &[],
+            &[],
+            |device, command_buffer| {
+                let subresource_range = ImageSubresourceRange {
+                    aspect_mask: ImageAspectFlags::COLOR,
+                    base_mip_level: 1,
+                    level_count: 1,
+                    base_array_layer: 1,
+                    layer_count: 1,
+                };
+
+                let memory_barrier = ImageMemoryBarrier2 {
+                    src_stage_mask: PipelineStageFlags2::NONE,
+                    src_access_mask: AccessFlags2::NONE,
+                    dst_stage_mask: PipelineStageFlags2::TRANSFER,
+                    dst_access_mask: AccessFlags2::MEMORY_READ,
+                    old_layout: ImageLayout::GENERAL,
+                    new_layout: ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    src_queue_family_index: QUEUE_FAMILY_IGNORED,
+                    dst_queue_family_index: QUEUE_FAMILY_IGNORED,
+                    image: self.image,
+                    subresource_range,
+                    ..Default::default()
+                };
+                let image_barriers: SmallVec<[_; 1]> = smallvec![memory_barrier];
+
+                let dependency_info = DependencyInfo {
+                    dependency_flags: DependencyFlags::BY_REGION,
+                    memory_barrier_count: 0,
+                    p_memory_barriers: std::ptr::null(),
+                    buffer_memory_barrier_count: 0,
+                    p_buffer_memory_barriers: std::ptr::null(),
+                    image_memory_barrier_count: 1,
+                    p_image_memory_barriers: image_barriers.as_ptr(),
+                    ..Default::default()
+                };
+
+                unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
+
+                let extent = Extent2D {
+                    width: self.size[0],
+                    height: self.size[1],
+                };
+                let image_subresource = ImageSubresourceLayers {
+                    aspect_mask: ImageAspectFlags::COLOR,
+                    mip_level: 1,
+                    base_array_layer: 1,
+                    layer_count: 1,
+                };
+                let copy_regions = BufferImageCopy2 {
+                    buffer_offset: 0,
+                    buffer_row_length: self.size[0],
+                    buffer_image_height: self.size[1],
+                    image_subresource,
+                    image_offset: Offset3D::default(),
+                    image_extent: extent.into(),
+                    ..Default::default()
+                };
+                let regions: SmallVec<[_; 1]> = smallvec![copy_regions];
+                let image_copy_info = CopyImageToBufferInfo2 {
+                    src_image: self.image,
+                    src_image_layout: ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    dst_buffer: staging_buffer,
+                    region_count: 1,
+                    p_regions: regions.as_ptr(),
+                    ..Default::default()
+                };
+                unsafe { device.cmd_copy_image_to_buffer2(command_buffer, &image_copy_info) };
             },
-            self.size[0] as u64 * self.size[1] as u64 * 4,
         )?;
 
-        let mut builder = AutoCommandBufferBuilder::primary(
-            &vk.allocators.command,
-            vk.queue.queue_family_index(),
-            CommandBufferUsage::OneTimeSubmit,
-        )
-        .map_err(Error::CreateCommandBuffer)?;
+        // Map memory
+        let memory_ptr = unsafe {
+            vk.device.map_memory(
+                staging_buffer_memory,
+                0,
+                WHOLE_SIZE,
+                MemoryMapFlags::empty(),
+            )
+        }
+        .map_err(|e| Error::Vulkan(e, "mapping staging buffer memory"))?;
 
-        builder
-            .copy_image_to_buffer(CopyImageToBufferInfo::image_buffer(
-                self.image.clone(),
-                staging_buffer.clone(),
-            ))
-            .map_err(Error::CopyImageToBuffer)?;
+        // Readback memory
+        let data: &[u8] =
+            unsafe { std::slice::from_raw_parts(memory_ptr.cast(), data_length as usize) };
+        let data_box = Box::from(data);
 
-        let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
-        let future = sync::now(vk.device.clone())
-            .then_execute(vk.queue.clone(), command_buffer)?
-            .then_signal_fence_and_flush()
-            .map_err(Error::SignalFence)?;
-        future.wait(None).map_err(Error::WaitFuture)?;
-
-        let data_box = staging_buffer.read()?[..].to_owned().into_boxed_slice();
+        // unmap memory and cleanup
+        unsafe {
+            vk.device.unmap_memory(staging_buffer_memory);
+            vk.device.free_memory(staging_buffer_memory, None);
+            vk.device.destroy_buffer(staging_buffer, None);
+        }
 
         Ok(data_box)
     }
@@ -59,27 +158,12 @@ impl TonemapOutput {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to create buffer:\n{0:?}")]
-    CreateBuffer(#[from] Validated<AllocateBufferError>),
+    #[error("Encountered vulkan error while {1}:\n{0}")]
+    Vulkan(#[source] vk::Result, &'static str),
 
-    #[error("Failed to create command buffer:\n{0:?}")]
-    CreateCommandBuffer(#[source] Validated<VulkanError>),
+    #[error("No suitable memory types are available for the allocation")]
+    NoSuitableMemoryType,
 
-    #[error("Failed to build command buffer:\n{0:?}")]
-    BuildCommandBuffer(#[source] Validated<VulkanError>),
-
-    #[error("Failed to copy image to staging buffer:\n{0}")]
-    CopyImageToBuffer(#[source] Box<ValidationError>),
-
-    #[error("Failed to signal fence and flush:\n{0:?}")]
-    SignalFence(#[source] Validated<VulkanError>),
-
-    #[error("Failed to wait for future:\n{0:?}")]
-    WaitFuture(#[source] Validated<VulkanError>),
-
-    #[error("Failed to read from staging buffer:\n{0}")]
-    ReadStaging(#[from] HostAccessError),
-
-    #[error("Failed to execute command buffer:\n{0}")]
-    ExecuteCommandBuffer(#[from] CommandBufferExecError),
+    #[error("Failed to record and submit command buffer:\n{0}")]
+    RecordCommandBuffer(#[from] vulkan_instance::record_submit_command_buffer::Error),
 }

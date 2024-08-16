@@ -1,8 +1,11 @@
+mod command_buffer;
 mod debug;
 mod drop;
+mod fences;
 mod instance;
 mod logical_device;
 pub(crate) mod physical_device;
+mod semaphores;
 
 use std::sync::Arc;
 
@@ -11,10 +14,13 @@ use ash::{
     vk::{self},
     Entry, LoadingError,
 };
+use command_buffer::get_command_buffers;
 use debug::setup_debug;
+use fences::get_fences;
 use instance::aquire_instance;
 use logical_device::get_logical_device;
 use physical_device::get_physical_device;
+use semaphores::get_semaphpores;
 use thiserror::Error;
 use tracing::{info, info_span};
 use winit::{
@@ -68,6 +74,14 @@ impl VulkanInstance {
             get_physical_device(&instance, surface, &surface_loader)?;
 
         let (device, queue) = get_logical_device(&instance, physical_device, queue_family_index)?;
+        let device = Arc::new(device);
+
+        let (command_pool, command_buffers) =
+            get_command_buffers(device.clone(), queue_family_index)?;
+
+        let fences = get_fences(device.clone())?;
+
+        let semaphores = get_semaphpores(device.clone())?;
 
         Ok(Self {
             entry,
@@ -81,6 +95,11 @@ impl VulkanInstance {
             //
             surface_loader,
             surface,
+            //
+            command_buffer_pool: command_pool,
+            command_buffers,
+            fences,
+            semaphores,
             //
             debug_utils_loader,
             debug_messenger,

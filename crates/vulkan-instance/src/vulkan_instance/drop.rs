@@ -4,10 +4,25 @@ impl Drop for VulkanInstance {
     fn drop(&mut self) {
         unsafe {
             self.device.device_wait_idle().unwrap();
+
+            for semaphore in self.semaphores.values() {
+                self.device.destroy_semaphore(*semaphore, None);
+            }
+
+            for fence in self.fences.values() {
+                self.device.destroy_fence(*fence, None);
+            }
+
+            self.device
+                .destroy_command_pool(self.command_buffer_pool, None);
+
             self.device.destroy_device(None);
+
             self.surface_loader.destroy_surface(self.surface, None);
+
             self.debug_utils_loader
                 .destroy_debug_utils_messenger(self.debug_messenger, None);
+
             self.instance.destroy_instance(None);
         }
     }

@@ -3,31 +3,11 @@ pub mod tonemap_output;
 
 use std::{fmt::Debug, sync::Arc};
 
+use ash::vk::ImageView;
 use thiserror::Error;
 use tonemap_output::TonemapOutput;
 use tracing::info_span;
-use vulkan_instance::{
-    copy_buffer::{self},
-    VulkanInstance,
-};
-
-use vulkano::{
-    buffer::AllocateBufferError,
-    command_buffer::{AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage},
-    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
-    image::view::ImageView,
-    pipeline::{
-        compute::ComputePipelineCreateInfo,
-        layout::{IntoPipelineLayoutCreateInfoError, PipelineDescriptorSetLayoutCreateInfo},
-        ComputePipeline, Pipeline, PipelineLayout, PipelineShaderStageCreateInfo,
-    },
-    sync::{self, GpuFuture, HostAccessError},
-    Validated, ValidationError, VulkanError,
-};
-
-mod shader {
-    vulkano_shaders::shader! {ty: "compute", bytes: "src/shaders/scRGB_to_sRGB.spv"}
-}
+use vulkan_instance::VulkanInstance;
 
 /// Tonemaps a capture from the scRGB colorspace into the sRGB colorspace.\
 /// Returns a vulkan image containing the capture.
@@ -122,51 +102,9 @@ pub fn tonemap(
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to allocate buffer:\n{0:?}")]
-    AllocateBuffer(#[from] Validated<AllocateBufferError>),
+    #[error("Encountered vulkan error while {1}:\n{0}")]
+    Vulkan(#[source] vk::Result, &'static str),
 
-    #[error("Failed to access buffer:\n{0:?}")]
-    BufferAccess(#[from] HostAccessError),
-
-    #[error("Failed to copy buffer:\n{0}")]
-    CopyBuffer(#[from] copy_buffer::Error),
-
-    #[error("Failed to load shader:\n{0:?}")]
-    LoadShader(#[source] Validated<VulkanError>),
-
-    #[error("Failed to specialize shader:\n{0:?}")]
-    Specialize(#[source] Box<ValidationError>),
-
-    #[error("Failed to create pipeline layout info:\n{0:?}")]
-    CreatePipelineLayoutInfo(#[from] IntoPipelineLayoutCreateInfoError),
-
-    #[error("Failed to create pipeline layout:\n{0:?}")]
-    CreatePipelineLayout(#[source] Validated<VulkanError>),
-
-    #[error("Failed to create pipline:\n{0:?}")]
-    CreatePipeline(#[source] Validated<VulkanError>),
-
-    #[error("Failed to create descriptor set:\n{0:?}")]
-    Descriptor(#[source] Validated<VulkanError>),
-
-    #[error("Failed to create tonemap output image:\n{0}")]
-    TonemapOutput(#[from] tonemap_output::Error),
-
-    #[error("Failed to create command buffer:\n{0:?}")]
-    CreateCommandBuffer(#[source] Validated<VulkanError>),
-
-    #[error("Failed to write to command buffer:\n{0}")]
-    WriteCommandBuffer(#[from] Box<ValidationError>),
-
-    #[error("Failed to build command buffer:\n{0:?}")]
-    BuildCommandBuffer(#[source] Validated<VulkanError>),
-
-    #[error("Failed to execute command buffer:\n{0}")]
-    ExecCommandBuffer(#[from] CommandBufferExecError),
-
-    #[error("Failed to signal fence and flush:\n{0:?}")]
-    SignalFenceAndFlush(#[source] Validated<VulkanError>),
-
-    #[error("Failed to await fence:\n{0:?}")]
-    AwaitFence(#[source] Validated<VulkanError>),
+    #[error("No suitable memory types are available for the allocation")]
+    NoSuitableMemoryType,
 }
