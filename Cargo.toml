@@ -30,3 +30,5 @@ vulkan-instance = { path = "crates/vulkan-instance" }
 vulkan-renderer = { path = "crates/vulkan-renderer" }
 scrgb-tonemapper = { path = "crates/scrgb-tonemapper" }
 windows-capture-provider = { path = "crates/windows-capture-provider" }
+
+test-helper = { path = "crates/test-helper" }

@@ -1,0 +1,10 @@
+[package]
+name = "test-helper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+winit = { workspace = true }
+tracing-subscriber = "0.3"
+tracing-appender = "0.2"
+tracing = { workspace = true }
