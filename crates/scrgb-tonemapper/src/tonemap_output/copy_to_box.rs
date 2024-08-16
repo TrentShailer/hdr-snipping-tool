@@ -1,3 +1,5 @@
+use std::u64;
+
 use ash::vk::{
     self, AccessFlags2, BufferCreateInfo, BufferImageCopy2, BufferUsageFlags,
     CopyImageToBufferInfo2, DependencyFlags, DependencyInfo, Extent2D, ImageAspectFlags,
@@ -23,37 +25,36 @@ impl TonemapOutput {
                 ..Default::default()
             };
 
-            let staging_buffer = vk
+            let buffer = vk
                 .device
                 .create_buffer(&buffer_create_info, None)
                 .map_err(|e| Error::Vulkan(e, "creating staging buffer"))?;
 
-            let staging_buffer_memory_requirements =
-                vk.device.get_buffer_memory_requirements(staging_buffer);
+            let memory_requirements = vk.device.get_buffer_memory_requirements(buffer);
 
-            let staging_buffer_memory_index = vk
+            let memory_index = vk
                 .find_memorytype_index(
-                    &staging_buffer_memory_requirements,
+                    &memory_requirements,
                     MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
                 )
                 .ok_or(Error::NoSuitableMemoryType)?;
 
-            let staging_buffer_allocate_info = MemoryAllocateInfo {
-                allocation_size: staging_buffer_memory_requirements.size,
-                memory_type_index: staging_buffer_memory_index,
+            let allocate_info = MemoryAllocateInfo {
+                allocation_size: memory_requirements.size,
+                memory_type_index: memory_index,
                 ..Default::default()
             };
 
-            let staging_buffer_memory = vk
+            let memory = vk
                 .device
-                .allocate_memory(&staging_buffer_allocate_info, None)
+                .allocate_memory(&allocate_info, None)
                 .map_err(|e| Error::Vulkan(e, "allocating staging buffer"))?;
 
             vk.device
-                .bind_buffer_memory(staging_buffer, staging_buffer_memory, 0)
+                .bind_buffer_memory(buffer, memory, 0)
                 .map_err(|e| Error::Vulkan(e, "binding staging memory"))?;
 
-            (staging_buffer, staging_buffer_memory)
+            (buffer, memory)
         };
 
         vk.record_submit_command_buffer(
@@ -129,6 +130,15 @@ impl TonemapOutput {
             },
         )?;
 
+        unsafe {
+            vk.device.wait_for_fences(
+                &[*vk.fences.get(&CommandBufferUsage::Setup).unwrap()],
+                true,
+                u64::MAX,
+            )
+        }
+        .map_err(|e| Error::Vulkan(e, "waiting for fence"))?;
+
         // Map memory
         let memory_ptr = unsafe {
             vk.device.map_memory(
@@ -148,8 +158,8 @@ impl TonemapOutput {
         // unmap memory and cleanup
         unsafe {
             vk.device.unmap_memory(staging_buffer_memory);
-            vk.device.free_memory(staging_buffer_memory, None);
             vk.device.destroy_buffer(staging_buffer, None);
+            vk.device.free_memory(staging_buffer_memory, None);
         }
 
         Ok(data_box)
