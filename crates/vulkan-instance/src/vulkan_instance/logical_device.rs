@@ -3,7 +3,7 @@ use ash::{
         self, PhysicalDevice, PhysicalDevice16BitStorageFeatures,
         PhysicalDeviceDynamicRenderingFeatures, PhysicalDeviceFeatures2,
         PhysicalDeviceShaderFloat16Int8Features, PhysicalDeviceShaderSubgroupExtendedTypesFeatures,
-        Queue,
+        PhysicalDeviceSynchronization2Features, Queue,
     },
     Device, Instance,
 };
@@ -40,11 +40,15 @@ pub fn get_logical_device(
     let mut dynamic_rendering =
         PhysicalDeviceDynamicRenderingFeatures::default().dynamic_rendering(true);
 
+    let mut synchronization2 =
+        PhysicalDeviceSynchronization2Features::default().synchronization2(true);
+
     let mut device_features = PhysicalDeviceFeatures2::default()
         .push_next(&mut shader_float16)
         .push_next(&mut storage_16_bit_access)
         .push_next(&mut subgroup_extended_types)
-        .push_next(&mut dynamic_rendering);
+        .push_next(&mut dynamic_rendering)
+        .push_next(&mut synchronization2);
 
     // end required features
 

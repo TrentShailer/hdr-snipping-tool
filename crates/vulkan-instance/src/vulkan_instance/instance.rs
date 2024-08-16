@@ -36,7 +36,7 @@ pub fn aquire_instance(entry: &Entry, window: Arc<Window>, debug: bool) -> Resul
     let app_info = ApplicationInfo::default()
         .application_name(APP_NAME)
         .application_version(0)
-        .api_version(vk::make_api_version(0, 1, 0, 0));
+        .api_version(vk::make_api_version(0, 1, 3, 0));
 
     let create_info = InstanceCreateInfo::default()
         .application_info(&app_info)

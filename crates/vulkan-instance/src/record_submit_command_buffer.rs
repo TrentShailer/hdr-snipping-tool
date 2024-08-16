@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use ash::{
-    vk::{
-        self, CommandBufferSubmitInfo, PipelineStageFlags2, SemaphoreSignalInfo,
-        SemaphoreSubmitInfo, SubmitFlags,
-    },
+    vk::{self, CommandBufferSubmitInfo, PipelineStageFlags2, SemaphoreSubmitInfo, SubmitFlags},
     Device,
 };
 use smallvec::{smallvec, SmallVec};

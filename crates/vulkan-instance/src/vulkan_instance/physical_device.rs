@@ -6,7 +6,7 @@ use ash::{
         self, PhysicalDevice, PhysicalDevice16BitStorageFeatures,
         PhysicalDeviceDynamicRenderingFeatures, PhysicalDeviceFeatures2,
         PhysicalDeviceShaderFloat16Int8Features, PhysicalDeviceShaderSubgroupExtendedTypesFeatures,
-        SurfaceKHR,
+        PhysicalDeviceSynchronization2Features, SurfaceKHR,
     },
     Instance,
 };
@@ -96,6 +96,7 @@ fn supports_required_extensions(instance: &Instance, device: PhysicalDevice) -> 
 }
 
 fn supports_required_features(instance: &Instance, device: PhysicalDevice) -> bool {
+    let mut synchronization2 = PhysicalDeviceSynchronization2Features::default();
     let mut shader_float16 = PhysicalDeviceShaderFloat16Int8Features::default();
     let mut storage_16_bit_access = PhysicalDevice16BitStorageFeatures::default();
     let mut subgroup_extended_types = PhysicalDeviceShaderSubgroupExtendedTypesFeatures::default();
@@ -105,7 +106,8 @@ fn supports_required_features(instance: &Instance, device: PhysicalDevice) -> bo
         .push_next(&mut shader_float16)
         .push_next(&mut storage_16_bit_access)
         .push_next(&mut subgroup_extended_types)
-        .push_next(&mut dynamic_rendering);
+        .push_next(&mut dynamic_rendering)
+        .push_next(&mut synchronization2);
 
     unsafe { instance.get_physical_device_features2(device, &mut device_features) };
 
@@ -114,6 +116,7 @@ fn supports_required_features(instance: &Instance, device: PhysicalDevice) -> bo
         && storage_16_bit_access.uniform_and_storage_buffer16_bit_access == vk::TRUE
         && subgroup_extended_types.shader_subgroup_extended_types == vk::TRUE
         && dynamic_rendering.dynamic_rendering == vk::TRUE
+        && synchronization2.synchronization2 == vk::TRUE
 }
 
 fn find_valid_queue(
