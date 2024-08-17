@@ -1,14 +1,8 @@
-use std::{
-    sync::{
-        mpsc::{channel, Receiver},
-        Arc,
-    },
-    thread::{self, JoinHandle},
-};
+use std::sync::{mpsc::Receiver, Arc};
 
 use winit::{platform::run_on_demand::EventLoopExtRunOnDemand, window::Window};
 
-use crate::winit::{create_event_loop, create_window, App};
+use crate::winit::{create_event_loop, App};
 
 pub fn get_window<F: Fn(Arc<Window>)>(callback: F, close_receiver: Receiver<()>) {
     let mut app = App {

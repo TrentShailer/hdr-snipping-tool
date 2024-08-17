@@ -8,3 +8,7 @@ winit = { workspace = true }
 tracing-subscriber = "0.3"
 tracing-appender = "0.2"
 tracing = { workspace = true }
+
+ash = { workspace = true }
+vulkan-instance = { workspace = true }
+half = { workspace = true }
