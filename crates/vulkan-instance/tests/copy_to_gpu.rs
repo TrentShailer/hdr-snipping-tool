@@ -7,11 +7,11 @@ use ash::{
     util::Align,
     vk::{
         AccessFlags2, BufferCopy2, BufferCreateInfo, BufferMemoryBarrier2, BufferUsageFlags,
-        CopyBufferInfo2, DependencyFlags, DependencyInfo, MemoryAllocateInfo, MemoryMapFlags,
-        MemoryPropertyFlags, PipelineStageFlags2, SharingMode, QUEUE_FAMILY_IGNORED,
+        CopyBufferInfo2, DependencyInfo, MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags,
+        PipelineStageFlags2, SharingMode, QUEUE_FAMILY_IGNORED,
     },
 };
-use smallvec::{smallvec, SmallVec};
+
 use test_helper::{get_window::get_window, logger::init_logger};
 use vulkan_instance::{CommandBufferUsage, VulkanInstance};
 use winit::window::Window;
@@ -123,18 +123,9 @@ fn copy_to_gpu_inner(window: Arc<Window>) {
                 size: 1024,
                 ..Default::default()
             };
+            let memory_barriers = &[memory_barrier];
 
-            let buffer_barriers: SmallVec<[_; 1]> = smallvec![memory_barrier];
-            let dependency_info = DependencyInfo {
-                dependency_flags: DependencyFlags::BY_REGION,
-                memory_barrier_count: 0,
-                p_memory_barriers: std::ptr::null(),
-                buffer_memory_barrier_count: 1,
-                p_buffer_memory_barriers: buffer_barriers.as_ptr(),
-                image_memory_barrier_count: 0,
-                p_image_memory_barriers: std::ptr::null(),
-                ..Default::default()
-            };
+            let dependency_info = DependencyInfo::default().buffer_memory_barriers(memory_barriers);
 
             unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
 
@@ -145,15 +136,12 @@ fn copy_to_gpu_inner(window: Arc<Window>) {
                 size: 1024,
                 ..Default::default()
             };
-            let buffer_copy_regions: SmallVec<[_; 1]> = smallvec![buffer_copy];
+            let buffer_copy_regions = &[buffer_copy];
 
-            let buffer_copy_info = CopyBufferInfo2 {
-                src_buffer: staging_buffer,
-                dst_buffer: gpu_buffer,
-                region_count: 1,
-                p_regions: buffer_copy_regions.as_ptr(),
-                ..Default::default()
-            };
+            let buffer_copy_info = CopyBufferInfo2::default()
+                .src_buffer(staging_buffer)
+                .dst_buffer(gpu_buffer)
+                .regions(buffer_copy_regions);
 
             unsafe { device.cmd_copy_buffer2(command_buffer, &buffer_copy_info) }
         },

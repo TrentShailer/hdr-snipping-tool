@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ash::{
-    vk::{self, CommandBufferSubmitInfo, PipelineStageFlags2, SemaphoreSubmitInfo, SubmitFlags},
+    vk::{self, CommandBufferSubmitInfo, PipelineStageFlags2, SemaphoreSubmitInfo},
     Device,
 };
 use smallvec::{smallvec, SmallVec};
@@ -51,12 +51,9 @@ impl VulkanInstance {
 
             // Submission:
 
-            let command_buffer_submit_info = CommandBufferSubmitInfo {
-                command_buffer,
-                device_mask: 0,
-                ..Default::default()
-            };
-            let command_buffers: SmallVec<[_; 1]> = smallvec![command_buffer_submit_info];
+            let command_buffer_submit_info =
+                CommandBufferSubmitInfo::default().command_buffer(command_buffer);
+            let command_buffer_submit_infos = &[command_buffer_submit_info];
 
             let mut wait_semaphore_infos: SmallVec<[SemaphoreSubmitInfo; 4]> = smallvec![];
             for semaphore in wait_semaphores {
@@ -79,16 +76,10 @@ impl VulkanInstance {
                 signal_semaphore_infos.push(signal_semaphore_info);
             }
 
-            let submit_info = vk::SubmitInfo2 {
-                flags: SubmitFlags::empty(),
-                wait_semaphore_info_count: wait_semaphore_infos.len() as u32,
-                p_wait_semaphore_infos: wait_semaphore_infos.as_ptr(),
-                command_buffer_info_count: 1,
-                p_command_buffer_infos: command_buffers.as_ptr(),
-                signal_semaphore_info_count: signal_semaphore_infos.len() as u32,
-                p_signal_semaphore_infos: signal_semaphore_infos.as_ptr(),
-                ..Default::default()
-            };
+            let submit_info = vk::SubmitInfo2::default()
+                .wait_semaphore_infos(&wait_semaphore_infos)
+                .signal_semaphore_infos(&signal_semaphore_infos)
+                .command_buffer_infos(command_buffer_submit_infos);
 
             self.device
                 .queue_submit2(self.queue, &[submit_info], fence)
