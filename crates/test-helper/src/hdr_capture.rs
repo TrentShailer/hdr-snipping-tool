@@ -1,12 +1,12 @@
 use ash::{
     util::Align,
     vk::{
-        AccessFlags2, BufferCreateInfo, BufferImageCopy2, BufferUsageFlags, CopyBufferToImageInfo2,
-        DependencyInfo, DeviceMemory, Extent2D, Format, Image, ImageAspectFlags, ImageCreateInfo,
-        ImageLayout, ImageMemoryBarrier2, ImageSubresourceLayers, ImageSubresourceRange,
-        ImageTiling, ImageType, ImageUsageFlags, ImageView, ImageViewCreateInfo, ImageViewType,
-        MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, Offset3D, PipelineStageFlags2,
-        SampleCountFlags, SharingMode, QUEUE_FAMILY_IGNORED,
+        AccessFlags2, BufferImageCopy2, BufferUsageFlags, CopyBufferToImageInfo2, DependencyInfo,
+        DeviceMemory, Extent2D, Format, Image, ImageAspectFlags, ImageCreateInfo, ImageLayout,
+        ImageMemoryBarrier2, ImageSubresourceLayers, ImageSubresourceRange, ImageTiling, ImageType,
+        ImageUsageFlags, ImageView, ImageViewCreateInfo, ImageViewType, MemoryAllocateInfo,
+        MemoryMapFlags, MemoryPropertyFlags, Offset3D, PipelineStageFlags2, SampleCountFlags,
+        SharingMode, QUEUE_FAMILY_IGNORED,
     },
 };
 use half::f16;
@@ -80,34 +80,17 @@ pub fn get_hdr_image(vk: &VulkanInstance) -> (Image, DeviceMemory, ImageView, [u
         vk.device.bind_image_memory(image, image_memory, 0).unwrap();
     };
 
-    // create and write to staging buffer
-    let (staging_buffer, staging_buffer_memory) = unsafe {
-        let buffer_create_info = BufferCreateInfo::default()
-            .size(data_bytes_len)
-            .usage(BufferUsageFlags::TRANSFER_SRC)
-            .sharing_mode(SharingMode::EXCLUSIVE);
+    // create staging buffer
+    let (staging_buffer, staging_buffer_memory) = vk
+        .create_unbound_buffer(
+            data_bytes_len,
+            BufferUsageFlags::TRANSFER_SRC,
+            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+        )
+        .unwrap();
 
-        let staging_buffer = vk.device.create_buffer(&buffer_create_info, None).unwrap();
-
-        let staging_buffer_memory_requirements =
-            vk.device.get_buffer_memory_requirements(staging_buffer);
-
-        let staging_buffer_memory_index = vk
-            .find_memorytype_index(
-                &staging_buffer_memory_requirements,
-                MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
-            )
-            .unwrap();
-
-        let staging_buffer_allocate_info = MemoryAllocateInfo::default()
-            .allocation_size(staging_buffer_memory_requirements.size)
-            .memory_type_index(staging_buffer_memory_index);
-
-        let staging_buffer_memory = vk
-            .device
-            .allocate_memory(&staging_buffer_allocate_info, None)
-            .unwrap();
-
+    // write to staging buffer
+    unsafe {
         let staging_ptr = vk
             .device
             .map_memory(
@@ -130,8 +113,6 @@ pub fn get_hdr_image(vk: &VulkanInstance) -> (Image, DeviceMemory, ImageView, [u
         vk.device
             .bind_buffer_memory(staging_buffer, staging_buffer_memory, 0)
             .unwrap();
-
-        (staging_buffer, staging_buffer_memory)
     };
 
     // copy from staging to gpu

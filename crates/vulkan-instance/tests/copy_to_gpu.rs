@@ -6,9 +6,9 @@ use std::{
 use ash::{
     util::Align,
     vk::{
-        AccessFlags2, BufferCopy2, BufferCreateInfo, BufferMemoryBarrier2, BufferUsageFlags,
-        CopyBufferInfo2, DependencyInfo, MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags,
-        PipelineStageFlags2, SharingMode, QUEUE_FAMILY_IGNORED,
+        AccessFlags2, BufferCopy2, BufferMemoryBarrier2, BufferUsageFlags, CopyBufferInfo2,
+        DependencyInfo, MemoryMapFlags, MemoryPropertyFlags, PipelineStageFlags2,
+        QUEUE_FAMILY_IGNORED,
     },
 };
 
@@ -35,33 +35,14 @@ fn copy_to_gpu_inner(window: Arc<Window>) {
     let vk = VulkanInstance::new(window, true).unwrap();
 
     // create and write to staging buffer
-    let (staging_buffer, staging_buffer_memory) = unsafe {
-        let buffer_create_info = BufferCreateInfo::default()
-            .size(1024)
-            .usage(BufferUsageFlags::TRANSFER_SRC)
-            .sharing_mode(SharingMode::EXCLUSIVE);
-
-        let staging_buffer = vk.device.create_buffer(&buffer_create_info, None).unwrap();
-
-        let staging_buffer_memory_requirements =
-            vk.device.get_buffer_memory_requirements(staging_buffer);
-
-        let staging_buffer_memory_index = vk
-            .find_memorytype_index(
-                &staging_buffer_memory_requirements,
-                MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
-            )
-            .unwrap();
-
-        let staging_buffer_allocate_info = MemoryAllocateInfo::default()
-            .allocation_size(staging_buffer_memory_requirements.size)
-            .memory_type_index(staging_buffer_memory_index);
-
-        let staging_buffer_memory = vk
-            .device
-            .allocate_memory(&staging_buffer_allocate_info, None)
-            .unwrap();
-
+    let (staging_buffer, staging_buffer_memory) = vk
+        .create_unbound_buffer(
+            1024,
+            BufferUsageFlags::TRANSFER_SRC,
+            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+        )
+        .unwrap();
+    unsafe {
         let staging_ptr = vk
             .device
             .map_memory(staging_buffer_memory, 0, 1024, MemoryMapFlags::empty())
@@ -75,35 +56,16 @@ fn copy_to_gpu_inner(window: Arc<Window>) {
         vk.device
             .bind_buffer_memory(staging_buffer, staging_buffer_memory, 0)
             .unwrap();
-
-        (staging_buffer, staging_buffer_memory)
-    };
+    }
 
     // create gpu buffer
-    let (gpu_buffer, gpu_buffer_memory) = unsafe {
-        let buffer_create_info = BufferCreateInfo::default()
-            .size(1024)
-            .usage(BufferUsageFlags::TRANSFER_DST)
-            .sharing_mode(SharingMode::EXCLUSIVE);
-
-        let buffer = vk.device.create_buffer(&buffer_create_info, None).unwrap();
-
-        let memory_requirements = vk.device.get_buffer_memory_requirements(buffer);
-
-        let memory_index = vk
-            .find_memorytype_index(&memory_requirements, MemoryPropertyFlags::DEVICE_LOCAL)
-            .unwrap();
-
-        let allocate_info = MemoryAllocateInfo::default()
-            .allocation_size(memory_requirements.size)
-            .memory_type_index(memory_index);
-
-        let memory = vk.device.allocate_memory(&allocate_info, None).unwrap();
-
-        vk.device.bind_buffer_memory(buffer, memory, 0).unwrap();
-
-        (buffer, memory)
-    };
+    let (gpu_buffer, gpu_buffer_memory) = vk
+        .create_bound_buffer(
+            1024,
+            BufferUsageFlags::TRANSFER_DST,
+            MemoryPropertyFlags::DEVICE_LOCAL,
+        )
+        .unwrap();
 
     // copy from staging to gpu
     vk.record_submit_command_buffer(

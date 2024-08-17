@@ -1,5 +1,6 @@
 // pub mod allocators;
 // pub mod copy_buffer;
+pub mod buffer;
 pub mod find_memory_type_index;
 pub mod record_submit_command_buffer;
 pub mod vulkan_instance;

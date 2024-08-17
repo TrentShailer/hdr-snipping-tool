@@ -3,14 +3,13 @@ use std::io::Cursor;
 use ash::{
     util::read_spv,
     vk::{
-        AccessFlags2, Buffer, BufferCopy2, BufferCreateInfo, BufferMemoryBarrier2,
-        BufferUsageFlags, ComputePipelineCreateInfo, CopyBufferInfo2, DependencyInfo,
-        DescriptorBufferInfo, DescriptorPoolCreateInfo, DescriptorPoolSize,
-        DescriptorSetAllocateInfo, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo,
-        DescriptorType, MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, PipelineBindPoint,
-        PipelineCache, PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo,
-        PipelineStageFlags2, PushConstantRange, ShaderModuleCreateInfo, ShaderStageFlags,
-        SharingMode, WriteDescriptorSet, QUEUE_FAMILY_IGNORED,
+        AccessFlags2, Buffer, BufferCopy2, BufferMemoryBarrier2, BufferUsageFlags,
+        ComputePipelineCreateInfo, CopyBufferInfo2, DependencyInfo, DescriptorBufferInfo,
+        DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSetAllocateInfo,
+        DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType, MemoryMapFlags,
+        MemoryPropertyFlags, PipelineBindPoint, PipelineCache, PipelineLayoutCreateInfo,
+        PipelineShaderStageCreateInfo, PipelineStageFlags2, PushConstantRange,
+        ShaderModuleCreateInfo, ShaderStageFlags, WriteDescriptorSet, QUEUE_FAMILY_IGNORED,
     },
 };
 use half::f16;
@@ -263,45 +262,13 @@ pub(crate) fn buffer_reduction(
     };
 
     // Setup CPU staging buffer for GPU to write data to.
-    let (staging_buffer, staging_buffer_memory) = unsafe {
-        let buffer_create_info = BufferCreateInfo {
-            size: 4,
-            usage: BufferUsageFlags::TRANSFER_DST,
-            sharing_mode: SharingMode::EXCLUSIVE,
-            ..Default::default()
-        };
-
-        let buffer = vk
-            .device
-            .create_buffer(&buffer_create_info, None)
-            .map_err(|e| Error::Vulkan(e, "creating staging buffer"))?;
-
-        let memory_requirements = vk.device.get_buffer_memory_requirements(buffer);
-
-        let memory_index = vk
-            .find_memorytype_index(
-                &memory_requirements,
-                MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
-            )
-            .ok_or(Error::NoSuitableMemoryType)?;
-
-        let allocate_info = MemoryAllocateInfo {
-            allocation_size: memory_requirements.size,
-            memory_type_index: memory_index,
-            ..Default::default()
-        };
-
-        let memory = vk
-            .device
-            .allocate_memory(&allocate_info, None)
-            .map_err(|e| Error::Vulkan(e, "allocating staging buffer"))?;
-
-        vk.device
-            .bind_buffer_memory(buffer, memory, 0)
-            .map_err(|e| Error::Vulkan(e, "binding staging memory"))?;
-
-        (buffer, memory)
-    };
+    let (staging_buffer, staging_buffer_memory) = vk
+        .create_bound_buffer(
+            4,
+            BufferUsageFlags::TRANSFER_DST,
+            MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+        )
+        .map_err(|e| Error::Vulkan(e, "creating staging buffer"))?;
 
     // copy from result to staging buffer
     vk.record_submit_command_buffer(

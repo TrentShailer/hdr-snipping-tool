@@ -1,6 +1,6 @@
 use ash::vk::{
-    BufferCreateInfo, BufferUsageFlags, ImageView, MemoryAllocateInfo, MemoryPropertyFlags,
-    PhysicalDeviceProperties2, PhysicalDeviceSubgroupProperties, SharingMode,
+    BufferUsageFlags, ImageView, MemoryPropertyFlags, PhysicalDeviceProperties2,
+    PhysicalDeviceSubgroupProperties,
 };
 use buffer_pass::buffer_reduction;
 use half::f16;
@@ -35,80 +35,22 @@ pub fn find_maximum(
     let buffer_length_bytes = (dispatches_x * dispatches_y) * 2;
 
     // Setup "read" buffer
-    let (read_buffer, read_buffer_memory) = unsafe {
-        let buffer_create_info = BufferCreateInfo {
-            size: buffer_length_bytes as u64,
-            usage: BufferUsageFlags::TRANSFER_SRC | BufferUsageFlags::STORAGE_BUFFER,
-            sharing_mode: SharingMode::EXCLUSIVE,
-            ..Default::default()
-        };
-
-        let buffer = vk
-            .device
-            .create_buffer(&buffer_create_info, None)
-            .map_err(|e| Error::Vulkan(e, "creating reading buffer"))?;
-
-        let memory_requirements = vk.device.get_buffer_memory_requirements(buffer);
-
-        let memory_index = vk
-            .find_memorytype_index(&memory_requirements, MemoryPropertyFlags::DEVICE_LOCAL)
-            .ok_or(Error::NoSuitableMemoryType)?;
-
-        let allocate_info = MemoryAllocateInfo {
-            allocation_size: memory_requirements.size,
-            memory_type_index: memory_index,
-            ..Default::default()
-        };
-
-        let memory = vk
-            .device
-            .allocate_memory(&allocate_info, None)
-            .map_err(|e| Error::Vulkan(e, "allocating reading buffer"))?;
-
-        vk.device
-            .bind_buffer_memory(buffer, memory, 0)
-            .map_err(|e| Error::Vulkan(e, "binding reading memory"))?;
-
-        (buffer, memory)
-    };
+    let (read_buffer, read_buffer_memory) = vk
+        .create_bound_buffer(
+            buffer_length_bytes as u64,
+            BufferUsageFlags::TRANSFER_SRC | BufferUsageFlags::STORAGE_BUFFER,
+            MemoryPropertyFlags::DEVICE_LOCAL,
+        )
+        .map_err(|e| Error::Vulkan(e, "creating read buffer"))?;
 
     // Setup "write" buffer
-    let (write_buffer, write_buffer_memory) = unsafe {
-        let buffer_create_info = BufferCreateInfo {
-            size: buffer_length_bytes as u64,
-            usage: BufferUsageFlags::TRANSFER_SRC | BufferUsageFlags::STORAGE_BUFFER,
-            sharing_mode: SharingMode::EXCLUSIVE,
-            ..Default::default()
-        };
-
-        let buffer = vk
-            .device
-            .create_buffer(&buffer_create_info, None)
-            .map_err(|e| Error::Vulkan(e, "creating writing buffer"))?;
-
-        let memory_requirements = vk.device.get_buffer_memory_requirements(buffer);
-
-        let memory_index = vk
-            .find_memorytype_index(&memory_requirements, MemoryPropertyFlags::DEVICE_LOCAL)
-            .ok_or(Error::NoSuitableMemoryType)?;
-
-        let allocate_info = MemoryAllocateInfo {
-            allocation_size: memory_requirements.size,
-            memory_type_index: memory_index,
-            ..Default::default()
-        };
-
-        let memory = vk
-            .device
-            .allocate_memory(&allocate_info, None)
-            .map_err(|e| Error::Vulkan(e, "allocating writing buffer"))?;
-
-        vk.device
-            .bind_buffer_memory(buffer, memory, 0)
-            .map_err(|e| Error::Vulkan(e, "binding writing memory"))?;
-
-        (buffer, memory)
-    };
+    let (write_buffer, write_buffer_memory) = vk
+        .create_bound_buffer(
+            buffer_length_bytes as u64,
+            BufferUsageFlags::TRANSFER_SRC | BufferUsageFlags::STORAGE_BUFFER,
+            MemoryPropertyFlags::DEVICE_LOCAL,
+        )
+        .map_err(|e| Error::Vulkan(e, "creating write buffer"))?;
 
     // Perform reduction on source writing results to read buffer
     source_reduction_pass(vk, source, source_size, read_buffer, subgroup_size)?;

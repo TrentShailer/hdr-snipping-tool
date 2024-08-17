@@ -1,10 +1,9 @@
 use std::u64;
 
 use ash::vk::{
-    self, AccessFlags2, BufferCreateInfo, BufferImageCopy2, BufferUsageFlags,
-    CopyImageToBufferInfo2, DependencyInfo, Extent2D, ImageAspectFlags, ImageLayout,
-    ImageMemoryBarrier2, ImageSubresourceLayers, ImageSubresourceRange, MemoryAllocateInfo,
-    MemoryMapFlags, MemoryPropertyFlags, Offset3D, PipelineStageFlags2, SharingMode,
+    self, AccessFlags2, BufferImageCopy2, BufferUsageFlags, CopyImageToBufferInfo2, DependencyInfo,
+    Extent2D, ImageAspectFlags, ImageLayout, ImageMemoryBarrier2, ImageSubresourceLayers,
+    ImageSubresourceRange, MemoryMapFlags, MemoryPropertyFlags, Offset3D, PipelineStageFlags2,
     QUEUE_FAMILY_IGNORED, WHOLE_SIZE,
 };
 
@@ -17,45 +16,13 @@ impl TonemapOutput {
     /// Copies the contents of the image to a box.
     pub fn copy_to_box(&self, vk: &VulkanInstance) -> Result<Box<[u8]>, Error> {
         let data_length = self.size[0] as u64 * self.size[1] as u64 * 4;
-        let (staging_buffer, staging_buffer_memory) = unsafe {
-            let buffer_create_info = BufferCreateInfo {
-                size: data_length,
-                usage: BufferUsageFlags::TRANSFER_DST,
-                sharing_mode: SharingMode::EXCLUSIVE,
-                ..Default::default()
-            };
-
-            let buffer = vk
-                .device
-                .create_buffer(&buffer_create_info, None)
-                .map_err(|e| Error::Vulkan(e, "creating staging buffer"))?;
-
-            let memory_requirements = vk.device.get_buffer_memory_requirements(buffer);
-
-            let memory_index = vk
-                .find_memorytype_index(
-                    &memory_requirements,
-                    MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
-                )
-                .ok_or(Error::NoSuitableMemoryType)?;
-
-            let allocate_info = MemoryAllocateInfo {
-                allocation_size: memory_requirements.size,
-                memory_type_index: memory_index,
-                ..Default::default()
-            };
-
-            let memory = vk
-                .device
-                .allocate_memory(&allocate_info, None)
-                .map_err(|e| Error::Vulkan(e, "allocating staging buffer"))?;
-
-            vk.device
-                .bind_buffer_memory(buffer, memory, 0)
-                .map_err(|e| Error::Vulkan(e, "binding staging memory"))?;
-
-            (buffer, memory)
-        };
+        let (staging_buffer, staging_buffer_memory) = vk
+            .create_bound_buffer(
+                data_length,
+                BufferUsageFlags::TRANSFER_DST,
+                MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+            )
+            .map_err(|e| Error::Vulkan(e, "creating staging buffer"))?;
 
         vk.record_submit_command_buffer(
             CommandBufferUsage::Setup,
