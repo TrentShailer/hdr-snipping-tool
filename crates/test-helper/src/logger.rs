@@ -9,7 +9,8 @@ pub fn init_logger() {
     let std_logger = tracing_subscriber::fmt::layer()
         .with_span_events(FmtSpan::CLOSE)
         .with_ansi(false)
-        .with_target(false);
+        .with_target(false)
+        .without_time();
 
     let collector = tracing_subscriber::registry().with(std_logger).with(filter);
 
