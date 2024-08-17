@@ -7,7 +7,7 @@ build = "build.rs"
 
 [dependencies]
 vulkan-instance = { workspace = true }
-vulkan-renderer = { workspace = true }
+# vulkan-renderer = { workspace = true }
 scrgb-tonemapper = { workspace = true }
 windows-capture-provider = { workspace = true }
 
@@ -23,8 +23,8 @@ windows = { workspace = true, features = [
 ] }
 windows-result = { workspace = true }
 winit = { workspace = true }
-vulkano = { workspace = true }
 half = { workspace = true }
+ash = { workspace = true }
 
 
 tracing-subscriber = "0.3"

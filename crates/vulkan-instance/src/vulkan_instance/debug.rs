@@ -55,20 +55,20 @@ unsafe extern "system" fn vulkan_debug_callback(
 
     match message_severity {
         vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE => {
-            debug!("[{message_type:?}] [{message_id_name} ({message_id_number})] : {message}")
+            debug!("[{message_type:?}] [{message_id_name} ({message_id_number})]\n{message}")
         }
 
         vk::DebugUtilsMessageSeverityFlagsEXT::INFO => {
-            info!("[{message_type:?}] [{message_id_name} ({message_id_number})] : {message}")
+            info!("[{message_type:?}] [{message_id_name} ({message_id_number})]\n{message}")
         }
         vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {
-            warn!("[{message_type:?}] [{message_id_name} ({message_id_number})] : {message}")
+            warn!("[{message_type:?}] [{message_id_name} ({message_id_number})]\n{message}")
         }
         vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
-            error!("[{message_type:?}] [{message_id_name} ({message_id_number})] : {message}")
+            error!("[{message_type:?}] [{message_id_name} ({message_id_number})]\n{message}")
         }
         _ => {
-            info!("[{message_type:?}] [{message_id_name} ({message_id_number})] : {message}")
+            info!("[{message_type:?}] [{message_id_name} ({message_id_number})]\n{message}")
         }
     };
 

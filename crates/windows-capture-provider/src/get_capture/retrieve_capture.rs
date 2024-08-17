@@ -2,9 +2,14 @@ use tracing::{info, info_span};
 use windows::{
     Graphics::Capture::Direct3D11CaptureFrame,
     Win32::{
-        Graphics::Direct3D11::{
-            ID3D11Resource, ID3D11Texture2D, D3D11_CPU_ACCESS_READ, D3D11_MAPPED_SUBRESOURCE,
-            D3D11_MAP_READ, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
+        Foundation::HANDLE,
+        Graphics::{
+            Direct3D11::{
+                ID3D11Device1, ID3D11Resource, ID3D11Texture2D, D3D11_CPU_ACCESS_READ,
+                D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ, D3D11_TEXTURE2D_DESC,
+                D3D11_USAGE_STAGING,
+            },
+            Dxgi::IDXGIResource1,
         },
         System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess,
         UI::WindowsAndMessaging::WM_APP,
@@ -19,6 +24,7 @@ use crate::DirectXDevices;
 pub fn retrieve_capture(
     devices: &DirectXDevices,
     d3d_capture: Direct3D11CaptureFrame,
+    output_handle: isize,
 ) -> Result<Box<[u8]>, WindowsError> {
     let _span = info_span!("retrieve_capture").entered();
 
@@ -26,6 +32,36 @@ pub fn retrieve_capture(
     let surface = d3d_capture.Surface()?;
     let access: IDirect3DDxgiInterfaceAccess = surface.cast()?;
     let source_texture = unsafe { access.GetInterface::<ID3D11Texture2D>()? };
+
+    info!("Test");
+    let handle = HANDLE(output_handle as *mut _);
+    unsafe {
+        let d3d11_1_device: ID3D11Device1 = devices.d3d11_device.cast().unwrap();
+        dbg!(handle.is_invalid());
+        let _test: IDXGIResource1 = d3d11_1_device.OpenSharedResource1(handle).unwrap();
+        info!("Opened shared resource");
+    };
+
+    // let mut output_texture: Option<ID3D11Resource> = None;
+    // unsafe {
+    //     devices
+    //         .d3d11_device
+    //         .OpenSharedResource(handle, &mut output_texture)?
+    // }
+    // info!("Opened shared resource");
+    // let output_texture = output_texture.ok_or(WindowsError::new(
+    //     HRESULT::from_win32(WM_APP),
+    //     "Failed import texture",
+    // ))?;
+
+    // // Copy from source to the inported texture
+    // unsafe {
+    //     devices
+    //         .d3d11_context
+    //         .CopyResource(Some(&output_texture.cast()?), Some(&source_texture.cast()?))
+    // };
+
+    // TODO remove below
 
     // Setup staging texture descriptor
     let mut source_desc = D3D11_TEXTURE2D_DESC::default();

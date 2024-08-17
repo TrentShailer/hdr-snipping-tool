@@ -963,6 +963,7 @@ name = "hdr-snipping-tool"
 version = "3.2.0"
 dependencies = [
  "arboard",
+ "ash 0.38.0+1.3.281",
  "chrono",
  "directories",
  "embed-resource",
@@ -978,8 +979,6 @@ dependencies = [
  "tracing-subscriber",
  "tray-icon",
  "vulkan-instance",
- "vulkan-renderer",
- "vulkano",
  "windows",
  "windows-capture-provider",
  "windows-result",
@@ -2610,8 +2609,11 @@ dependencies = [
 name = "windows-capture-provider"
 version = "4.0.0"
 dependencies = [
+ "ash 0.38.0+1.3.281",
+ "test-helper",
  "thiserror",
  "tracing",
+ "vulkan-instance",
  "windows",
  "windows-core 0.58.0",
  "windows-result",
