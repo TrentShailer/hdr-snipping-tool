@@ -2,12 +2,12 @@ use std::u64;
 
 use ash::vk::{
     self, AccessFlags2, BufferCreateInfo, BufferImageCopy2, BufferUsageFlags,
-    CopyImageToBufferInfo2, DependencyFlags, DependencyInfo, Extent2D, ImageAspectFlags,
-    ImageLayout, ImageMemoryBarrier2, ImageSubresourceLayers, ImageSubresourceRange,
-    MemoryAllocateInfo, MemoryMapFlags, MemoryPropertyFlags, Offset3D, PipelineStageFlags2,
-    SharingMode, QUEUE_FAMILY_IGNORED, WHOLE_SIZE,
+    CopyImageToBufferInfo2, DependencyInfo, Extent2D, ImageAspectFlags, ImageLayout,
+    ImageMemoryBarrier2, ImageSubresourceLayers, ImageSubresourceRange, MemoryAllocateInfo,
+    MemoryMapFlags, MemoryPropertyFlags, Offset3D, PipelineStageFlags2, SharingMode,
+    QUEUE_FAMILY_IGNORED, WHOLE_SIZE,
 };
-use smallvec::{smallvec, SmallVec};
+
 use thiserror::Error;
 use vulkan_instance::{CommandBufferUsage, VulkanInstance};
 
@@ -62,15 +62,7 @@ impl TonemapOutput {
             &[],
             &[],
             |device, command_buffer| {
-                let subresource_range = ImageSubresourceRange {
-                    aspect_mask: ImageAspectFlags::COLOR,
-                    base_mip_level: 1,
-                    level_count: 1,
-                    base_array_layer: 1,
-                    layer_count: 1,
-                };
-
-                let memory_barrier = ImageMemoryBarrier2 {
+                let memory_barriers = [ImageMemoryBarrier2 {
                     src_stage_mask: PipelineStageFlags2::NONE,
                     src_access_mask: AccessFlags2::NONE,
                     dst_stage_mask: PipelineStageFlags2::TRANSFER,
@@ -80,21 +72,18 @@ impl TonemapOutput {
                     src_queue_family_index: QUEUE_FAMILY_IGNORED,
                     dst_queue_family_index: QUEUE_FAMILY_IGNORED,
                     image: self.image,
-                    subresource_range,
+                    subresource_range: ImageSubresourceRange {
+                        aspect_mask: ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
                     ..Default::default()
-                };
-                let image_barriers: SmallVec<[_; 1]> = smallvec![memory_barrier];
+                }];
 
-                let dependency_info = DependencyInfo {
-                    dependency_flags: DependencyFlags::BY_REGION,
-                    memory_barrier_count: 0,
-                    p_memory_barriers: std::ptr::null(),
-                    buffer_memory_barrier_count: 0,
-                    p_buffer_memory_barriers: std::ptr::null(),
-                    image_memory_barrier_count: 1,
-                    p_image_memory_barriers: image_barriers.as_ptr(),
-                    ..Default::default()
-                };
+                let dependency_info =
+                    DependencyInfo::default().image_memory_barriers(&memory_barriers);
 
                 unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
 
@@ -104,28 +93,28 @@ impl TonemapOutput {
                 };
                 let image_subresource = ImageSubresourceLayers {
                     aspect_mask: ImageAspectFlags::COLOR,
-                    mip_level: 1,
-                    base_array_layer: 1,
+                    mip_level: 0,
+                    base_array_layer: 0,
                     layer_count: 1,
                 };
                 let copy_regions = BufferImageCopy2 {
                     buffer_offset: 0,
-                    buffer_row_length: self.size[0],
-                    buffer_image_height: self.size[1],
+                    buffer_row_length: 0,
+                    buffer_image_height: 0,
                     image_subresource,
                     image_offset: Offset3D::default(),
                     image_extent: extent.into(),
                     ..Default::default()
                 };
-                let regions: SmallVec<[_; 1]> = smallvec![copy_regions];
-                let image_copy_info = CopyImageToBufferInfo2 {
-                    src_image: self.image,
-                    src_image_layout: ImageLayout::TRANSFER_SRC_OPTIMAL,
-                    dst_buffer: staging_buffer,
-                    region_count: 1,
-                    p_regions: regions.as_ptr(),
-                    ..Default::default()
-                };
+
+                let regions = &[copy_regions];
+
+                let image_copy_info = CopyImageToBufferInfo2::default()
+                    .src_image(self.image)
+                    .src_image_layout(ImageLayout::TRANSFER_SRC_OPTIMAL)
+                    .dst_buffer(staging_buffer)
+                    .regions(regions);
+
                 unsafe { device.cmd_copy_image_to_buffer2(command_buffer, &image_copy_info) };
             },
         )?;
@@ -139,25 +128,28 @@ impl TonemapOutput {
         }
         .map_err(|e| Error::Vulkan(e, "waiting for fence"))?;
 
-        // Map memory
-        let memory_ptr = unsafe {
-            vk.device.map_memory(
-                staging_buffer_memory,
-                0,
-                WHOLE_SIZE,
-                MemoryMapFlags::empty(),
-            )
-        }
-        .map_err(|e| Error::Vulkan(e, "mapping staging buffer memory"))?;
+        // Read staging buffer
+        let data_box = unsafe {
+            let memory_ptr = vk
+                .device
+                .map_memory(
+                    staging_buffer_memory,
+                    0,
+                    WHOLE_SIZE,
+                    MemoryMapFlags::empty(),
+                )
+                .map_err(|e| Error::Vulkan(e, "mapping staging buffer memory"))?;
 
-        // Readback memory
-        let data: &[u8] =
-            unsafe { std::slice::from_raw_parts(memory_ptr.cast(), data_length as usize) };
-        let data_box = Box::from(data);
+            // Readback memory
+            let data: &[u8] = std::slice::from_raw_parts(memory_ptr.cast(), data_length as usize);
 
-        // unmap memory and cleanup
-        unsafe {
+            let data_box = Box::from(data);
             vk.device.unmap_memory(staging_buffer_memory);
+
+            data_box
+        };
+
+        unsafe {
             vk.device.destroy_buffer(staging_buffer, None);
             vk.device.free_memory(staging_buffer_memory, None);
         }

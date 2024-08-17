@@ -4,14 +4,17 @@ use std::sync::Arc;
 
 use ash::{
     vk::{
-        self, DeviceMemory, Extent2D, Format, Image, ImageCreateInfo, ImageLayout, ImageTiling,
-        ImageType, ImageUsageFlags, ImageView, ImageViewCreateInfo, ImageViewType,
-        MemoryAllocateInfo, MemoryPropertyFlags, SampleCountFlags, SharingMode,
+        self, AccessFlags2, DependencyInfo, DeviceMemory, Extent2D, Format, Image,
+        ImageAspectFlags, ImageCreateInfo, ImageLayout, ImageMemoryBarrier2, ImageSubresourceRange,
+        ImageTiling, ImageType, ImageUsageFlags, ImageView, ImageViewCreateInfo, ImageViewType,
+        MemoryAllocateInfo, MemoryPropertyFlags, PipelineStageFlags2, SampleCountFlags,
+        SharingMode, QUEUE_FAMILY_IGNORED,
     },
     Device,
 };
 use thiserror::Error;
 use tracing::info_span;
+use vulkan_instance::{record_submit_command_buffer, CommandBufferUsage};
 
 use crate::VulkanInstance;
 
@@ -30,28 +33,28 @@ impl TonemapOutput {
     pub fn new(vk: &VulkanInstance, size: [u32; 2]) -> Result<Self, Error> {
         let _span = info_span!("TonemapOutput::new").entered();
 
-        let image_extent = Extent2D {
-            width: size[0],
-            height: size[1],
-        };
-
-        let image_create_info = ImageCreateInfo {
-            image_type: ImageType::TYPE_2D,
-            format: Format::R8G8B8A8_UNORM,
-            extent: image_extent.into(),
-            mip_levels: 1,
-            array_layers: 1,
-            samples: SampleCountFlags::TYPE_1,
-            tiling: ImageTiling::OPTIMAL,
-            usage: ImageUsageFlags::TRANSFER_SRC
-                | ImageUsageFlags::TRANSFER_DST
-                | ImageUsageFlags::STORAGE,
-            sharing_mode: SharingMode::EXCLUSIVE,
-            initial_layout: ImageLayout::GENERAL,
-            ..Default::default()
-        };
-
         let image = unsafe {
+            let image_extent = Extent2D {
+                width: size[0],
+                height: size[1],
+            };
+
+            let image_create_info = ImageCreateInfo {
+                image_type: ImageType::TYPE_2D,
+                format: Format::R8G8B8A8_UNORM,
+                extent: image_extent.into(),
+                mip_levels: 1,
+                array_layers: 1,
+                samples: SampleCountFlags::TYPE_1,
+                tiling: ImageTiling::OPTIMAL,
+                usage: ImageUsageFlags::TRANSFER_SRC
+                    | ImageUsageFlags::TRANSFER_DST
+                    | ImageUsageFlags::STORAGE,
+                sharing_mode: SharingMode::EXCLUSIVE,
+                initial_layout: ImageLayout::UNDEFINED,
+                ..Default::default()
+            };
+
             vk.device
                 .create_image(&image_create_info, None)
                 .map_err(|e| Error::Vulkan(e, "creating image"))?
@@ -84,14 +87,53 @@ impl TonemapOutput {
                 .map_err(|e| Error::Vulkan(e, "binding memory"))?
         };
 
-        let image_view_create_info = ImageViewCreateInfo {
-            image,
-            view_type: ImageViewType::TYPE_2D,
-            format: Format::R8G8B8A8_UNORM,
-            ..Default::default()
-        };
+        vk.record_submit_command_buffer(
+            CommandBufferUsage::Tonemap,
+            &[],
+            &[],
+            |device, command_buffer| {
+                let memory_barriers = [ImageMemoryBarrier2 {
+                    src_stage_mask: PipelineStageFlags2::NONE,
+                    src_access_mask: AccessFlags2::NONE,
+                    dst_stage_mask: PipelineStageFlags2::NONE,
+                    dst_access_mask: AccessFlags2::NONE,
+                    old_layout: ImageLayout::UNDEFINED,
+                    new_layout: ImageLayout::GENERAL,
+                    src_queue_family_index: QUEUE_FAMILY_IGNORED,
+                    dst_queue_family_index: QUEUE_FAMILY_IGNORED,
+                    image,
+                    subresource_range: ImageSubresourceRange {
+                        aspect_mask: ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    ..Default::default()
+                }];
+
+                let dependency_info =
+                    DependencyInfo::default().image_memory_barriers(&memory_barriers);
+
+                unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
+            },
+        )?;
 
         let image_view = unsafe {
+            let image_view_create_info = ImageViewCreateInfo {
+                image,
+                view_type: ImageViewType::TYPE_2D,
+                format: Format::R8G8B8A8_UNORM,
+                subresource_range: ImageSubresourceRange {
+                    aspect_mask: ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                ..Default::default()
+            };
+
             vk.device
                 .create_image_view(&image_view_create_info, None)
                 .map_err(|e| Error::Vulkan(e, "creating image view"))?
@@ -124,4 +166,7 @@ pub enum Error {
 
     #[error("No suitable memory types are available for the allocation")]
     NoSuitableMemoryType,
+
+    #[error("Failed to record and submit command buffer:\n{0}")]
+    RecordSubmit(#[from] record_submit_command_buffer::Error),
 }

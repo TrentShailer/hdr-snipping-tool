@@ -192,9 +192,9 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "bytemuck"
-version = "1.16.3"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "102087e286b4677862ea56cf8fc58bb2cdfa8725c40ffb80fe3a008eb7f2fc83"
+checksum = "6fd4c6dcc3b0aea2f5c0b4b82c2b15fe39ddbc76041a310848f4706edf76bb31"
 dependencies = [
  "bytemuck_derive",
 ]
@@ -1942,11 +1942,10 @@ version = "3.0.0"
 dependencies = [
  "ash 0.38.0+1.3.281",
  "half",
- "smallvec",
+ "test-helper",
  "thiserror",
  "tracing",
  "vulkan-instance",
- "windows-capture-provider",
 ]
 
 [[package]]
@@ -2101,9 +2100,12 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 name = "test-helper"
 version = "0.1.0"
 dependencies = [
+ "ash 0.38.0+1.3.281",
+ "half",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "vulkan-instance",
  "winit",
 ]
 

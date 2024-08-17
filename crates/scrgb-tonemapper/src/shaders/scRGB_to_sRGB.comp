@@ -7,8 +7,8 @@ layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 layout(constant_id = 0) const float whitepoint = 3.5;
 
-layout(set = 0, binding = 0, rgba16f) uniform image2D input_image;
-layout(set = 0, binding = 1, rgba8) uniform image2D output_image;
+layout(set = 0, binding = 0, rgba16f) uniform readonly image2D input_image;
+layout(set = 0, binding = 1, rgba8) uniform writeonly image2D output_image;
 
 // Performs gamma correction to tonemap linear RGB to sRGB
 // From https://en.wikipedia.org/wiki/SRGB#Transformation
