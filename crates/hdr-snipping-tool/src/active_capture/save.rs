@@ -19,8 +19,8 @@ use super::ActiveCapture;
 impl ActiveCapture {
     pub fn save(&mut self, vk: &VulkanInstance) -> Result<(), Error> {
         let _span = info_span!("ActiveCapture::save").entered();
-        let size = self.display.size;
-        let tonemapped_image = tonemap(vk, self.capture_image.clone(), size, self.whitepoint)?;
+        let size = self.capture.display.size;
+        let tonemapped_image = tonemap(vk, self.capture_view, size, self.whitepoint)?;
         let raw_capture = tonemapped_image.copy_to_box(vk)?;
 
         let raw_capture_len = raw_capture.len();

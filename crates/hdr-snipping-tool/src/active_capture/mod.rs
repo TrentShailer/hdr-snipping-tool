@@ -2,26 +2,27 @@ mod capture_image;
 pub mod save;
 pub mod selection;
 
-use std::sync::Arc;
-
+use ash::vk::{DeviceMemory, Image, ImageView};
 use half::f16;
 use scrgb_tonemapper::maximum::{self, find_maximum};
 use selection::Selection;
 use thiserror::Error;
 use tracing::{info, info_span};
 use vulkan_instance::VulkanInstance;
-use vulkano::image::view::ImageView;
 use windows::Win32::Foundation::HWND;
 use windows_capture_provider::{
-    display_cache, get_capture::get_capture, hovered, DirectXDevices, Display, DisplayCache,
+    display_cache, get_capture::get_capture, hovered, Capture, DirectXDevices, Display,
+    DisplayCache,
 };
 use winit::dpi::PhysicalPosition;
 
 use crate::windows_helpers::foreground_window::get_foreground_window;
 
 pub struct ActiveCapture {
-    pub display: Display,
-    pub capture_image: Arc<ImageView>,
+    pub capture: Capture,
+    pub capture_image: Image,
+    pub capture_memory: DeviceMemory,
+    pub capture_view: ImageView,
     pub selection: Selection,
     pub formerly_focused_window: HWND,
     pub whitepoint: f32,
@@ -54,9 +55,9 @@ impl ActiveCapture {
         };
 
         let capture = get_capture(dx, &display, capture_item)?;
-        let capture_image = Self::image_from_capture(vk, &capture)?;
+        let (capture_image, capture_memory, capture_view) = Self::image_from_capture(vk, &capture)?;
 
-        let maximum = find_maximum(vk, capture_image.clone(), display.size)?;
+        let maximum = find_maximum(vk, capture_view.clone(), display.size)?;
         let maximum = if f16::from_bits(maximum.to_bits() - 1).to_f32()
             == capture.display.sdr_referece_white
         {
@@ -80,12 +81,14 @@ impl ActiveCapture {
             PhysicalPosition::new(capture.display.size[0], capture.display.size[1]),
         );
 
-        let display = capture.display;
-
         Ok(Self {
-            display,
             selection,
+            //
+            capture,
             capture_image,
+            capture_memory,
+            capture_view,
+            //
             whitepoint,
             formerly_focused_window,
         })

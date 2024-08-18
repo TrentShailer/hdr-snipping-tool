@@ -13,10 +13,10 @@ impl ActiveApp {
         let active_capture =
             ActiveCapture::new(&self.vk, &self.dx, &mut self.display_cache, hdr_whitepoint)?;
 
-        let size: PhysicalSize<u32> = active_capture.display.size.into();
+        let size: PhysicalSize<u32> = active_capture.capture.display.size.into();
         let _ = self.window.request_inner_size(size);
 
-        let position: PhysicalPosition<i32> = active_capture.display.position.into();
+        let position: PhysicalPosition<i32> = active_capture.capture.display.position.into();
         self.window.set_outer_position(position);
 
         self.renderer.capture.load_capture(
