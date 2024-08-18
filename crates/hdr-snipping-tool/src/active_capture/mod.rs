@@ -1,8 +1,14 @@
 mod capture_image;
+mod drop;
 pub mod save;
 pub mod selection;
 
-use ash::vk::{DeviceMemory, Image, ImageView};
+use std::sync::Arc;
+
+use ash::{
+    vk::{DeviceMemory, Image, ImageView},
+    Device,
+};
 use half::f16;
 use scrgb_tonemapper::maximum::{self, find_maximum};
 use selection::Selection;
@@ -19,6 +25,7 @@ use winit::dpi::PhysicalPosition;
 use crate::windows_helpers::foreground_window::get_foreground_window;
 
 pub struct ActiveCapture {
+    device: Arc<Device>,
     pub capture: Capture,
     pub capture_image: Image,
     pub capture_memory: DeviceMemory,
@@ -82,6 +89,7 @@ impl ActiveCapture {
         );
 
         Ok(Self {
+            device: vk.device.clone(),
             selection,
             //
             capture,
