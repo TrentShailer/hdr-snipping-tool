@@ -1827,7 +1827,6 @@ version = "3.0.0"
 dependencies = [
  "ash",
  "half",
- "test-helper",
  "thiserror",
  "tracing",
  "vulkan-instance",
@@ -1946,20 +1945,6 @@ name = "target-lexicon"
 version = "0.12.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
-
-[[package]]
-name = "test-helper"
-version = "0.1.0"
-dependencies = [
- "ash",
- "half",
- "image",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "vulkan-instance",
- "winit",
-]
 
 [[package]]
 name = "thiserror"
@@ -2223,7 +2208,6 @@ dependencies = [
  "ash",
  "ash-window",
  "smallvec",
- "test-helper",
  "thiserror",
  "tracing",
  "winit",
@@ -2393,12 +2377,8 @@ dependencies = [
 name = "windows-capture-provider"
 version = "4.0.0"
 dependencies = [
- "ash",
- "scrgb-tonemapper",
- "test-helper",
  "thiserror",
  "tracing",
- "vulkan-instance",
  "windows",
  "windows-core 0.58.0",
  "windows-result",

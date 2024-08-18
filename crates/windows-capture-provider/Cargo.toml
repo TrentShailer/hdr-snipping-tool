@@ -27,9 +27,3 @@ windows = { workspace = true, features = [
 windows-core = { workspace = true }
 windows-result = { workspace = true }
 tracing = { workspace = true }
-
-[dev-dependencies]
-ash = { workspace = true }
-vulkan-instance = { workspace = true }
-test-helper = { workspace = true }
-scrgb-tonemapper = { workspace = true }

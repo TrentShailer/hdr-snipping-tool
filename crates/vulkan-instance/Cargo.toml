@@ -9,8 +9,5 @@ smallvec = { workspace = true }
 thiserror = { workspace = true }
 
 ash = { workspace = true }
-winit = { workspace = true }
 ash-window = { workspace = true }
-
-[dev-dependencies]
-test-helper = { workspace = true }
+winit = { workspace = true }
