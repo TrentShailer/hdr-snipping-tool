@@ -18,7 +18,6 @@ pub fn get_capture(
     devices: &DirectXDevices,
     display: &Display,
     capture_item: &GraphicsCaptureItem,
-    output_handle: isize,
 ) -> Result<Capture, Error> {
     let _span = info_span!("get_capture").entered();
 
@@ -35,15 +34,14 @@ pub fn get_capture(
     framepool.Close().map_err(Error::CloseSession)?;
 
     // get the capture from gpu
-    let capture =
-        retrieve_capture(devices, d3d11_capture, output_handle).map_err(Error::FetchCapture)?;
+    let capture_handle = retrieve_capture(d3d11_capture).map_err(Error::FetchCapture)?;
 
     // free resources
     unsafe { devices.d3d11_context.ClearState() };
     devices.d3d_device.Trim().map_err(Error::Trim)?;
 
     Ok(Capture {
-        data: capture,
+        handle: capture_handle,
         display: *display,
     })
 }

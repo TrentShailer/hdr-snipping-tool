@@ -26,6 +26,11 @@ ash = { version = "0.38.0", default-features = false, features = [
 ] }
 ash-window = { version = "0.13.0" }
 
+image = { version = "0.25", features = [
+	"rayon",
+	"png",
+], default-features = false }
+
 vulkan-instance = { path = "crates/vulkan-instance" }
 vulkan-renderer = { path = "crates/vulkan-renderer" }
 scrgb-tonemapper = { path = "crates/scrgb-tonemapper" }

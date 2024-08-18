@@ -25,6 +25,7 @@ windows-result = { workspace = true }
 winit = { workspace = true }
 half = { workspace = true }
 ash = { workspace = true }
+image = { workspace = true }
 
 
 tracing-subscriber = "0.3"
@@ -36,10 +37,6 @@ chrono = { version = "0.4", features = [
 ], default-features = false }
 directories = "5.0"
 global-hotkey = "0.5"
-image = { version = "0.25", features = [
-	"rayon",
-	"png",
-], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 tray-icon = "0.14"

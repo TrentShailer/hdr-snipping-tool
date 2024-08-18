@@ -12,3 +12,4 @@ tracing = { workspace = true }
 ash = { workspace = true }
 vulkan-instance = { workspace = true }
 half = { workspace = true }
+image = { workspace = true }

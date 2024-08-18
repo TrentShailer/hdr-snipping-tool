@@ -1,18 +1,18 @@
 use std::sync::mpsc::channel;
 
-use ash::{
-    khr::external_memory_win32,
-    vk::{
-        DeviceMemory, ExportMemoryAllocateInfo, Extent2D, ExternalMemoryHandleTypeFlags,
-        ExternalMemoryImageCreateInfo, Format, Image, ImageCreateInfo, ImageLayout, ImageTiling,
-        ImageType, ImageUsageFlags, MemoryAllocateInfo, MemoryDedicatedAllocateInfo,
-        MemoryGetWin32HandleInfoKHR, MemoryPropertyFlags, SampleCountFlags, SharingMode,
-    },
+use ash::vk::{
+    AccessFlags2, DependencyInfo, DeviceMemory, Extent2D, ExternalMemoryHandleTypeFlags,
+    ExternalMemoryImageCreateInfo, Format, Image, ImageAspectFlags, ImageCreateInfo, ImageLayout,
+    ImageMemoryBarrier2, ImageSubresourceRange, ImageTiling, ImageType, ImageUsageFlags,
+    ImageViewCreateInfo, ImageViewType, ImportMemoryWin32HandleInfoKHR, MemoryAllocateInfo,
+    MemoryDedicatedAllocateInfo, MemoryPropertyFlags, PipelineStageFlags2, SampleCountFlags,
+    SharingMode, QUEUE_FAMILY_IGNORED,
 };
+use scrgb_tonemapper::tonemap;
 use test_helper::{get_window::get_window, logger::init_logger};
-use vulkan_instance::VulkanInstance;
-use windows::Win32::Foundation::{CloseHandle, HANDLE};
-use windows_capture_provider::{get_capture::get_capture, DirectXDevices, DisplayCache};
+use vulkan_instance::{CommandBufferUsage, VulkanInstance};
+use windows::Win32::Foundation::CloseHandle;
+use windows_capture_provider::{get_capture::get_capture, Capture, DirectXDevices, DisplayCache};
 
 #[test]
 fn windows_capture_provider() {
@@ -44,29 +44,59 @@ pub fn inner(vk: &VulkanInstance) {
         .get(&(display.handle.0 as isize))
         .unwrap();
 
-    let (image, image_memory, handle) = create_capture_image(vk, display.size);
+    let capture = get_capture(&dx, &display, capture_item).unwrap();
 
-    // unsafe {
-    //     vk.device.bind_image_memory(image, image_memory, 0).unwrap();
-    // }
+    let (image, memory) = import_capture(vk, &capture);
 
-    let _capture = get_capture(&dx, &display, capture_item, handle).unwrap();
+    save_image(vk, image, &capture);
 
     unsafe {
         vk.device.destroy_image(image, None);
-        vk.device.free_memory(image_memory, None);
-        CloseHandle(HANDLE(handle as *mut _)).unwrap();
+        vk.device.free_memory(memory, None);
+
+        CloseHandle(capture.handle).unwrap();
     }
 }
 
-pub fn create_capture_image(
-    vk: &VulkanInstance,
-    image_size: [u32; 2],
-) -> (Image, DeviceMemory, ash::vk::HANDLE) {
+pub fn save_image(vk: &VulkanInstance, image: Image, capture: &Capture) {
+    let image_view = unsafe {
+        let image_view_create_info = ImageViewCreateInfo {
+            image,
+            view_type: ImageViewType::TYPE_2D,
+            format: Format::R16G16B16A16_SFLOAT,
+            subresource_range: ImageSubresourceRange {
+                aspect_mask: ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            ..Default::default()
+        };
+
+        vk.device
+            .create_image_view(&image_view_create_info, None)
+            .unwrap()
+    };
+
+    let srgb = tonemap(vk, image_view, capture.display.size, 1.0).unwrap();
+
+    let raw_capture = srgb.copy_to_box(vk).unwrap();
+
+    test_helper::save_image::save_image(
+        "windows-capture-provider",
+        raw_capture,
+        capture.display.size,
+    );
+
+    unsafe { vk.device.destroy_image_view(image_view, None) };
+}
+
+pub fn import_capture(vk: &VulkanInstance, capture: &Capture) -> (Image, DeviceMemory) {
     let image = unsafe {
         let image_extent = Extent2D {
-            width: image_size[0],
-            height: image_size[1],
+            width: capture.display.size[0],
+            height: capture.display.size[1],
         };
 
         let mut external_memory_image = ExternalMemoryImageCreateInfo::default()
@@ -90,25 +120,22 @@ pub fn create_capture_image(
         vk.device.create_image(&image_create_info, None).unwrap()
     };
 
-    let image_memory = unsafe {
+    let memory = unsafe {
         let memory_requirement = vk.device.get_image_memory_requirements(image);
 
         let memory_index = vk
             .find_memorytype_index(&memory_requirement, MemoryPropertyFlags::DEVICE_LOCAL)
             .unwrap();
 
-        let mut export_allocate_info = ExportMemoryAllocateInfo::default()
-            .handle_types(ExternalMemoryHandleTypeFlags::OPAQUE_WIN32);
-
-        let mut dedicated_allocation = MemoryDedicatedAllocateInfo {
-            image,
-            ..Default::default()
-        };
+        let mut dedicated_allocation = MemoryDedicatedAllocateInfo::default().image(image);
+        let mut import_info = ImportMemoryWin32HandleInfoKHR::default()
+            .handle_type(ExternalMemoryHandleTypeFlags::OPAQUE_WIN32)
+            .handle(capture.handle.0 as isize);
 
         let allocate_info = MemoryAllocateInfo::default()
             .allocation_size(memory_requirement.size)
             .memory_type_index(memory_index)
-            .push_next(&mut export_allocate_info)
+            .push_next(&mut import_info)
             .push_next(&mut dedicated_allocation);
 
         let device_memory = vk.device.allocate_memory(&allocate_info, None).unwrap();
@@ -120,21 +147,38 @@ pub fn create_capture_image(
         device_memory
     };
 
-    let handle = unsafe {
-        let external_mem_device = external_memory_win32::Device::new(&vk.instance, &vk.device);
-        let memory_handle_create_info = MemoryGetWin32HandleInfoKHR {
-            memory: image_memory,
-            handle_type: ExternalMemoryHandleTypeFlags::OPAQUE_WIN32,
-            ..Default::default()
-        };
-        let handle = external_mem_device
-            .get_memory_win32_handle(&memory_handle_create_info)
-            .unwrap();
+    // transition image layout
+    vk.record_submit_command_buffer(
+        CommandBufferUsage::Setup,
+        &[],
+        &[],
+        |device, command_buffer| {
+            let memory_barriers = [ImageMemoryBarrier2 {
+                src_stage_mask: PipelineStageFlags2::NONE,
+                src_access_mask: AccessFlags2::NONE,
+                dst_stage_mask: PipelineStageFlags2::NONE,
+                dst_access_mask: AccessFlags2::NONE,
+                old_layout: ImageLayout::UNDEFINED,
+                new_layout: ImageLayout::GENERAL,
+                src_queue_family_index: QUEUE_FAMILY_IGNORED,
+                dst_queue_family_index: QUEUE_FAMILY_IGNORED,
+                image,
+                subresource_range: ImageSubresourceRange {
+                    aspect_mask: ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                ..Default::default()
+            }];
 
-        dbg!(handle);
+            let dependency_info = DependencyInfo::default().image_memory_barriers(&memory_barriers);
 
-        handle
-    };
+            unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
+        },
+    )
+    .unwrap();
 
-    (image, image_memory, handle)
+    (image, memory)
 }
