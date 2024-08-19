@@ -14,7 +14,7 @@ use ash::{
 };
 use thiserror::Error;
 use tracing::info_span;
-use vulkan_instance::{record_submit_command_buffer, CommandBufferUsage};
+use vulkan_instance::record_submit_command_buffer;
 
 use crate::VulkanInstance;
 
@@ -73,12 +73,9 @@ impl TonemapOutput {
                 ..Default::default()
             };
 
-            let device_memory = vk
-                .device
+            vk.device
                 .allocate_memory(&allocate_info, None)
-                .map_err(|e| Error::Vulkan(e, "allocating memory"))?;
-
-            device_memory
+                .map_err(|e| Error::Vulkan(e, "allocating memory"))?
         };
 
         unsafe {
@@ -88,10 +85,11 @@ impl TonemapOutput {
         };
 
         vk.record_submit_command_buffer(
-            CommandBufferUsage::Tonemap,
+            vk.command_buffer,
+            vk.fence,
             &[],
             &[],
-            |device, command_buffer| {
+            |device, command_buffer| unsafe {
                 let memory_barriers = [ImageMemoryBarrier2 {
                     src_stage_mask: PipelineStageFlags2::NONE,
                     src_access_mask: AccessFlags2::NONE,
@@ -115,7 +113,7 @@ impl TonemapOutput {
                 let dependency_info =
                     DependencyInfo::default().image_memory_barriers(&memory_barriers);
 
-                unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
+                device.cmd_pipeline_barrier2(command_buffer, &dependency_info);
                 Ok(())
             },
         )?;

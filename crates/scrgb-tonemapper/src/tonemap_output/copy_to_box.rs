@@ -6,7 +6,7 @@ use ash::vk::{
 };
 
 use thiserror::Error;
-use vulkan_instance::{CommandBufferUsage, VulkanInstance};
+use vulkan_instance::VulkanInstance;
 
 use super::TonemapOutput;
 
@@ -23,10 +23,11 @@ impl TonemapOutput {
             .map_err(|e| Error::Vulkan(e, "creating staging buffer"))?;
 
         vk.record_submit_command_buffer(
-            CommandBufferUsage::Setup,
+            vk.command_buffer,
+            vk.fence,
             &[],
             &[],
-            |device, command_buffer| {
+            |device, command_buffer| unsafe {
                 let memory_barriers = [ImageMemoryBarrier2 {
                     src_stage_mask: PipelineStageFlags2::NONE,
                     src_access_mask: AccessFlags2::NONE,
@@ -50,7 +51,7 @@ impl TonemapOutput {
                 let dependency_info =
                     DependencyInfo::default().image_memory_barriers(&memory_barriers);
 
-                unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
+                device.cmd_pipeline_barrier2(command_buffer, &dependency_info);
 
                 let extent = Extent2D {
                     width: self.size[0],
@@ -80,19 +81,13 @@ impl TonemapOutput {
                     .dst_buffer(staging_buffer)
                     .regions(regions);
 
-                unsafe { device.cmd_copy_image_to_buffer2(command_buffer, &image_copy_info) };
+                device.cmd_copy_image_to_buffer2(command_buffer, &image_copy_info);
                 Ok(())
             },
         )?;
 
-        unsafe {
-            vk.device.wait_for_fences(
-                &[*vk.fences.get(&CommandBufferUsage::Setup).unwrap()],
-                true,
-                u64::MAX,
-            )
-        }
-        .map_err(|e| Error::Vulkan(e, "waiting for fence"))?;
+        unsafe { vk.device.wait_for_fences(&[vk.fence], true, u64::MAX) }
+            .map_err(|e| Error::Vulkan(e, "waiting for fence"))?;
 
         // Read staging buffer
         let data_box = unsafe {

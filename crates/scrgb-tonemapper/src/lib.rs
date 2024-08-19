@@ -21,7 +21,7 @@ use ash::{
 use thiserror::Error;
 use tonemap_output::TonemapOutput;
 use tracing::info_span;
-use vulkan_instance::{CommandBufferUsage, VulkanInstance};
+use vulkan_instance::VulkanInstance;
 
 /// Tonemaps a capture from the scRGB colorspace into the sRGB colorspace.\
 /// Returns a vulkan image containing the capture.
@@ -114,12 +114,9 @@ pub fn tonemap(
             .descriptor_pool(descriptor_pool)
             .set_layouts(&descriptor_layouts);
 
-        let descriptor_sets = vk
-            .device
+        vk.device
             .allocate_descriptor_sets(&descriptor_allocate_info)
-            .map_err(|e| Error::Vulkan(e, "allocating descriptor sets"))?;
-
-        descriptor_sets
+            .map_err(|e| Error::Vulkan(e, "allocating descriptor sets"))?
     };
 
     unsafe {
@@ -187,7 +184,8 @@ pub fn tonemap(
     let workgroup_y = capture_size[1].div_ceil(32);
 
     vk.record_submit_command_buffer(
-        CommandBufferUsage::Tonemap,
+        vk.command_buffer,
+        vk.fence,
         &[],
         &[],
         |device, command_buffer| unsafe {
@@ -207,14 +205,8 @@ pub fn tonemap(
         },
     )?;
 
-    unsafe {
-        vk.device.wait_for_fences(
-            &[*vk.fences.get(&CommandBufferUsage::Tonemap).unwrap()],
-            true,
-            u64::MAX,
-        )
-    }
-    .map_err(|e| Error::Vulkan(e, "waiting for fence"))?;
+    unsafe { vk.device.wait_for_fences(&[vk.fence], true, u64::MAX) }
+        .map_err(|e| Error::Vulkan(e, "waiting for fence"))?;
 
     // cleanup resources
     unsafe {
