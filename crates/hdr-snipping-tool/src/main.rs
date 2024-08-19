@@ -90,8 +90,16 @@ fn main() {
 }
 
 fn init() -> Result<(), AppError> {
-    let _span = if IS_DEV {
-        Some(info_span!("dev_build").entered())
+    let _dev_span = if IS_DEV {
+        Some(info_span!("dev").entered())
+    } else {
+        None
+    };
+
+    let version_span = info_span!(VERSION).entered();
+
+    let _validation_span = if is_vk_debug() {
+        Some(info_span!("validation").entered())
     } else {
         None
     };
@@ -158,6 +166,9 @@ fn init() -> Result<(), AppError> {
 
     // run the app
     event_loop.run_app(&mut app)?;
+
+    version_span.exit();
+
     Ok(())
 }
 

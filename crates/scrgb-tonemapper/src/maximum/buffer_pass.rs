@@ -154,9 +154,8 @@ impl BufferPass {
         byte_count: u32,
         subgroup_size: u32,
     ) -> Result<Buffer, Error> {
-        // command_buffers: &[CommandBuffer],
-        // fences: &[Fence],
-        // semaphores: &[Semaphore],
+        let _span = info_span!("BufferPass::run").entered();
+
         let command_buffers: &[CommandBuffer] = &maximum_obj.command_buffers;
         let fences: &[Fence] = &maximum_obj.fences;
         let semaphores: &[Semaphore] = &maximum_obj.semaphores;
@@ -225,8 +224,6 @@ impl BufferPass {
         let mut submission_index = 1;
 
         while input_length > 1 {
-            let _span = info_span!("pass").entered();
-
             let workgroup_count = output_length;
             use_write_read_ds = !use_write_read_ds;
 
