@@ -51,7 +51,6 @@ impl Maximum {
         // create fences
         let fence_create_info = FenceCreateInfo::default().flags(FenceCreateFlags::SIGNALED);
         let fences: Vec<Fence> = (0..MAXIMUM_SUBMISSIONS)
-            .into_iter()
             .map(|_| unsafe {
                 vk.device
                     .create_fence(&fence_create_info, None)
@@ -62,7 +61,6 @@ impl Maximum {
         // create semaphores
         let semaphore_create_info = SemaphoreCreateInfo::default();
         let semaphores: Vec<Semaphore> = (0..MAXIMUM_SUBMISSIONS)
-            .into_iter()
             .map(|_| unsafe {
                 vk.device
                     .create_semaphore(&semaphore_create_info, None)
@@ -133,17 +131,13 @@ impl Maximum {
             source_size,
             read_buffer,
             subgroup_size,
-            self.fences[0],
-            self.command_buffers[0],
-            self.semaphores[0],
+            (self.command_buffers[0], self.fences[0], self.semaphores[0]),
         )?;
 
         // finish reduction over read and write buffers until final result
         let result_buffer = self.buffer_pass.run(
             vk,
-            &self.command_buffers,
-            &self.fences,
-            &self.semaphores,
+            self,
             read_buffer,
             write_buffer,
             buffer_length_bytes,

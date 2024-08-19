@@ -17,7 +17,7 @@ use ash::{
 use tracing::info_span;
 use vulkan_instance::VulkanInstance;
 
-use super::{Error, MAXIMUM_SUBMISSIONS};
+use super::{Error, Maximum, MAXIMUM_SUBMISSIONS};
 
 pub struct BufferPass {
     module: ShaderModule,
@@ -97,12 +97,9 @@ impl BufferPass {
                 .descriptor_pool(descriptor_pool)
                 .set_layouts(&descriptor_layouts);
 
-            let descriptor_sets = vk
-                .device
+            vk.device
                 .allocate_descriptor_sets(&descriptor_allocate_info)
-                .map_err(|e| Error::Vulkan(e, "allocating descriptor sets"))?;
-
-            descriptor_sets
+                .map_err(|e| Error::Vulkan(e, "allocating descriptor sets"))?
         };
 
         let (compute_pipeline, pipeline_layout) = unsafe {
@@ -150,14 +147,20 @@ impl BufferPass {
     pub fn run(
         &self,
         vk: &VulkanInstance,
-        command_buffers: &[CommandBuffer],
-        fences: &[Fence],
-        semaphores: &[Semaphore],
+        maximum_obj: &Maximum,
+
         read_buffer: Buffer,
         write_buffer: Buffer,
         byte_count: u32,
         subgroup_size: u32,
     ) -> Result<Buffer, Error> {
+        // command_buffers: &[CommandBuffer],
+        // fences: &[Fence],
+        // semaphores: &[Semaphore],
+        let command_buffers: &[CommandBuffer] = &maximum_obj.command_buffers;
+        let fences: &[Fence] = &maximum_obj.fences;
+        let semaphores: &[Semaphore] = &maximum_obj.semaphores;
+
         // Update descriptor sets
         unsafe {
             let read_buffer_descriptor = DescriptorBufferInfo {

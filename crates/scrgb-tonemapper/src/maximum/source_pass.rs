@@ -104,12 +104,9 @@ impl SourcePass {
                 .descriptor_pool(descriptor_pool)
                 .set_layouts(&descriptor_layouts);
 
-            let descriptor_sets = vk
-                .device
+            vk.device
                 .allocate_descriptor_sets(&descriptor_allocate_info)
-                .map_err(|e| Error::Vulkan(e, "allocating descriptor sets"))?;
-
-            descriptor_sets
+                .map_err(|e| Error::Vulkan(e, "allocating descriptor sets"))?
         };
 
         let (compute_pipeline, pipeline_layout) = unsafe {
@@ -154,10 +151,7 @@ impl SourcePass {
         source_size: [u32; 2],
         output_buffer: Buffer,
         subgroup_size: u32,
-        //
-        fence: Fence,
-        command_buffer: CommandBuffer,
-        signal_semaphore: Semaphore,
+        submission_resources: (CommandBuffer, Fence, Semaphore),
     ) -> Result<(), Error> {
         let _span = info_span!("SourcePass::run").entered();
 
@@ -198,10 +192,10 @@ impl SourcePass {
         let workgroup_x = source_size[0].div_ceil(32);
         let workgroup_y = source_size[1].div_ceil(32).div_ceil(subgroup_size);
 
-        let signal_semaphores = [(signal_semaphore, PipelineStageFlags2::BOTTOM_OF_PIPE)];
+        let signal_semaphores = [(submission_resources.2, PipelineStageFlags2::BOTTOM_OF_PIPE)];
         vk.record_submit_command_buffer(
-            command_buffer,
-            fence,
+            submission_resources.0,
+            submission_resources.1,
             &[],
             &signal_semaphores,
             |device, command_buffer| unsafe {
@@ -220,7 +214,7 @@ impl SourcePass {
 
                 Ok(())
             },
-        );
+        )?;
 
         Ok(())
     }
