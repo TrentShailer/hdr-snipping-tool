@@ -109,7 +109,8 @@ pub fn create_vertex_and_index_buffer<V: Copy>(
     // Copy buffers
 
     vk.record_submit_command_buffer(
-        vulkan_instance::CommandBufferUsage::Setup,
+        vk.command_buffer,
+        vk.fence,
         &[],
         &[],
         |device, command_buffer| {

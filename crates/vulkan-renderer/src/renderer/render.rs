@@ -1,15 +1,12 @@
 use std::sync::Arc;
 
 use ash::vk::{
-    AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, Extent2D, Fence, ImageLayout,
+    AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, Extent2D, ImageLayout,
     Offset2D, PipelineStageFlags2, PresentInfoKHR, Rect2D, RenderingAttachmentInfo, RenderingInfo,
-    SemaphoreWaitInfo,
+    Semaphore,
 };
 use thiserror::Error;
-use tracing::info;
-use vulkan_instance::{
-    record_submit_command_buffer, CommandBufferUsage, SemaphoreUsage, VulkanInstance,
-};
+use vulkan_instance::{record_submit_command_buffer, VulkanInstance};
 
 use winit::window::Window;
 
@@ -38,38 +35,40 @@ impl Renderer {
             self.recreate_swapchain(vk, window_size)?;
         }
 
-        let aquire_semaphore = *vk.semaphores.get(&SemaphoreUsage::Aquire).unwrap();
-        let aquire_fence = *vk.fences.get(&CommandBufferUsage::AquireImage).unwrap();
-        let render_semaphore = *vk.semaphores.get(&SemaphoreUsage::Render).unwrap();
+        // TODO add ability to wait for a fence
 
-        let aquire_timeout = if should_wait { u64::MAX } else { 0 };
-
-        // try waiting for aquire fence
-        // If the render call shouldn't wait and the fence is not signalled
-        // then this render call is skipped
-        // this ensures that when the render call can be passed through
-        // it has the most up to date information
-        unsafe {
-            let fences = [aquire_fence];
-
-            if let Err(e) = vk.device.wait_for_fences(&fences, true, aquire_timeout) {
-                match e {
-                    ash::vk::Result::TIMEOUT => return Ok(()),
-                    _ => return Err(Error::Vulkan(e, "waiting for aquire fence")),
+        // try and find a free acquire fence
+        let free_fence = self
+            .acquire_fences
+            .iter()
+            .enumerate()
+            .find_map(|(index, fence)| unsafe {
+                match vk.device.get_fence_status(*fence) {
+                    Ok(signalled) => {
+                        if !signalled {
+                            Some((index, *fence))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => None,
                 }
-            }
+            });
 
-            vk.device
-                .reset_fences(&fences)
-                .map_err(|e| Error::Vulkan(e, "resetting aquire fence"))?;
-        }
+        let (sync_index, acquire_fence) = match free_fence {
+            Some(values) => values,
+            None => return Ok(()),
+        };
+
+        // 100μs
+        let aquire_timeout = if should_wait { u64::MAX } else { 100000 };
 
         let image_index = unsafe {
             let aquire_result = self.swapchain_loader.acquire_next_image(
                 self.swapchain,
                 aquire_timeout,
-                aquire_semaphore,
-                aquire_fence,
+                Semaphore::null(),
+                acquire_fence,
             );
 
             match aquire_result {
@@ -88,22 +87,39 @@ impl Renderer {
                     ash::vk::Result::NOT_READY => return Ok(()),
 
                     // A wait operation has not completed in the specified time
-                    ash::vk::Result::TIMEOUT => return Ok(()),
+                    ash::vk::Result::TIMEOUT => {
+                        // TODO ensure fence is un-signalled for next run
+
+                        return Ok(());
+                    }
                     _ => return Err(Error::Vulkan(e, "aquiring image")),
                 },
             }
         };
 
+        // wait for and reset acquire fence
+        unsafe {
+            let fences = [acquire_fence];
+            vk.device
+                .wait_for_fences(&fences, true, u64::MAX)
+                .map_err(|e| Error::Vulkan(e, "waiting for acquire fence"))?;
+            vk.device
+                .reset_fences(&fences)
+                .map_err(|e| Error::Vulkan(e, "resetting acquire fence"))?;
+        }
+
+        let command_buffer = self.command_buffers[sync_index];
+        let cb_fence = self.cb_fences[sync_index];
+        let render_semaphore = self.render_semaphores[sync_index];
+
         vk.record_submit_command_buffer(
-            CommandBufferUsage::Draw,
-            &[(
-                aquire_semaphore,
-                PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-            )],
+            command_buffer,
+            cb_fence,
+            &[],
             &[(render_semaphore, PipelineStageFlags2::BOTTOM_OF_PIPE)],
             |device, command_buffer| {
                 unsafe {
-                    // Wait for PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT?
+                    // TODO Wait for PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT?
 
                     let color_attachments = [RenderingAttachmentInfo::default()
                         .clear_value(ClearValue {
@@ -175,26 +191,6 @@ impl Renderer {
         if suboptimal {
             self.recreate_swapchain = true;
         }
-
-        // ------
-
-        // Cleanup finished resources
-        // if let Some(v) = self.render_future.as_mut() {
-        //     v.cleanup_finished();
-        // }
-
-        // let render_future = self
-        //     .render_future
-        //     .take()
-        //     .unwrap_or_else(|| sync::now(vk.device.clone()).boxed())
-        //     .join(aquire_future)
-        //     .then_execute(vk.queue.clone(), command_buffer)?
-        //     .then_swapchain_present(
-        //         vk.queue.clone(),
-        //         SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_index),
-        //     )
-        //     .boxed()
-        //     .then_signal_fence_and_flush();
 
         Ok(())
     }

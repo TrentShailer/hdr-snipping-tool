@@ -115,7 +115,8 @@ impl Renderer {
 
     pub fn transition_images(vk: &VulkanInstance, images: &[Image]) -> Result<(), Error> {
         vk.record_submit_command_buffer(
-            vulkan_instance::CommandBufferUsage::Draw,
+            vk.command_buffer,
+            vk.fence,
             &[],
             &[],
             |device, command_buffer| {
@@ -148,10 +149,7 @@ impl Renderer {
             },
         )?;
 
-        let fences = [*vk
-            .fences
-            .get(&vulkan_instance::CommandBufferUsage::Draw)
-            .unwrap()];
+        let fences = [vk.fence];
         unsafe {
             vk.device
                 .wait_for_fences(&fences, true, u64::MAX)

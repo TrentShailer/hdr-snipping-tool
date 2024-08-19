@@ -7,8 +7,10 @@ use std::sync::Arc;
 
 use ash::{
     vk::{
-        DescriptorSetLayout, Image, ImageView, Pipeline, PipelineLayout,
-        PipelineRenderingCreateInfo, ShaderModule, SwapchainKHR, Viewport,
+        CommandBuffer, CommandBufferAllocateInfo, CommandBufferLevel, DescriptorSetLayout, Fence,
+        FenceCreateFlags, FenceCreateInfo, Image, ImageView, Pipeline, PipelineLayout,
+        PipelineRenderingCreateInfo, Semaphore, SemaphoreCreateInfo, ShaderModule, SwapchainKHR,
+        Viewport,
     },
     Device,
 };
@@ -29,21 +31,23 @@ pub struct Renderer {
 
     pub device: Arc<Device>,
 
-    // pub aquire_future: Option<SwapchainAcquireFuture>,
+    pub command_buffers: Vec<CommandBuffer>,
+    pub cb_fences: Vec<Fence>,
+    pub acquire_fences: Vec<Fence>,
+    pub render_semaphores: Vec<Semaphore>,
+
     pub swapchain_loader: ash::khr::swapchain::Device,
     pub swapchain: SwapchainKHR,
-    //
+
     pub attachment_images: Vec<Image>,
     pub attachment_views: Vec<ImageView>,
 
-    //
     pub viewport: Viewport,
-    //
+
     pub capture: Capture,
     pub selection: Selection,
     pub mouse_guides: MouseGuides,
 
-    //
     pub pipeline_layouts: Vec<PipelineLayout>,
     pub pipelines: Vec<Pipeline>,
     pub shaders: Vec<ShaderModule>,
@@ -143,20 +147,73 @@ impl Renderer {
 
         let descriptor_layouts = vec![capture_pipeline.3[0], capture_pipeline.3[1]];
 
+        let sync_item_count = swapchain_images.len() as u32;
+        // create command buffers
+        let command_buffer_allocate_info = CommandBufferAllocateInfo::default()
+            .command_buffer_count(sync_item_count)
+            .command_pool(vk.command_buffer_pool)
+            .level(CommandBufferLevel::PRIMARY);
+        let command_buffers = unsafe {
+            vk.device
+                .allocate_command_buffers(&command_buffer_allocate_info)
+                .map_err(|e| Error::Vulkan(e, "allocating command buffers"))?
+        };
+
+        // create command buffer fences
+        let fence_create_info = FenceCreateInfo::default().flags(FenceCreateFlags::SIGNALED);
+        let cb_fences: Vec<Fence> = (0..sync_item_count)
+            .map(|_| unsafe {
+                vk.device
+                    .create_fence(&fence_create_info, None)
+                    .map_err(|e| Error::Vulkan(e, "creating fence"))
+            })
+            .collect::<Result<_, Error>>()?;
+
+        // create acquire fences
+        let fence_create_info = FenceCreateInfo::default();
+        let acquire_fences: Vec<Fence> = (0..sync_item_count)
+            .map(|_| unsafe {
+                vk.device
+                    .create_fence(&fence_create_info, None)
+                    .map_err(|e| Error::Vulkan(e, "creating fence"))
+            })
+            .collect::<Result<_, Error>>()?;
+
+        // create render semaphores
+        let semaphore_create_info = SemaphoreCreateInfo::default();
+        let render_semaphores: Vec<Semaphore> = (0..sync_item_count)
+            .map(|_| unsafe {
+                vk.device
+                    .create_semaphore(&semaphore_create_info, None)
+                    .map_err(|e| Error::Vulkan(e, "creating semaphore"))
+            })
+            .collect::<Result<_, Error>>()?;
+
         Ok(Self {
             device: vk.device.clone(),
+
+            command_buffers,
+            cb_fences,
+            acquire_fences,
+            render_semaphores,
+
             swapchain_loader,
             swapchain,
+
             attachment_images: swapchain_images,
             attachment_views,
+
             viewport,
+
             capture,
             selection,
             mouse_guides,
+
             pipeline_layouts,
             pipelines,
             descriptor_layouts,
             shaders,
+
             recreate_swapchain: false,
         })
     }
