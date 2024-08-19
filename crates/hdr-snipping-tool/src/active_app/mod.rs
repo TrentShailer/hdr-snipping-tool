@@ -19,7 +19,7 @@ use create_tray_icon::create_tray_icon;
 use create_window::create_window;
 
 use crate::{
-    is_debug,
+    is_vk_debug,
     windows_helpers::foreground_window::{get_foreground_window, set_foreground_window},
 };
 
@@ -44,7 +44,7 @@ impl ActiveApp {
         let tray_icon = create_tray_icon()?;
         tray_icon.set_visible(true)?;
 
-        let vk = VulkanInstance::new(window.clone(), is_debug())?;
+        let vk = VulkanInstance::new(window.clone(), is_vk_debug())?;
         let renderer = Renderer::new(&vk, window.clone())?;
 
         let dx = DirectXDevices::new()?;

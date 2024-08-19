@@ -33,6 +33,7 @@ pub const IS_DEV: bool = true;
 pub const IS_DEV: bool = false;
 
 pub const DEBUG_ENV_VAR: &str = "hdr-snipping-tool-debug";
+pub const VK_DEBUG_ENV_VAR: &str = "hdr-snipping-tool-debug-vk";
 
 pub fn is_debug() -> bool {
     std::env::var(DEBUG_ENV_VAR).is_ok()
@@ -42,9 +43,20 @@ pub fn enable_debug() {
     std::env::set_var(DEBUG_ENV_VAR, "true");
 }
 
+pub fn is_vk_debug() -> bool {
+    std::env::var(VK_DEBUG_ENV_VAR).is_ok()
+}
+
+pub fn enable_vk_debug() {
+    std::env::set_var(VK_DEBUG_ENV_VAR, "true");
+}
+
 fn main() {
     if std::env::args().any(|arg| arg.eq("--debug")) {
         enable_debug();
+    }
+    if std::env::args().any(|arg| arg.eq("--debug-vk")) {
+        enable_vk_debug();
     }
 
     if let Err(e) = fs::create_dir_all(project_directory()) {

@@ -33,6 +33,6 @@ pub struct VulkanInstance {
     pub command_buffer: CommandBuffer,
     pub fence: Fence,
 
-    pub debug_utils_loader: debug_utils::Instance,
-    pub debug_messenger: DebugUtilsMessengerEXT,
+    pub debug_utils_loader: Option<debug_utils::Instance>,
+    pub debug_messenger: Option<DebugUtilsMessengerEXT>,
 }

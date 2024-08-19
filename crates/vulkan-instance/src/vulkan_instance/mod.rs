@@ -54,7 +54,12 @@ impl VulkanInstance {
 
         let instance = aquire_instance(&entry, window.clone(), debug)?;
 
-        let (debug_utils_loader, debug_messenger) = setup_debug(&entry, &instance)?;
+        let (debug_utils_loader, debug_messenger) = if debug {
+            let (debug_utils_loader, debug_messenger) = setup_debug(&entry, &instance)?;
+            (Some(debug_utils_loader), Some(debug_messenger))
+        } else {
+            (None, None)
+        };
 
         let surface = unsafe {
             ash_window::create_surface(

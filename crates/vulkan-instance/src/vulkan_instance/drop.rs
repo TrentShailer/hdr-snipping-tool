@@ -14,8 +14,11 @@ impl Drop for VulkanInstance {
 
             self.surface_loader.destroy_surface(self.surface, None);
 
-            self.debug_utils_loader
-                .destroy_debug_utils_messenger(self.debug_messenger, None);
+            if let Some(debug_utils_loader) = &self.debug_utils_loader {
+                if let Some(debug_messenger) = self.debug_messenger {
+                    debug_utils_loader.destroy_debug_utils_messenger(debug_messenger, None);
+                }
+            }
 
             self.instance.destroy_instance(None);
         }
