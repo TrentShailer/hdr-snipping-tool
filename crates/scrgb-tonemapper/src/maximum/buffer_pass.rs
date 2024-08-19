@@ -222,7 +222,7 @@ impl BufferPass {
         let mut input_length = byte_count / 2;
         let mut output_length = (byte_count / 2).div_ceil(compute_blocksize);
         let mut use_write_read_ds = true;
-        let mut submission_index = 0;
+        let mut submission_index = 1;
 
         while input_length > 1 {
             let _span = info_span!("pass").entered();
@@ -240,10 +240,18 @@ impl BufferPass {
 
                 let command_buffer = command_buffers[submission_index];
                 let fence = fences[submission_index];
-                let signal_semaphores = [(
+
+                let will_have_following_submission = output_length > 1;
+                let maybe_signal_semaphores = [(
                     semaphores[submission_index],
                     PipelineStageFlags2::BOTTOM_OF_PIPE,
                 )];
+                let signal_semaphores: &[(Semaphore, PipelineStageFlags2)] =
+                    if will_have_following_submission {
+                        &maybe_signal_semaphores
+                    } else {
+                        &[]
+                    };
 
                 let wait_semaphore_index = if submission_index == 0 {
                     MAXIMUM_SUBMISSIONS - 1
@@ -259,7 +267,7 @@ impl BufferPass {
                     command_buffer,
                     fence,
                     &wait_semaphores,
-                    &signal_semaphores,
+                    signal_semaphores,
                     |device, command_buffer| unsafe {
                         device.cmd_bind_descriptor_sets(
                             command_buffer,
