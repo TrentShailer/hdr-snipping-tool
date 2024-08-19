@@ -30,9 +30,8 @@ pub struct VulkanInstance {
     pub surface: SurfaceKHR,
 
     pub command_buffer_pool: CommandPool,
-    pub command_buffers: HashMap<CommandBufferUsage, CommandBuffer>,
-    pub fences: HashMap<CommandBufferUsage, Fence>,
-    pub semaphores: HashMap<SemaphoreUsage, Semaphore>,
+    pub command_buffer: CommandBuffer,
+    pub fence: Fence,
 
     pub debug_utils_loader: debug_utils::Instance,
     pub debug_messenger: DebugUtilsMessengerEXT,
@@ -52,13 +51,4 @@ impl CommandBufferUsage {
         CommandBufferUsage::Setup,
         CommandBufferUsage::Tonemap,
     ];
-}
-
-#[derive(PartialEq, Eq, Hash)]
-pub enum SemaphoreUsage {
-    Render,
-    Aquire,
-}
-impl SemaphoreUsage {
-    pub const VALUES: [SemaphoreUsage; 2] = [SemaphoreUsage::Render, SemaphoreUsage::Aquire];
 }

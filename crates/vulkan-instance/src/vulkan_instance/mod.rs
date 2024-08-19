@@ -5,7 +5,6 @@ mod fences;
 mod instance;
 mod logical_device;
 pub(crate) mod physical_device;
-mod semaphores;
 
 use std::sync::Arc;
 
@@ -20,7 +19,6 @@ use fences::get_fences;
 use instance::aquire_instance;
 use logical_device::get_logical_device;
 use physical_device::get_physical_device;
-use semaphores::get_semaphpores;
 use thiserror::Error;
 use tracing::{info, info_span};
 use winit::{
@@ -76,12 +74,10 @@ impl VulkanInstance {
         let (device, queue) = get_logical_device(&instance, physical_device, queue_family_index)?;
         let device = Arc::new(device);
 
-        let (command_pool, command_buffers) =
-            get_command_buffers(device.clone(), queue_family_index)?;
+        let (command_pool, command_buffer) =
+            get_command_buffer(device.clone(), queue_family_index)?;
 
-        let fences = get_fences(device.clone())?;
-
-        let semaphores = get_semaphpores(device.clone())?;
+        let fence = get_fence(device.clone())?;
 
         Ok(Self {
             entry,
@@ -97,9 +93,8 @@ impl VulkanInstance {
             surface,
             //
             command_buffer_pool: command_pool,
-            command_buffers,
-            fences,
-            semaphores,
+            command_buffer,
+            fence,
             //
             debug_utils_loader,
             debug_messenger,

@@ -1,28 +1,26 @@
 use std::sync::Arc;
 
 use ash::{
-    vk::{self, CommandBufferSubmitInfo, PipelineStageFlags2, SemaphoreSubmitInfo},
+    vk::{self, CommandBuffer, CommandBufferSubmitInfo, SemaphoreSubmitInfo},
     Device,
 };
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 
-use crate::{CommandBufferUsage, VulkanInstance};
+use crate::VulkanInstance;
 
 impl VulkanInstance {
     pub fn record_submit_command_buffer<
         F: FnOnce(Arc<Device>, vk::CommandBuffer) -> Result<(), ash::vk::Result>,
     >(
         &self,
-        usage: CommandBufferUsage,
+        command_buffer: CommandBuffer,
+        fence: vk::Fence,
         wait_semaphores: &[(vk::Semaphore, vk::PipelineStageFlags2)],
         signal_semaphores: &[(vk::Semaphore, vk::PipelineStageFlags2)],
         f: F,
     ) -> Result<(), Error> {
         unsafe {
-            let fence = *self.fences.get(&usage).unwrap();
-            let command_buffer = *self.command_buffers.get(&usage).unwrap();
-
             self.device
                 .wait_for_fences(&[fence], true, u64::MAX)
                 .map_err(|e| Error::Vulkan(e, "waiting for fences"))?;
