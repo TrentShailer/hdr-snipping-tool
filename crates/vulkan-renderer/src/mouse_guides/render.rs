@@ -36,7 +36,7 @@ impl MouseGuides {
 
         unsafe {
             device.cmd_bind_pipeline(command_buffer, PipelineBindPoint::GRAPHICS, self.pipeline);
-            device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.0], &[]);
+            device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.0], &[0]);
             device.cmd_bind_index_buffer(command_buffer, self.index_buffer.0, 0, IndexType::UINT32);
             device.cmd_push_constants(
                 command_buffer,

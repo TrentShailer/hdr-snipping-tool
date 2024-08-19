@@ -38,6 +38,9 @@ pub fn init_tracing() -> Result<WorkerGuard, SetGlobalDefaultError> {
         .with(std_logger)
         .with(filter);
 
+    #[cfg(feature = "tracy")]
+    let collector = collector.with(tracing_tracy::TracyLayer::default());
+
     set_global_default(collector)?;
 
     Ok(_guard)

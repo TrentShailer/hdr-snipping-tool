@@ -34,6 +34,7 @@ impl Capture {
         };
 
         self.whitepoint = whitepoint;
+        self.loaded = true;
 
         Ok(())
     }
