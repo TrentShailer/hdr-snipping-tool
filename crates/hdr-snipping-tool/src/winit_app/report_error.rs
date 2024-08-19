@@ -18,6 +18,7 @@ pub fn report_new_app_error(error: active_app::Error) {
         active_app::Error::Renderer(_) => make_message("creating the renderer"),
         active_app::Error::DxDevices(_) => make_message("creating the DirectX devices"),
         active_app::Error::DisplayCache(_) => make_message("creating the display cache"),
+        active_app::Error::Maximum(_) => make_message("creating the maximum finder"),
     };
     display_message(&message, MB_ICONERROR);
 }

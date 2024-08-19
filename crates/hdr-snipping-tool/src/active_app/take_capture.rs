@@ -10,8 +10,13 @@ impl ActiveApp {
     pub fn take_capture(&mut self, hdr_whitepoint: f32) -> Result<ActiveCapture, Error> {
         let _span = info_span!("ActiveApp::take_capture").entered();
 
-        let active_capture =
-            ActiveCapture::new(&self.vk, &self.dx, &mut self.display_cache, hdr_whitepoint)?;
+        let active_capture = ActiveCapture::new(
+            &self.vk,
+            &self.maximum,
+            &self.dx,
+            &mut self.display_cache,
+            hdr_whitepoint,
+        )?;
 
         let size: PhysicalSize<u32> = active_capture.capture.display.size.into();
         let _ = self.window.request_inner_size(size);

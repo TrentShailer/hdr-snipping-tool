@@ -10,7 +10,7 @@ use ash::{
     Device,
 };
 use half::f16;
-use scrgb_tonemapper::maximum::{self, find_maximum};
+use scrgb_tonemapper::maximum::{self, Maximum};
 use selection::Selection;
 use thiserror::Error;
 use tracing::{info, info_span};
@@ -38,6 +38,7 @@ pub struct ActiveCapture {
 impl ActiveCapture {
     pub fn new(
         vk: &VulkanInstance,
+        maximum_finder: &Maximum,
         dx: &DirectXDevices,
         display_cache: &mut DisplayCache,
         hdr_whitepoint: f32,
@@ -64,7 +65,7 @@ impl ActiveCapture {
         let capture = get_capture(dx, &display, capture_item)?;
         let (capture_image, capture_memory, capture_view) = Self::image_from_capture(vk, &capture)?;
 
-        let maximum = find_maximum(vk, capture_view.clone(), display.size)?;
+        let maximum = maximum_finder.find_maximum(vk, capture_view, display.size)?;
         let maximum = if f16::from_bits(maximum.to_bits() - 1).to_f32()
             == capture.display.sdr_referece_white
         {

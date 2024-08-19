@@ -8,7 +8,7 @@ use ash::vk::{
 };
 use thiserror::Error;
 use tracing::info_span;
-use vulkan_instance::{record_submit_command_buffer, CommandBufferUsage, VulkanInstance};
+use vulkan_instance::{record_submit_command_buffer, VulkanInstance};
 use windows_capture_provider::Capture;
 
 use super::ActiveCapture;

@@ -5,6 +5,7 @@ pub mod take_capture;
 
 use std::sync::Arc;
 
+use scrgb_tonemapper::maximum::{self, Maximum};
 use thiserror::Error;
 use tracing::info_span;
 use tray_icon::TrayIcon;
@@ -29,6 +30,7 @@ pub struct ActiveApp {
     pub renderer: Renderer,
     pub dx: DirectXDevices,
     pub display_cache: DisplayCache,
+    pub maximum: Maximum,
 }
 
 impl ActiveApp {
@@ -48,12 +50,15 @@ impl ActiveApp {
         let dx = DirectXDevices::new()?;
         let display_cache = DisplayCache::new(&dx)?;
 
+        let maximum = Maximum::new(&vk)?;
+
         Ok(ActiveApp {
             window,
             vk,
             renderer,
             dx,
             display_cache,
+            maximum,
             _tray_icon: tray_icon,
         })
     }
@@ -81,4 +86,7 @@ pub enum Error {
 
     #[error("Failed to create Display Cache:\n{0}")]
     DisplayCache(#[from] windows_capture_provider::display_cache::Error),
+
+    #[error("Failed to create maximum finder:\n{0}")]
+    Maximum(#[from] maximum::Error),
 }
