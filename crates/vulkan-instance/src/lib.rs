@@ -3,14 +3,14 @@ pub mod find_memory_type_index;
 pub mod record_submit_command_buffer;
 pub mod vulkan_instance;
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use ash::{
     ext::debug_utils,
     khr::surface,
     vk::{
         CommandBuffer, CommandPool, DebugUtilsMessengerEXT, Fence, PhysicalDevice, Queue,
-        Semaphore, SurfaceKHR,
+        SurfaceKHR,
     },
     Device, Entry, Instance,
 };
@@ -35,20 +35,4 @@ pub struct VulkanInstance {
 
     pub debug_utils_loader: debug_utils::Instance,
     pub debug_messenger: DebugUtilsMessengerEXT,
-}
-
-#[derive(PartialEq, Eq, Hash)]
-pub enum CommandBufferUsage {
-    Draw,
-    AquireImage,
-    Setup,
-    Tonemap,
-}
-impl CommandBufferUsage {
-    pub const VALUES: [CommandBufferUsage; 4] = [
-        CommandBufferUsage::AquireImage,
-        CommandBufferUsage::Draw,
-        CommandBufferUsage::Setup,
-        CommandBufferUsage::Tonemap,
-    ];
 }

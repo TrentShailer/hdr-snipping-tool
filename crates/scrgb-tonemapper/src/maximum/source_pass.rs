@@ -4,18 +4,19 @@ use ash::{
     util::read_spv,
     vk::{
         Buffer, CommandBuffer, ComputePipelineCreateInfo, DescriptorBufferInfo,
-        DescriptorImageInfo, DescriptorPoolCreateInfo, DescriptorPoolSize,
-        DescriptorSetAllocateInfo, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo,
-        DescriptorType, ImageLayout, ImageView, PipelineBindPoint, PipelineCache,
-        PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo, PipelineStageFlags2, Sampler,
-        Semaphore, ShaderModuleCreateInfo, ShaderStageFlags, WriteDescriptorSet,
+        DescriptorImageInfo, DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize,
+        DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
+        DescriptorSetLayoutCreateInfo, DescriptorType, Fence, ImageLayout, ImageView, Pipeline,
+        PipelineBindPoint, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
+        PipelineShaderStageCreateInfo, PipelineStageFlags2, Sampler, Semaphore, ShaderModule,
+        ShaderModuleCreateInfo, ShaderStageFlags, WriteDescriptorSet,
     },
     Device,
 };
 use tracing::info_span;
-use vulkan_instance::{CommandBufferUsage, VulkanInstance};
+use vulkan_instance::VulkanInstance;
 
-use super::{Error, Maximum};
+use super::Error;
 
 pub struct SourcePass {
     module: ShaderModule,
@@ -226,7 +227,7 @@ impl SourcePass {
 
     pub fn drop(&self, device: &Device) {
         unsafe {
-            device.destroy_descriptor_set_layout(descriptor_layouts[0], None);
+            device.destroy_descriptor_set_layout(self.descriptor_layouts[0], None);
             device.destroy_descriptor_pool(self.descriptor_pool, None);
             device.destroy_pipeline(self.pipeline, None);
             device.destroy_pipeline_layout(self.layout, None);

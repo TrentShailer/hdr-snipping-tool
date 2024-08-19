@@ -3,19 +3,19 @@ use std::io::Cursor;
 use ash::{
     util::read_spv,
     vk::{
-        AccessFlags2, Buffer, BufferCopy2, BufferMemoryBarrier2, BufferUsageFlags, CommandBuffer,
-        ComputePipelineCreateInfo, CopyBufferInfo2, DependencyInfo, DescriptorBufferInfo,
-        DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSetAllocateInfo,
-        DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType, MemoryMapFlags,
-        MemoryPropertyFlags, PipelineBindPoint, PipelineCache, PipelineLayoutCreateInfo,
-        PipelineShaderStageCreateInfo, PipelineStageFlags2, PushConstantRange, Semaphore,
-        ShaderModuleCreateInfo, ShaderStageFlags, WriteDescriptorSet, QUEUE_FAMILY_IGNORED,
+        Buffer, CommandBuffer, ComputePipelineCreateInfo, DescriptorBufferInfo, DescriptorPool,
+        DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
+        DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo,
+        DescriptorType, Fence, Pipeline, PipelineBindPoint, PipelineCache, PipelineLayout,
+        PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo, PipelineStageFlags2,
+        PushConstantRange, Semaphore, ShaderModule, ShaderModuleCreateInfo, ShaderStageFlags,
+        WriteDescriptorSet,
     },
     Device,
 };
-use half::f16;
+
 use tracing::info_span;
-use vulkan_instance::{CommandBufferUsage, VulkanInstance};
+use vulkan_instance::VulkanInstance;
 
 use super::{Error, MAXIMUM_SUBMISSIONS};
 
@@ -230,9 +230,9 @@ impl BufferPass {
             // Perform reduction pass
             {
                 let descriptor_set = if use_write_read_ds {
-                    descriptor_sets[1]
+                    self.descriptor_sets[1]
                 } else {
-                    descriptor_sets[0]
+                    self.descriptor_sets[0]
                 };
 
                 let command_buffer = command_buffers[submission_index];
@@ -309,7 +309,7 @@ impl BufferPass {
 
     pub fn drop(&self, device: &Device) {
         unsafe {
-            device.destroy_descriptor_set_layout(descriptor_layouts[0], None);
+            device.destroy_descriptor_set_layout(self.descriptor_layouts[0], None);
             device.destroy_descriptor_pool(self.descriptor_pool, None);
             device.destroy_pipeline(self.pipeline, None);
             device.destroy_pipeline_layout(self.layout, None);

@@ -2,16 +2,17 @@ use std::sync::Arc;
 
 use ash::{
     vk::{
-        BufferUsageFlags, CommandBuffer, DescriptorPool, DescriptorSet, DescriptorSetLayout, Fence,
-        FenceCreateFlags, FenceCreateInfo, ImageView, MemoryPropertyFlags,
-        PhysicalDeviceProperties2, PhysicalDeviceSubgroupProperties, Pipeline, PipelineLayout,
-        Semaphore, SemaphoreCreateInfo, ShaderModule,
+        AccessFlags2, BufferCopy2, BufferMemoryBarrier2, BufferUsageFlags, CommandBuffer,
+        CommandBufferAllocateInfo, CommandBufferLevel, CopyBufferInfo2, DependencyInfo, Fence,
+        FenceCreateFlags, FenceCreateInfo, ImageView, MemoryMapFlags, MemoryPropertyFlags,
+        PhysicalDeviceProperties2, PhysicalDeviceSubgroupProperties, PipelineStageFlags2,
+        Semaphore, SemaphoreCreateInfo, QUEUE_FAMILY_IGNORED,
     },
     Device,
 };
-use buffer_pass::{buffer_reduction, BufferPass};
+use buffer_pass::BufferPass;
 use half::f16;
-use source_pass::{source_reduction_pass, SourcePass};
+use source_pass::SourcePass;
 use thiserror::Error;
 use tracing::info_span;
 use vulkan_instance::VulkanInstance;
@@ -38,8 +39,8 @@ impl Maximum {
         let _span = info_span!("Maximum::new").entered();
         // create command buffers
         let command_buffer_allocate_info = CommandBufferAllocateInfo::default()
-            .command_buffer_count(MAXIMUM_SUBMISSIONS)
-            .command_pool(command_buffer_pool)
+            .command_buffer_count(MAXIMUM_SUBMISSIONS as u32)
+            .command_pool(vk.command_buffer_pool)
             .level(CommandBufferLevel::PRIMARY);
         let command_buffers = unsafe {
             vk.device
@@ -213,7 +214,7 @@ impl Maximum {
         unsafe {
             vk.device
                 .wait_for_fences(&self.fences, true, u64::MAX)
-                .map_err(|e| Error::Vulkan(e, "waiting for fences"))
+                .map_err(|e| Error::Vulkan(e, "waiting for fences"))?;
         }
 
         let maximum = unsafe {
@@ -254,10 +255,10 @@ impl Drop for Maximum {
             self.source_pass.drop(&self.device);
             self.fences
                 .iter()
-                .for_each(|fence| self.device.destroy_fence(fence, None));
+                .for_each(|&fence| self.device.destroy_fence(fence, None));
             self.semaphores
                 .iter()
-                .for_each(|semaphore| self.device.destroy_semaphore(semaphore, None));
+                .for_each(|&semaphore| self.device.destroy_semaphore(semaphore, None));
         }
     }
 }

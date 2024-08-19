@@ -1,11 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use ash::{
     vk::{self, CommandBuffer, CommandBufferAllocateInfo, CommandBufferLevel, CommandPool},
     Device,
 };
-
-use crate::CommandBufferUsage;
 
 use super::Error;
 
@@ -26,14 +24,11 @@ pub fn get_command_buffer(
         .command_pool(command_buffer_pool)
         .level(CommandBufferLevel::PRIMARY);
 
-    let command_buffers_vec =
-        unsafe { device.allocate_command_buffers(&command_buffer_allocate_info) }
-            .map_err(|e| Error::Vulkan(e, "allocating command buffers"))?;
+    let command_buffer = unsafe {
+        device
+            .allocate_command_buffers(&command_buffer_allocate_info)
+            .map_err(|e| Error::Vulkan(e, "allocating command buffers"))?[0]
+    };
 
-    let mut command_buffers = HashMap::new();
-    for (index, value) in CommandBufferUsage::VALUES.into_iter().enumerate() {
-        command_buffers.insert(value, command_buffers_vec[index]);
-    }
-
-    Ok((command_buffer_pool, command_buffers))
+    Ok((command_buffer_pool, command_buffer))
 }

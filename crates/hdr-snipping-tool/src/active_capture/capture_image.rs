@@ -81,7 +81,8 @@ impl ActiveCapture {
 
         // transition image layout
         vk.record_submit_command_buffer(
-            CommandBufferUsage::Setup,
+            vk.command_buffer,
+            vk.fence,
             &[],
             &[],
             |device, command_buffer| {

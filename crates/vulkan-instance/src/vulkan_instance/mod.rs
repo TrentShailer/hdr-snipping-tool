@@ -13,9 +13,9 @@ use ash::{
     vk::{self},
     Entry, LoadingError,
 };
-use command_buffer::get_command_buffers;
+use command_buffer::get_command_buffer;
 use debug::setup_debug;
-use fences::get_fences;
+use fences::get_fence;
 use instance::aquire_instance;
 use logical_device::get_logical_device;
 use physical_device::get_physical_device;

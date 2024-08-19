@@ -5,13 +5,7 @@ impl Drop for VulkanInstance {
         unsafe {
             self.device.device_wait_idle().unwrap();
 
-            for semaphore in self.semaphores.values() {
-                self.device.destroy_semaphore(*semaphore, None);
-            }
-
-            for fence in self.fences.values() {
-                self.device.destroy_fence(*fence, None);
-            }
+            self.device.destroy_fence(self.fence, None);
 
             self.device
                 .destroy_command_pool(self.command_buffer_pool, None);
