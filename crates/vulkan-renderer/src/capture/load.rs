@@ -1,13 +1,8 @@
-use std::sync::Arc;
-
+use ash::vk::{
+    DescriptorImageInfo, DescriptorType, ImageLayout, ImageView, Sampler, WriteDescriptorSet,
+};
 use thiserror::Error;
 use vulkan_instance::VulkanInstance;
-use vulkano::{
-    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
-    image::view::ImageView,
-    pipeline::Pipeline,
-    Validated, VulkanError,
-};
 
 use super::Capture;
 
@@ -15,34 +10,38 @@ impl Capture {
     pub fn load_capture(
         &mut self,
         vk: &VulkanInstance,
-        image: Arc<ImageView>,
+        image: ImageView,
         whitepoint: f32,
     ) -> Result<(), Error> {
-        let ds_layout = self.pipeline.layout().set_layouts()[0].clone();
+        unsafe {
+            let image_descriptor = DescriptorImageInfo {
+                sampler: Sampler::null(),
+                image_view: image,
+                image_layout: ImageLayout::GENERAL,
+            };
 
-        let descriptor_set = PersistentDescriptorSet::new(
-            &vk.allocators.descriptor,
-            ds_layout.clone(),
-            [
-                WriteDescriptorSet::sampler(0, self.sampler.clone()),
-                WriteDescriptorSet::image_view(1, image.clone()),
-            ],
-            [],
-        )?;
+            let write_descriptor_sets = [WriteDescriptorSet {
+                dst_set: self.descriptor_sets[1],
+                dst_binding: 0,
+                descriptor_count: 1,
+                descriptor_type: DescriptorType::SAMPLED_IMAGE,
+                p_image_info: &image_descriptor,
+                ..Default::default()
+            }];
+
+            vk.device
+                .update_descriptor_sets(&write_descriptor_sets, &[]);
+        };
 
         self.whitepoint = whitepoint;
-        self.capture_ds = Some(descriptor_set);
 
         Ok(())
     }
 
     pub fn unload_capture(&mut self) {
-        self.capture_ds = None;
+        self.loaded = false;
     }
 }
 
 #[derive(Debug, Error)]
-pub enum Error {
-    #[error("Failed to create descriptor set:\n{0:?}")]
-    DescriptorSet(#[from] Validated<VulkanError>),
-}
+pub enum Error {}

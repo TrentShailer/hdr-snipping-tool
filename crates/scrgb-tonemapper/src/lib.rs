@@ -4,7 +4,6 @@ pub mod tonemap_output;
 use std::{
     fmt::Debug,
     io::{self, Cursor},
-    u64,
 };
 
 use ash::{
@@ -204,6 +203,7 @@ pub fn tonemap(
             device.cmd_bind_pipeline(command_buffer, PipelineBindPoint::COMPUTE, compute_pipeline);
 
             device.cmd_dispatch(command_buffer, workgroup_x, workgroup_y, 1);
+            Ok(())
         },
     )?;
 

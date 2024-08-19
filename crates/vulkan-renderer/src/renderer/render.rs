@@ -1,19 +1,19 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
-use thiserror::Error;
-use vulkan_instance::VulkanInstance;
-use vulkano::{
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferExecError, CommandBufferUsage,
-        RenderingAttachmentInfo, RenderingInfo,
-    },
-    swapchain::{acquire_next_image, SwapchainCreateInfo, SwapchainPresentInfo},
-    sync::{self, GpuFuture},
-    Validated, ValidationError, VulkanError,
+use ash::vk::{
+    AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, Extent2D, Fence, ImageLayout,
+    Offset2D, PipelineStageFlags2, PresentInfoKHR, Rect2D, RenderingAttachmentInfo, RenderingInfo,
+    SemaphoreWaitInfo,
 };
+use thiserror::Error;
+use tracing::info;
+use vulkan_instance::{
+    record_submit_command_buffer, CommandBufferUsage, SemaphoreUsage, VulkanInstance,
+};
+
 use winit::window::Window;
 
-use super::{window_size_dependent_setup, Renderer};
+use super::{swapchain, Renderer};
 
 impl Renderer {
     pub fn render(
@@ -28,11 +28,6 @@ impl Renderer {
         let window_size: [u32; 2] = window.inner_size().into();
         let window_scale = window.scale_factor();
 
-        // Cleanup finished resources
-        if let Some(v) = self.render_future.as_mut() {
-            v.cleanup_finished();
-        }
-
         // Don't try to render a surface that isn't visible
         if window_size.contains(&0) {
             return Ok(());
@@ -40,133 +35,167 @@ impl Renderer {
 
         // Handle recreatin the swapchain
         if self.recreate_swapchain {
-            self.recreate_swapchain(window_size)?;
+            self.recreate_swapchain(vk, window_size)?;
         }
 
-        let aquire_future = match self.aquire_future.take() {
-            Some(v) => v,
-            None => {
-                // Get the next image index and future for when it is available
-                let (_, suboptimal, acquire_future) =
-                    match acquire_next_image(self.swapchain.clone(), None) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            if matches!(e, Validated::Error(VulkanError::OutOfDate)) {
-                                self.recreate_swapchain = true;
-                                return Ok(());
-                            }
+        let aquire_semaphore = *vk.semaphores.get(&SemaphoreUsage::Aquire).unwrap();
+        let aquire_fence = *vk.fences.get(&CommandBufferUsage::AquireImage).unwrap();
+        let render_semaphore = *vk.semaphores.get(&SemaphoreUsage::Render).unwrap();
 
-                            return Err(Error::AquireImage(e));
-                        }
+        let aquire_timeout = if should_wait { u64::MAX } else { 0 };
+
+        // try waiting for aquire fence
+        // If the render call shouldn't wait and the fence is not signalled
+        // then this render call is skipped
+        // this ensures that when the render call can be passed through
+        // it has the most up to date information
+        unsafe {
+            let fences = [aquire_fence];
+
+            if let Err(e) = vk.device.wait_for_fences(&fences, true, aquire_timeout) {
+                match e {
+                    ash::vk::Result::TIMEOUT => return Ok(()),
+                    _ => return Err(Error::Vulkan(e, "waiting for aquire fence")),
+                }
+            }
+
+            vk.device
+                .reset_fences(&fences)
+                .map_err(|e| Error::Vulkan(e, "resetting aquire fence"))?;
+        }
+
+        let image_index = unsafe {
+            let aquire_result = self.swapchain_loader.acquire_next_image(
+                self.swapchain,
+                aquire_timeout,
+                aquire_semaphore,
+                aquire_fence,
+            );
+
+            match aquire_result {
+                Ok((image_index, suboptimal)) => {
+                    if suboptimal {
+                        self.recreate_swapchain = true;
+                    }
+                    image_index
+                }
+                Err(e) => match e {
+                    ash::vk::Result::ERROR_OUT_OF_DATE_KHR => {
+                        self.recreate_swapchain = true;
+                        return Ok(());
+                    }
+
+                    ash::vk::Result::NOT_READY => return Ok(()),
+
+                    // A wait operation has not completed in the specified time
+                    ash::vk::Result::TIMEOUT => return Ok(()),
+                    _ => return Err(Error::Vulkan(e, "aquiring image")),
+                },
+            }
+        };
+
+        vk.record_submit_command_buffer(
+            CommandBufferUsage::Draw,
+            &[(
+                aquire_semaphore,
+                PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+            )],
+            &[(render_semaphore, PipelineStageFlags2::BOTTOM_OF_PIPE)],
+            |device, command_buffer| {
+                unsafe {
+                    // Wait for PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT?
+
+                    let color_attachments = [RenderingAttachmentInfo::default()
+                        .clear_value(ClearValue {
+                            color: ClearColorValue {
+                                float32: [0.05, 0.05, 0.05, 1.0],
+                            },
+                        })
+                        .load_op(AttachmentLoadOp::CLEAR)
+                        .store_op(AttachmentStoreOp::STORE)
+                        .image_layout(ImageLayout::ATTACHMENT_OPTIMAL)
+                        .image_view(self.attachment_views[image_index as usize])];
+                    let render_area = Rect2D {
+                        offset: Offset2D { x: 0, y: 0 },
+                        extent: Extent2D {
+                            width: window_size[0],
+                            height: window_size[1],
+                        },
                     };
+                    let rendering_info = RenderingInfo::default()
+                        .color_attachments(&color_attachments)
+                        .layer_count(1)
+                        .render_area(render_area);
+                    device.cmd_begin_rendering(command_buffer, &rendering_info);
 
-                if suboptimal {
-                    self.recreate_swapchain = true;
+                    let viewports = [self.viewport];
+                    device.cmd_set_viewport(command_buffer, 0, &viewports);
+                    let scissors = [render_area];
+                    device.cmd_set_scissor_with_count(command_buffer, &scissors);
+
+                    if self.capture.loaded {
+                        self.capture.render(&device, command_buffer)?;
+
+                        self.mouse_guides.render(
+                            &device,
+                            command_buffer,
+                            mouse_position,
+                            window_size,
+                            window_scale,
+                        )?;
+
+                        self.selection.render(
+                            &device,
+                            command_buffer,
+                            selection_top_left,
+                            selection_size,
+                            window_size,
+                            window_scale,
+                        )?;
+                    }
+
+                    device.cmd_end_rendering(command_buffer);
                 }
 
-                acquire_future
-            }
-        };
+                Ok(())
+            },
+        )?;
 
-        // if we shouldn't wait for the image and the image is not aquired, don't draw
-        if !should_wait && aquire_future.wait(Some(Duration::from_secs(0))).is_err() {
-            self.aquire_future = Some(aquire_future);
-            return Ok(());
+        let wait_semaphores = [render_semaphore];
+        let swapchains = [self.swapchain];
+        let image_indicies = [image_index];
+        let present_info = PresentInfoKHR::default()
+            .wait_semaphores(&wait_semaphores)
+            .swapchains(&swapchains)
+            .image_indices(&image_indicies);
+
+        let suboptimal = unsafe { self.swapchain_loader.queue_present(vk.queue, &present_info) }
+            .map_err(|e| Error::Vulkan(e, "queueing present"))?;
+
+        if suboptimal {
+            self.recreate_swapchain = true;
         }
 
-        let image_index = aquire_future.image_index();
+        // ------
 
-        let mut builder = AutoCommandBufferBuilder::primary(
-            &vk.allocators.command,
-            vk.queue.queue_family_index(),
-            CommandBufferUsage::OneTimeSubmit,
-        )
-        .map_err(Error::CreateCommandBuffer)?;
+        // Cleanup finished resources
+        // if let Some(v) = self.render_future.as_mut() {
+        //     v.cleanup_finished();
+        // }
 
-        builder
-            .begin_rendering(RenderingInfo {
-                color_attachments: vec![Some(RenderingAttachmentInfo {
-                    load_op: vulkano::render_pass::AttachmentLoadOp::Clear,
-                    store_op: vulkano::render_pass::AttachmentStoreOp::Store,
-                    clear_value: Some([0.05, 0.05, 0.05, 1.0].into()),
-                    ..RenderingAttachmentInfo::image_view(
-                        self.attachment_views[image_index as usize].clone(),
-                    )
-                })],
-                ..Default::default()
-            })?
-            .set_viewport(0, [self.viewport.clone()].into_iter().collect())?;
+        // let render_future = self
+        //     .render_future
+        //     .take()
+        //     .unwrap_or_else(|| sync::now(vk.device.clone()).boxed())
+        //     .join(aquire_future)
+        //     .then_execute(vk.queue.clone(), command_buffer)?
+        //     .then_swapchain_present(
+        //         vk.queue.clone(),
+        //         SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_index),
+        //     )
+        //     .boxed()
+        //     .then_signal_fence_and_flush();
 
-        if self.capture.capture_ds.is_some() {
-            self.capture
-                .render(&mut builder)
-                .map_err(|e| Error::Render(e, "capture"))?;
-
-            self.mouse_guides
-                .render(&mut builder, mouse_position, window_size, window_scale)
-                .map_err(|e| Error::Render(e, "mouse_guides"))?;
-
-            self.selection
-                .render(
-                    &mut builder,
-                    selection_top_left,
-                    selection_size,
-                    window_size,
-                    window_scale,
-                )
-                .map_err(|e| Error::Render(e, "selection"))?;
-        }
-
-        builder.end_rendering()?;
-
-        let command_buffer = builder.build().map_err(Error::BuildCommandBuffer)?;
-
-        let render_future = self
-            .render_future
-            .take()
-            .unwrap_or_else(|| sync::now(vk.device.clone()).boxed())
-            .join(aquire_future)
-            .then_execute(vk.queue.clone(), command_buffer)?
-            .then_swapchain_present(
-                vk.queue.clone(),
-                SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_index),
-            )
-            .boxed()
-            .then_signal_fence_and_flush();
-
-        match render_future {
-            Ok(v) => {
-                self.render_future = Some(v.boxed());
-            }
-            Err(e) => {
-                if matches!(e, Validated::Error(VulkanError::OutOfDate)) {
-                    self.recreate_swapchain = true;
-                    self.render_future = Some(sync::now(vk.device.clone()).boxed());
-                } else {
-                    return Err(Error::FailedToFlush(e));
-                }
-            }
-        };
-
-        Ok(())
-    }
-
-    fn recreate_swapchain(&mut self, window_size: [u32; 2]) -> Result<(), Error> {
-        let (new_swapchain, new_images) = self
-            .swapchain
-            .recreate(SwapchainCreateInfo {
-                image_extent: window_size,
-                ..self.swapchain.create_info()
-            })
-            .map_err(Error::RecreateSwapchain)?;
-        self.swapchain = new_swapchain;
-
-        let attachment_views = window_size_dependent_setup(&new_images, &mut self.viewport)?;
-        self.attachment_views = attachment_views;
-
-        self.aquire_future = None;
-
-        self.recreate_swapchain = false;
         Ok(())
     }
 }
@@ -174,29 +203,11 @@ impl Renderer {
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Failed to recreate swapchain:\n{0:?}")]
-    RecreateSwapchain(#[source] Validated<VulkanError>),
+    RecreateSwapchain(#[from] swapchain::Error),
 
-    #[error("Failed to perform window size dependent setup:\n{0}")]
-    WindowSizeDependentSetup(#[from] window_size_dependent_setup::Error),
+    #[error("Encountered vulkan error while {1}:\n{0}")]
+    Vulkan(#[source] ash::vk::Result, &'static str),
 
-    #[error("Failed to aquire image:\n{0:?}")]
-    AquireImage(#[source] Validated<VulkanError>),
-
-    #[error("Failed to create command buffer:\n{0:?}")]
-    CreateCommandBuffer(#[source] Validated<VulkanError>),
-
-    #[error("Failed to write to command buffer:\n{0}")]
-    UseCommandBuffer(#[from] Box<ValidationError>),
-
-    #[error("Failed to render {1}:\n{0}")]
-    Render(#[source] Box<ValidationError>, &'static str),
-
-    #[error("Failed to build command buffer:\n{0:?}")]
-    BuildCommandBuffer(#[source] Validated<VulkanError>),
-
-    #[error("Failed to execute command buffer:\n{0}")]
-    ExecuteCommandBuffer(#[from] CommandBufferExecError),
-
-    #[error("Failed to flush:\n{0:?}")]
-    FailedToFlush(#[source] Validated<VulkanError>),
+    #[error("Failed to record and submit command buffer:\n{0}")]
+    RecordSubmit(#[from] record_submit_command_buffer::Error),
 }

@@ -10,11 +10,13 @@ use thiserror::Error;
 use crate::{CommandBufferUsage, VulkanInstance};
 
 impl VulkanInstance {
-    pub fn record_submit_command_buffer<F: FnOnce(Arc<Device>, vk::CommandBuffer)>(
+    pub fn record_submit_command_buffer<
+        F: FnOnce(Arc<Device>, vk::CommandBuffer) -> Result<(), ash::vk::Result>,
+    >(
         &self,
         usage: CommandBufferUsage,
-        wait_semaphores: &[vk::Semaphore],
-        signal_semaphores: &[vk::Semaphore],
+        wait_semaphores: &[(vk::Semaphore, vk::PipelineStageFlags2)],
+        signal_semaphores: &[(vk::Semaphore, vk::PipelineStageFlags2)],
         f: F,
     ) -> Result<(), Error> {
         unsafe {
@@ -43,7 +45,8 @@ impl VulkanInstance {
                 .begin_command_buffer(command_buffer, &command_buffer_begin_info)
                 .map_err(|e| Error::Vulkan(e, "beginning command buffer"))?;
 
-            f(self.device.clone(), command_buffer);
+            f(self.device.clone(), command_buffer)
+                .map_err(|e| Error::Vulkan(e, "recording commands"))?;
 
             self.device
                 .end_command_buffer(command_buffer)
@@ -56,10 +59,10 @@ impl VulkanInstance {
             let command_buffer_submit_infos = &[command_buffer_submit_info];
 
             let mut wait_semaphore_infos: SmallVec<[SemaphoreSubmitInfo; 4]> = smallvec![];
-            for semaphore in wait_semaphores {
+            for (semaphore, stage) in wait_semaphores {
                 let wait_semaphore_info = SemaphoreSubmitInfo {
                     semaphore: *semaphore,
-                    stage_mask: PipelineStageFlags2::TOP_OF_PIPE,
+                    stage_mask: *stage,
                     device_index: 0,
                     ..Default::default()
                 };
@@ -67,10 +70,10 @@ impl VulkanInstance {
             }
 
             let mut signal_semaphore_infos: SmallVec<[SemaphoreSubmitInfo; 3]> = smallvec![];
-            for semaphore in signal_semaphores {
+            for (semaphore, stage) in signal_semaphores {
                 let signal_semaphore_info = SemaphoreSubmitInfo {
                     semaphore: *semaphore,
-                    stage_mask: PipelineStageFlags2::BOTTOM_OF_PIPE,
+                    stage_mask: *stage,
                     ..Default::default()
                 };
                 signal_semaphore_infos.push(signal_semaphore_info);

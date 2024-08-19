@@ -5,7 +5,7 @@ layout(location = 0) in vec2 in_uv;
 layout(location = 0) out vec4 out_color;
 
 layout(set = 0, binding = 0) uniform sampler capture_sampler;
-layout(set = 0, binding = 1) uniform texture2D capture;
+layout(set = 1, binding = 0) uniform texture2D capture;
 
 layout(push_constant) uniform PushConstants {
 	 float whitepoint;

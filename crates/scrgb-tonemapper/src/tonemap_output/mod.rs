@@ -116,6 +116,7 @@ impl TonemapOutput {
                     DependencyInfo::default().image_memory_barriers(&memory_barriers);
 
                 unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
+                Ok(())
             },
         )?;
 

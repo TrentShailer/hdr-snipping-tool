@@ -1,5 +1,3 @@
-use std::u64;
-
 use ash::vk::{
     self, AccessFlags2, BufferImageCopy2, BufferUsageFlags, CopyImageToBufferInfo2, DependencyInfo,
     Extent2D, ImageAspectFlags, ImageLayout, ImageMemoryBarrier2, ImageSubresourceLayers,
@@ -83,6 +81,7 @@ impl TonemapOutput {
                     .regions(regions);
 
                 unsafe { device.cmd_copy_image_to_buffer2(command_buffer, &image_copy_info) };
+                Ok(())
             },
         )?;
 

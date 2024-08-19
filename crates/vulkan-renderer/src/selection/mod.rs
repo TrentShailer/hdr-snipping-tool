@@ -1,9 +1,8 @@
+pub mod drop;
 pub mod render;
 
-use std::sync::Arc;
-
+use ash::vk::{Buffer, DeviceMemory, Pipeline, PipelineLayout};
 use vulkan_instance::VulkanInstance;
-use vulkano::{buffer::Subbuffer, pipeline::GraphicsPipeline};
 
 use crate::{
     border::Border, pipelines::selection_shading::Vertex,
@@ -23,16 +22,22 @@ const NO_FLAGS: u32 = 0b00000000_00000000_00000000_00000000;
 
 pub struct Selection {
     pub border: Border,
-    pub vertex_buffer: Subbuffer<[Vertex]>,
-    pub index_buffer: Subbuffer<[u32]>,
-    pub shading_pipeline: Arc<GraphicsPipeline>,
+
+    pub vertex_buffer: (Buffer, DeviceMemory),
+    pub index_buffer: (Buffer, DeviceMemory),
+    pub indicies: u32,
+
+    pub shading_pipeline: Pipeline,
+    pub shading_pipeline_layout: PipelineLayout,
 }
 
 impl Selection {
     pub fn new(
         vk: &VulkanInstance,
-        shading_pipeline: Arc<GraphicsPipeline>,
-        border_pipeline: Arc<GraphicsPipeline>,
+        shading_pipeline: Pipeline,
+        shading_pipeline_layout: PipelineLayout,
+        border_pipeline: Pipeline,
+        border_pipeline_layout: PipelineLayout,
     ) -> Result<Self, crate::vertex_index_buffer::Error> {
         let color = [0, 0, 0, 127];
         let verticies = vec![
@@ -86,15 +91,25 @@ impl Selection {
         ];
 
         let (vertex_buffer, index_buffer) =
-            create_vertex_and_index_buffer(vk, verticies, indicies)?;
+            create_vertex_and_index_buffer(vk, &verticies, &indicies)?;
 
-        let border = Border::new(vk, border_pipeline, [255, 255, 255, 255], 2.0)?;
+        let border = Border::new(
+            vk,
+            border_pipeline,
+            border_pipeline_layout,
+            [255, 255, 255, 255],
+            2.0,
+        )?;
 
         Ok(Self {
             border,
+
             vertex_buffer,
             index_buffer,
+            indicies: indicies.len() as u32,
+
             shading_pipeline,
+            shading_pipeline_layout,
         })
     }
 }

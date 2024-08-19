@@ -236,6 +236,7 @@ pub(crate) fn buffer_reduction(
                     );
 
                     device.cmd_dispatch(command_buffer, workgroup_count, 1, 1);
+                    Ok(())
                 },
             )?;
 
@@ -309,6 +310,7 @@ pub(crate) fn buffer_reduction(
                 .regions(buffer_copy_regions);
 
             unsafe { device.cmd_copy_buffer2(command_buffer, &buffer_copy_info) }
+            Ok(())
         },
     )
     .unwrap();

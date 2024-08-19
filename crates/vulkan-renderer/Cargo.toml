@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 vulkan-instance = { workspace = true }
-scrgb-tonemapper = { workspace = true }
 
 tracing = { workspace = true }
 thiserror = { workspace = true }
 winit = { workspace = true }
+ash = { workspace = true }

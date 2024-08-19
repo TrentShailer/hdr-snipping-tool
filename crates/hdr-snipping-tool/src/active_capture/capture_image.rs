@@ -39,7 +39,7 @@ impl ActiveCapture {
                 array_layers: 1,
                 samples: SampleCountFlags::TYPE_1,
                 tiling: ImageTiling::OPTIMAL,
-                usage: ImageUsageFlags::STORAGE,
+                usage: ImageUsageFlags::STORAGE | ImageUsageFlags::SAMPLED,
                 sharing_mode: SharingMode::EXCLUSIVE,
                 initial_layout: ImageLayout::UNDEFINED,
                 ..Default::default()
@@ -109,6 +109,7 @@ impl ActiveCapture {
                     DependencyInfo::default().image_memory_barriers(&memory_barriers);
 
                 unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
+                Ok(())
             },
         )?;
 

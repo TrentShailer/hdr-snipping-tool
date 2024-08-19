@@ -21,7 +21,7 @@ impl ActiveApp {
 
         self.renderer.capture.load_capture(
             &self.vk,
-            active_capture.capture_image.clone(),
+            active_capture.capture_view,
             active_capture.whitepoint,
         )?;
 

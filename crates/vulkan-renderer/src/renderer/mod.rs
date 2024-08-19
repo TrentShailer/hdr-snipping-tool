@@ -1,23 +1,20 @@
+pub mod drop;
 pub mod render;
+pub mod swapchain;
 pub mod units;
-pub mod window_size_dependent_setup;
 
 use std::sync::Arc;
 
-use thiserror::Error;
-use tracing::{info, info_span};
-use vulkan_instance::VulkanInstance;
-use vulkano::{
-    format::Format,
-    image::{view::ImageView, ImageUsage},
-    pipeline::graphics::{subpass::PipelineRenderingCreateInfo, viewport::Viewport},
-    swapchain::{
-        ColorSpace, CompositeAlpha, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
+use ash::{
+    vk::{
+        DescriptorSetLayout, Image, ImageView, Pipeline, PipelineLayout,
+        PipelineRenderingCreateInfo, ShaderModule, SwapchainKHR, Viewport,
     },
-    sync::{self, GpuFuture},
-    Validated, VulkanError,
+    Device,
 };
-use window_size_dependent_setup::window_size_dependent_setup;
+use thiserror::Error;
+use tracing::info_span;
+use vulkan_instance::{record_submit_command_buffer, VulkanInstance};
 use winit::window::Window;
 
 use crate::{
@@ -29,177 +26,155 @@ use crate::{
 
 pub struct Renderer {
     pub recreate_swapchain: bool,
-    pub render_future: Option<Box<dyn GpuFuture>>,
-    pub aquire_future: Option<SwapchainAcquireFuture>,
-    pub swapchain: Arc<Swapchain>,
-    pub attachment_views: Vec<Arc<ImageView>>,
+
+    pub device: Arc<Device>,
+
+    // pub aquire_future: Option<SwapchainAcquireFuture>,
+    pub swapchain_loader: ash::khr::swapchain::Device,
+    pub swapchain: SwapchainKHR,
+    //
+    pub attachment_images: Vec<Image>,
+    pub attachment_views: Vec<ImageView>,
+
+    //
     pub viewport: Viewport,
     //
     pub capture: Capture,
     pub selection: Selection,
     pub mouse_guides: MouseGuides,
+
+    //
+    pub pipeline_layouts: Vec<PipelineLayout>,
+    pub pipelines: Vec<Pipeline>,
+    pub shaders: Vec<ShaderModule>,
+    pub descriptor_layouts: Vec<DescriptorSetLayout>,
 }
 
 impl Renderer {
     pub fn new(vk: &VulkanInstance, window: Arc<Window>) -> Result<Self, Error> {
         let _span = info_span!("Renderer::new").entered();
 
-        let (swapchain, images) = {
-            // Querying the capabilities of the surface. When we create the swapchain we can only pass
-            // values that are allowed by the capabilities.
-            let surface_capabilities = vk
-                .device
-                .physical_device()
-                .surface_capabilities(&vk.surface, Default::default())
-                .map_err(Error::GetSurfaceCapabilites)?;
+        let window_size: [u32; 2] = window.inner_size().into();
 
-            // Choosing the internal format that the images will have.
-            let (image_format, image_space) = vk
-                .device
-                .physical_device()
-                .surface_formats(&vk.surface, Default::default())
-                .map_err(Error::GetSurfaceFormats)?
-                .into_iter()
-                .min_by_key(|(format, color_space)| match format {
-                    Format::R16G16B16A16_SFLOAT => 0,
-                    _ => 1,
-                }
-				+
-				match color_space {
-                    ColorSpace::ExtendedSrgbLinear => 0,
-                    _ => 1,
-                }
-			).unwrap();
-
-            let composite_alpha = surface_capabilities
-                .supported_composite_alpha
-                .into_iter()
-                .min_by_key(|composite_alpha| match composite_alpha {
-                    CompositeAlpha::Opaque => 0,
-                    CompositeAlpha::PreMultiplied => 1,
-                    CompositeAlpha::PostMultiplied => 2,
-                    CompositeAlpha::Inherit => 3,
-                    _ => 4,
-                })
-                .ok_or(Error::CompositeAlpha)?;
-
-            let present_modes = vk
-                .device
-                .physical_device()
-                .surface_present_modes(&vk.surface, Default::default())
-                .map_err(Error::GetSurfaceCapabilites)?;
-
-            let swapchain_image_count = surface_capabilities.min_image_count + 1;
-
-            let present_mode = present_modes
-                .min_by_key(|mode| match mode {
-                    vulkano::swapchain::PresentMode::Fifo => 0,
-                    vulkano::swapchain::PresentMode::Mailbox => 1,
-                    vulkano::swapchain::PresentMode::FifoRelaxed => 2,
-                    vulkano::swapchain::PresentMode::Immediate => 3,
-                    _ => 4,
-                })
-                .expect("Device has no present modes");
-
-            info!("Surface format: {:?}", image_format);
-            info!("Surface space: {:?}", image_space);
-            info!("Swapchain images: {}", swapchain_image_count);
-            info!("Present mode: {:?}", present_mode);
-
-            Swapchain::new(
-                vk.device.clone(),
-                vk.surface.clone(),
-                SwapchainCreateInfo {
-                    min_image_count: swapchain_image_count,
-                    image_format,
-                    image_color_space: image_space,
-                    image_extent: window.inner_size().into(),
-                    image_usage: ImageUsage::COLOR_ATTACHMENT,
-                    composite_alpha,
-                    present_mode,
-                    ..Default::default()
-                },
-            )
-            .map_err(Error::CreateSwapchain)?
+        let swapchain_loader = ash::khr::swapchain::Device::new(&vk.instance, &vk.device);
+        let swapchain = Self::create_swapchain(vk, &swapchain_loader, window_size, None)?;
+        let swapchain_images = unsafe {
+            swapchain_loader
+                .get_swapchain_images(swapchain)
+                .map_err(|e| Error::Vulkan(e, "getting swapchain images"))?
         };
+        Self::transition_images(vk, &swapchain_images)?;
 
-        let mut viewport = Viewport {
-            offset: [0.0, 0.0],
-            extent: [0.0, 0.0],
-            depth_range: 0.0..=1.0,
-        };
+        let mut viewport = Viewport::default().min_depth(0.0).max_depth(1.0);
+        let attachment_views =
+            Self::window_size_dependant_setup(vk, &swapchain_images, window_size, &mut viewport)?;
 
-        let attachment_views = window_size_dependent_setup(&images, &mut viewport)?;
-
-        let subpass = PipelineRenderingCreateInfo {
-            color_attachment_formats: vec![Some(swapchain.image_format())],
-            ..Default::default()
-        };
+        let surface_format =
+            Self::get_surface_format(vk).map_err(|e| Error::Vulkan(e, "getting surface format"))?;
+        let surface_formats = [surface_format.format];
+        let pipeline_rendering_create_info =
+            PipelineRenderingCreateInfo::default().color_attachment_formats(&surface_formats);
 
         // Create pipelines
-        let capture_pipeline = pipelines::capture::create_pipeline(vk, subpass.clone())
-            .map_err(|e| Error::Pipeline(e, "capture"))?;
+        let capture_pipeline =
+            pipelines::capture::create_pipeline(vk, pipeline_rendering_create_info, viewport)
+                .map_err(|e| Error::Pipeline(e, "capture"))?;
 
-        let selection_shading_pipeline =
-            pipelines::selection_shading::create_pipeline(vk, subpass.clone())
-                .map_err(|e| Error::Pipeline(e, "selection shading"))?;
+        let selection_shading_pipeline = pipelines::selection_shading::create_pipeline(
+            vk,
+            pipeline_rendering_create_info,
+            viewport,
+        )
+        .map_err(|e| Error::Pipeline(e, "selection shading"))?;
 
-        let border_pipeline = pipelines::border::create_pipeline(vk, subpass.clone())
-            .map_err(|e| Error::Pipeline(e, "border"))?;
+        let border_pipeline =
+            pipelines::border::create_pipeline(vk, pipeline_rendering_create_info, viewport)
+                .map_err(|e| Error::Pipeline(e, "border"))?;
 
-        let mouse_guides_pipeline = pipelines::mouse_guides::create_pipeline(vk, subpass.clone())
-            .map_err(|e| Error::Pipeline(e, "mouse guide"))?;
+        let mouse_guides_pipeline =
+            pipelines::mouse_guides::create_pipeline(vk, pipeline_rendering_create_info, viewport)
+                .map_err(|e| Error::Pipeline(e, "mouse guide"))?;
 
         // Objects
-        let capture = Capture::new(vk, capture_pipeline)?;
+        let capture = Capture::new(
+            vk,
+            capture_pipeline.0,
+            capture_pipeline.1,
+            capture_pipeline.3,
+        )?;
 
-        let selection = Selection::new(vk, selection_shading_pipeline, border_pipeline.clone())
-            .map_err(|e| Error::Object(e, "selection"))?;
+        let selection = Selection::new(
+            vk,
+            selection_shading_pipeline.0,
+            selection_shading_pipeline.1,
+            border_pipeline.0,
+            border_pipeline.1,
+        )
+        .map_err(|e| Error::Object(e, "selection"))?;
 
-        let mouse_guides = MouseGuides::new(vk, mouse_guides_pipeline, 1.0)
-            .map_err(|e| Error::Object(e, "mouse guides"))?;
+        let mouse_guides =
+            MouseGuides::new(vk, mouse_guides_pipeline.0, mouse_guides_pipeline.1, 1.0)
+                .map_err(|e| Error::Object(e, "mouse guides"))?;
+
+        let pipelines = vec![
+            capture_pipeline.0,
+            border_pipeline.0,
+            mouse_guides_pipeline.0,
+            selection_shading_pipeline.0,
+        ];
+
+        let pipeline_layouts = vec![
+            capture_pipeline.1,
+            border_pipeline.1,
+            mouse_guides_pipeline.1,
+            selection_shading_pipeline.1,
+        ];
+
+        let shaders = vec![
+            capture_pipeline.2[0],
+            capture_pipeline.2[1],
+            border_pipeline.2[0],
+            border_pipeline.2[1],
+            mouse_guides_pipeline.2[0],
+            mouse_guides_pipeline.2[1],
+            selection_shading_pipeline.2[0],
+            selection_shading_pipeline.2[1],
+        ];
+
+        let descriptor_layouts = vec![capture_pipeline.3[0], capture_pipeline.3[1]];
 
         Ok(Self {
-            viewport,
+            device: vk.device.clone(),
+            swapchain_loader,
             swapchain,
+            attachment_images: swapchain_images,
             attachment_views,
-            aquire_future: None,
-            recreate_swapchain: false,
-            //
+            viewport,
             capture,
             selection,
             mouse_guides,
-            //
-            render_future: Some(sync::now(vk.device.clone()).boxed()),
+            pipeline_layouts,
+            pipelines,
+            descriptor_layouts,
+            shaders,
+            recreate_swapchain: false,
         })
     }
 }
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to get surface capabilites:\n{0:?}")]
-    GetSurfaceCapabilites(#[source] Validated<VulkanError>),
+    #[error("Encountered vulkan error while {1}:\n{0}")]
+    Vulkan(#[source] ash::vk::Result, &'static str),
 
-    #[error("Failed to get surface formats:\n{0:?}")]
-    GetSurfaceFormats(#[source] Validated<VulkanError>),
+    #[error("No suitable memory types are available for the allocation")]
+    NoSuitableMemoryType,
 
-    #[error("Composite alpha is not supported")]
-    CompositeAlpha,
+    #[error("Failed to record and submit command buffer:\n{0}")]
+    RecordSubmit(#[from] record_submit_command_buffer::Error),
 
-    #[error("Failed to create swapchain:\n{0:?}")]
-    CreateSwapchain(#[source] Validated<VulkanError>),
-
-    #[error("Failed to create renderpass:\n{0:?}")]
-    CreateRenderpass(#[source] Validated<VulkanError>),
-
-    #[error("Failed to create pipline layout:\n{0:?}")]
-    CreatePipelineLayout(#[source] Validated<VulkanError>),
-
-    #[error("Failed to create descriptor set:\n{0:?}")]
-    CreateDescriptorSet(#[source] Validated<VulkanError>),
-
-    #[error("Failed to perform Window Size Dependent Setup:\n{0}")]
-    WindowSizeDependentSetup(#[from] window_size_dependent_setup::Error),
+    #[error("Failed to create swapchain:\n{0}")]
+    Swapchain(#[from] swapchain::Error),
 
     //
     #[error("Failed to create {1} pipeline:\n{0}")]

@@ -1,9 +1,8 @@
+pub mod drop;
 pub mod render;
 
-use std::sync::Arc;
-
+use ash::vk::{Buffer, DeviceMemory, Pipeline, PipelineLayout};
 use vulkan_instance::VulkanInstance;
-use vulkano::{buffer::Subbuffer, pipeline::GraphicsPipeline};
 
 use crate::{pipelines::border::Vertex, vertex_index_buffer::create_vertex_and_index_buffer};
 
@@ -21,16 +20,21 @@ const LEFT_FLAG: u32 = 0b00000000_00000000_00000000_00000001;
 const NO_FLAGS: u32 = 0b00000000_00000000_00000000_00000000;
 
 pub struct Border {
-    pub vertex_buffer: Subbuffer<[Vertex]>,
-    pub index_buffer: Subbuffer<[u32]>,
-    pub pipeline: Arc<GraphicsPipeline>,
+    pub vertex_buffer: (Buffer, DeviceMemory),
+    pub index_buffer: (Buffer, DeviceMemory),
+    pub indicies: u32,
+
+    pub pipeline_layout: PipelineLayout,
+    pub pipeline: Pipeline,
+
     pub line_size: f32,
 }
 
 impl Border {
     pub fn new(
         vk: &VulkanInstance,
-        pipeline: Arc<GraphicsPipeline>,
+        pipeline: Pipeline,
+        pipeline_layout: PipelineLayout,
         color: [u8; 4],
         line_size: f32,
     ) -> Result<Self, crate::vertex_index_buffer::Error> {
@@ -85,12 +89,16 @@ impl Border {
         ];
 
         let (vertex_buffer, index_buffer) =
-            create_vertex_and_index_buffer(vk, verticies, indicies)?;
+            create_vertex_and_index_buffer(vk, &verticies, &indicies)?;
 
         Ok(Self {
             vertex_buffer,
             index_buffer,
+            indicies: indicies.len() as u32,
+
+            pipeline_layout,
             pipeline,
+
             line_size,
         })
     }

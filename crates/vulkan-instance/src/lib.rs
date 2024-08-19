@@ -41,11 +41,13 @@ pub struct VulkanInstance {
 #[derive(PartialEq, Eq, Hash)]
 pub enum CommandBufferUsage {
     Draw,
+    AquireImage,
     Setup,
     Tonemap,
 }
 impl CommandBufferUsage {
-    pub const VALUES: [CommandBufferUsage; 3] = [
+    pub const VALUES: [CommandBufferUsage; 4] = [
+        CommandBufferUsage::AquireImage,
         CommandBufferUsage::Draw,
         CommandBufferUsage::Setup,
         CommandBufferUsage::Tonemap,
@@ -55,8 +57,8 @@ impl CommandBufferUsage {
 #[derive(PartialEq, Eq, Hash)]
 pub enum SemaphoreUsage {
     Render,
-    Present,
+    Aquire,
 }
 impl SemaphoreUsage {
-    pub const VALUES: [SemaphoreUsage; 2] = [SemaphoreUsage::Render, SemaphoreUsage::Present];
+    pub const VALUES: [SemaphoreUsage; 2] = [SemaphoreUsage::Render, SemaphoreUsage::Aquire];
 }

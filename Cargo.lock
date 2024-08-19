@@ -915,6 +915,7 @@ dependencies = [
  "tracing-subscriber",
  "tray-icon",
  "vulkan-instance",
+ "vulkan-renderer",
  "windows",
  "windows-capture-provider",
  "windows-result",
@@ -2217,7 +2218,7 @@ dependencies = [
 name = "vulkan-renderer"
 version = "2.0.0"
 dependencies = [
- "scrgb-tonemapper",
+ "ash",
  "thiserror",
  "tracing",
  "vulkan-instance",

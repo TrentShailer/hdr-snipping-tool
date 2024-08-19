@@ -186,6 +186,7 @@ pub(crate) fn source_reduction_pass(
             device.cmd_bind_pipeline(command_buffer, PipelineBindPoint::COMPUTE, compute_pipeline);
 
             device.cmd_dispatch(command_buffer, workgroup_x, workgroup_y, 1);
+            Ok(())
         },
     )?;
 
