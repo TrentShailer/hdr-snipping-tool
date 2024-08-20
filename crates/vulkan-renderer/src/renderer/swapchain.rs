@@ -6,6 +6,7 @@ use ash::vk::{
     SwapchainCreateInfoKHR, SwapchainKHR, Viewport,
 };
 use thiserror::Error;
+use tracing::{info, info_span};
 use vulkan_instance::{record_submit_command_buffer, VulkanInstance};
 
 use super::Renderer;
@@ -38,6 +39,8 @@ impl Renderer {
         window_size: [u32; 2],
         old_swapchain: Option<SwapchainKHR>,
     ) -> Result<SwapchainKHR, Error> {
+        let _span = info_span!("create_swapchain").entered();
+
         let surface_format =
             Self::get_surface_format(vk).map_err(|e| Error::Vulkan(e, "getting surface format"))?;
 
@@ -110,6 +113,10 @@ impl Renderer {
         let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_create_info, None) }
             .map_err(|e| Error::Vulkan(e, "creating the swapchain"))?;
 
+        info!("Surface format: {:#?}", surface_format.format);
+        info!("Surface color space: {:#?}", surface_format.color_space);
+        info!("Swapchain Size: {}", swapchain_image_count);
+
         Ok(swapchain)
     }
 
@@ -164,6 +171,8 @@ impl Renderer {
         vk: &VulkanInstance,
         window_size: [u32; 2],
     ) -> Result<(), Error> {
+        let _span = info_span!("recreate_swapchain").entered();
+
         unsafe {
             vk.device
                 .device_wait_idle()
@@ -194,8 +203,6 @@ impl Renderer {
             &mut self.viewport,
         )?;
         self.attachment_views = attachment_views;
-
-        // TODO self.aquire_future = None;
 
         self.recreate_swapchain = false;
         Ok(())

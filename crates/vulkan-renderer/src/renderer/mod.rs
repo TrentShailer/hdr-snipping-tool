@@ -75,6 +75,7 @@ impl Renderer {
 
         let surface_format =
             Self::get_surface_format(vk).map_err(|e| Error::Vulkan(e, "getting surface format"))?;
+
         let surface_formats = [surface_format.format];
         let pipeline_rendering_create_info =
             PipelineRenderingCreateInfo::default().color_attachment_formats(&surface_formats);

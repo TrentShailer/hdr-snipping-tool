@@ -96,12 +96,9 @@ impl Capture {
                 .descriptor_pool(descriptor_pool)
                 .set_layouts(&descriptor_layouts);
 
-            let descriptor_sets = vk
-                .device
+            vk.device
                 .allocate_descriptor_sets(&descriptor_allocate_info)
-                .map_err(|e| Error::Vulkan(e, "allocating descriptor sets"))?;
-
-            descriptor_sets
+                .map_err(|e| Error::Vulkan(e, "allocating descriptor sets"))?
         };
 
         unsafe {

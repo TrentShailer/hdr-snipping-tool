@@ -25,11 +25,16 @@ impl Selection {
         let target_size = selection_size.as_f32_array();
 
         let push_constants = [
+            0.0,
+            0.0,
+            1.0,
+            1.0,
             target_position[0],
             target_position[1],
             target_size[0],
             target_size[1],
         ];
+
         let push_constants: Box<[u8]> = push_constants
             .into_iter()
             .flat_map(|value| value.to_le_bytes())

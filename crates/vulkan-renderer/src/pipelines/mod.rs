@@ -33,10 +33,9 @@ pub fn create_pipeline(
 
     let viewports = [viewport];
     let viewport_state = PipelineViewportStateCreateInfo::default().viewports(&viewports);
-    // TODO scissors?
 
     let rasterization_state = PipelineRasterizationStateCreateInfo::default()
-        .front_face(FrontFace::COUNTER_CLOCKWISE)
+        .front_face(FrontFace::CLOCKWISE)
         .line_width(1.0)
         .polygon_mode(PolygonMode::FILL);
 
