@@ -19,8 +19,7 @@ pub fn create_vertex_and_index_buffer<V: Copy>(
     indicies: &[u32],
 ) -> Result<VertexIndexBuffer, Error> {
     // Vertex buffer
-    let vertex_size = std::mem::size_of::<V>();
-    let vertex_buffer_size = (verticies.len() * vertex_size) as u64;
+    let vertex_buffer_size = std::mem::size_of_val(verticies) as u64;
 
     let (vertex, vertex_memory) = vk
         .create_bound_buffer(
@@ -63,8 +62,7 @@ pub fn create_vertex_and_index_buffer<V: Copy>(
     }
 
     // Index buffer
-    let index_size = std::mem::size_of::<u32>();
-    let index_buffer_size = (indicies.len() * index_size) as u64;
+    let index_buffer_size = std::mem::size_of_val(indicies) as u64;
 
     let (index, index_memory) = vk
         .create_bound_buffer(

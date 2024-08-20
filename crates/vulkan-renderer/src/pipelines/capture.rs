@@ -139,12 +139,9 @@ pub fn create_pipeline(
             let descriptor_info =
                 DescriptorSetLayoutCreateInfo::default().bindings(&descriptor_layout_bindings);
 
-            let descriptor_layout = vk
-                .device
+            vk.device
                 .create_descriptor_set_layout(&descriptor_info, None)
-                .map_err(|e| Error::Vulkan(e, "creating descriptor set layout"))?;
-
-            descriptor_layout
+                .map_err(|e| Error::Vulkan(e, "creating descriptor set layout"))?
         };
 
         [sampler_layout, view_layout]
