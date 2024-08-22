@@ -145,12 +145,7 @@ pub fn create_vertex_and_index_buffer<V: Copy>(
             unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
 
             // vertex copy
-            let vertex_buffer_copy = BufferCopy2 {
-                src_offset: 0,
-                dst_offset: 0,
-                size: vertex_buffer_size,
-                ..Default::default()
-            };
+            let vertex_buffer_copy = BufferCopy2::default().size(vertex_buffer_size);
             let vertex_buffer_copy_regions = &[vertex_buffer_copy];
 
             let vertex_buffer_copy_info = CopyBufferInfo2::default()
@@ -161,12 +156,7 @@ pub fn create_vertex_and_index_buffer<V: Copy>(
             unsafe { device.cmd_copy_buffer2(command_buffer, &vertex_buffer_copy_info) }
 
             // index copy
-            let index_buffer_copy = BufferCopy2 {
-                src_offset: 0,
-                dst_offset: 0,
-                size: index_buffer_size,
-                ..Default::default()
-            };
+            let index_buffer_copy = BufferCopy2::default().size(index_buffer_size);
             let index_buffer_copy_regions = &[index_buffer_copy];
 
             let index_buffer_copy_info = CopyBufferInfo2::default()
