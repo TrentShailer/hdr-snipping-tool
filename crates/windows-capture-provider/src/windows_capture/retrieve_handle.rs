@@ -1,4 +1,4 @@
-use tracing::info_span;
+use tracing::instrument;
 use windows::{
     Graphics::Capture::Direct3D11CaptureFrame,
     Win32::{
@@ -13,10 +13,9 @@ use windows::{
 use windows_core::Interface;
 use windows_result::Error as WindowsError;
 
-/// Retrieves the capture from the GPU.
-pub fn retrieve_capture(d3d_capture: Direct3D11CaptureFrame) -> Result<HANDLE, WindowsError> {
-    let _span = info_span!("retrieve_capture").entered();
-
+/// Retrieves the capture handle from the GPU.
+#[instrument("retrieve_capture", skip_all, err)]
+pub fn retrieve_handle(d3d_capture: Direct3D11CaptureFrame) -> Result<HANDLE, WindowsError> {
     // Get the surface of the capture
     let surface = d3d_capture.Surface()?;
     let access: IDirect3DDxgiInterfaceAccess = surface.cast()?;

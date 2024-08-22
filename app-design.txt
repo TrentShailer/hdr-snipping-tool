@@ -32,7 +32,7 @@ WindowsCaptureProvider {
         handle: HMONITOR
         position: [i32; 2]
         size: [u32; 2]
-        sdr_whitepoint: f32
+        sdr_reference_white: f32
     }
 
     DirectXDevices {

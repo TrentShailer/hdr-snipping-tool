@@ -1,7 +1,7 @@
 use std::sync::mpsc::{channel, Receiver};
 
 use thiserror::Error;
-use tracing::info_span;
+use tracing::instrument;
 use windows::{
     Foundation::TypedEventHandler,
     Graphics::{
@@ -20,6 +20,7 @@ use crate::DirectXDevices;
 
 /// Start a capture session for a given capture item.\
 /// Returns the frame pool, the capture session, and a receiver for the capture frame.
+#[instrument("start_capture_session", skip_all, err)]
 pub fn start_capture_session(
     devices: &DirectXDevices,
     capture_item: &GraphicsCaptureItem,
@@ -31,8 +32,6 @@ pub fn start_capture_session(
     ),
     Error,
 > {
-    let _span = info_span!("start_capture_session").entered();
-
     let capture_size = capture_item.Size().map_err(Error::CaptureSize)?;
 
     let framepool = Direct3D11CaptureFramePool::CreateFreeThreaded(
