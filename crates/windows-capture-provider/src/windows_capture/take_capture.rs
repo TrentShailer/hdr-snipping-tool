@@ -12,13 +12,13 @@ impl WindowsCapture {
     #[instrument("WindowsCapture::take_capture", skip_all, err)]
     pub fn take_capture(
         devices: &DirectXDevices,
-        display: (&Display, &GraphicsCaptureItem),
+        display: (Display, GraphicsCaptureItem),
     ) -> Result<Self, Error> {
         let (display, capture_item) = display;
 
         // get the framepool, capture session, and captuire receiver
         let (framepool, capture_session, capture_receiver) =
-            start_capture_session(devices, capture_item)?;
+            start_capture_session(devices, &capture_item)?;
 
         // get the d3d_capture
         let recv_span = info_span!("recv").entered();
@@ -38,7 +38,7 @@ impl WindowsCapture {
         Ok(WindowsCapture {
             handle: capture_handle,
             size: display.size,
-            display: *display,
+            display,
         })
     }
 }

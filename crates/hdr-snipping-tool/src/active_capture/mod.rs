@@ -17,8 +17,7 @@ use tracing::{info, info_span};
 use vulkan_instance::VulkanInstance;
 use windows::Win32::Foundation::HWND;
 use windows_capture_provider::{
-    capture_item_cache, get_capture::get_capture, hovered, Capture, CaptureItemCache,
-    DirectXDevices, Display,
+    capture_item_cache, windows_capture, CaptureItemCache, DirectXDevices, WindowsCapture,
 };
 use winit::dpi::PhysicalPosition;
 
@@ -26,7 +25,7 @@ use crate::windows_helpers::foreground_window::get_foreground_window;
 
 pub struct ActiveCapture {
     device: Arc<Device>,
-    pub capture: Capture,
+    pub capture: WindowsCapture,
     pub capture_image: Image,
     pub capture_memory: DeviceMemory,
     pub capture_view: ImageView,
@@ -47,25 +46,17 @@ impl ActiveCapture {
 
         let formerly_focused_window = get_foreground_window();
 
-        display_cache.refresh(dx)?;
+        display_cache.refresh_displays(dx)?;
 
         let display = match display_cache.hovered()? {
             Some(display) => display,
             None => return Err(Error::NoDisplay),
         };
 
-        let capture_item = match display_cache
-            .capture_items
-            .get(&(display.handle.0 as isize))
-        {
-            Some(capture_item) => capture_item,
-            None => return Err(Error::NoCaptureItem(display)),
-        };
-
-        let capture = get_capture(dx, &display, capture_item)?;
+        let capture = WindowsCapture::take_capture(dx, display)?;
         let (capture_image, capture_memory, capture_view) = Self::image_from_capture(vk, &capture)?;
 
-        let maximum = maximum_finder.find_maximum(vk, capture_view, display.size)?;
+        let maximum = maximum_finder.find_maximum(vk, capture_view, capture.size)?;
         let maximum = if f16::from_bits(maximum.to_bits() - 1).to_f32()
             == capture.display.sdr_referece_white
         {
@@ -76,10 +67,10 @@ impl ActiveCapture {
 
         info!("Maximum: {:.2}", maximum);
 
-        let whitepoint = if maximum > display.sdr_referece_white {
+        let whitepoint = if maximum > capture.display.sdr_referece_white {
             hdr_whitepoint
         } else {
-            display.sdr_referece_white
+            capture.display.sdr_referece_white
         };
 
         info!("Whitepoint: {:.2}", whitepoint);
@@ -106,20 +97,14 @@ impl ActiveCapture {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to refresh display cache:\n{0}")]
-    RefreshCache(#[from] capture_item_cache::Error),
-
-    #[error("Failed to get hovered display:\n{0}")]
-    HoveredDisplay(#[from] hovered::Error),
+    #[error("Failed while accessing the capture item cache:\n{0}")]
+    HoveredDisplay(#[from] capture_item_cache::Error),
 
     #[error("No display is being hovered")]
     NoDisplay,
 
-    #[error("No capture item exists for hovered display: {0:?}")]
-    NoCaptureItem(Display),
-
-    #[error("Failed to get capture:\n{0}")]
-    GetCapture(#[from] windows_capture_provider::get_capture::Error),
+    #[error("Failed to take capture:\n{0}")]
+    TakeCapture(#[from] windows_capture::Error),
 
     #[error("Failed to create capture image:\n{0}")]
     CaptureImage(#[from] capture_image::Error),

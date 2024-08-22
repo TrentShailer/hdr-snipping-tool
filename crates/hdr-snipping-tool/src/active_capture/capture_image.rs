@@ -9,7 +9,7 @@ use ash::vk::{
 use thiserror::Error;
 use tracing::info_span;
 use vulkan_instance::{record_submit_command_buffer, VulkanInstance};
-use windows_capture_provider::Capture;
+use windows_capture_provider::WindowsCapture;
 
 use super::ActiveCapture;
 
@@ -17,7 +17,7 @@ impl ActiveCapture {
     /// Creates a vulkan image from the capture by importing the shared dx11 texture handle.
     pub fn image_from_capture(
         vk: &VulkanInstance,
-        capture: &Capture,
+        capture: &WindowsCapture,
     ) -> Result<(Image, DeviceMemory, ImageView), Error> {
         let _span = info_span!("image_from_capture").entered();
 
