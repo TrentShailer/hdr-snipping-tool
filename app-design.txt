@@ -1,0 +1,191 @@
+// Notes:
+// All errors should be #[non_exhaustive]
+// Structs that are subject to change/iteration should be #[non_exhaustive]
+
+// objects that create vulkan objects are required to take a RENFERENCE
+// to the VulkanInstance::device and have their own lifetimes to ensure
+// that the child object does not outlive the vulkan instance.
+
+// TODO crush a lot of A{..Default::default} into A::default()...;
+
+HdrSnippingTool {
+
+}
+
+WindowsCaptureProvider {
+    /// Capture from windows in R16G16B16A16_Float format
+    WindowsCapture {
+        handle: HANDLE
+        size: [u32; 2] // TODO May be need to handle display capture differences
+        display: Display
+
+        fn take_capture(devices: &DirectXDevices, display: (&Display, &GraphicsCaptureItem)) -> Result<Self, Error>
+
+        enum Error {
+            StartCaptureSession,
+            RetreieveHandle,
+            Cleanup
+        }
+    }
+
+    Display {
+        handle: HMONITOR
+        position: [i32; 2]
+        size: [u32; 2]
+        sdr_whitepoint: f32
+    }
+
+    DirectXDevices {
+        dxgi_adapter: IDXGIAdapter1,
+        d3d_device: IDirect3DDevice,
+        d3d11_device: ID3D11Device,
+        d3d11_context: ID3D11DeviceContext,
+
+        fn new() -> Result<Self, Error>
+
+        enum Error {
+            D3D11Device
+            D3D11Context
+            D3DDevice
+            DXGIAdapter
+        }
+    }
+
+    CapureItemCache {
+        fn new(devices: &DirectXDevices) -> Result<Self, Error>
+
+        fn hovered(&self) -> Result<Option<(Display, GraphicsCaptureItem)>, Error>
+
+        /// Only refreshes the cached displays and invalidated remove graphics capure items.
+        /// New graphics capture items are only created on request.
+        fn refresh_displays(&mut self, devices: &DirectXDevices) -> Result<(), Error>
+
+        enum Error {
+            GetDisplays,
+            CreateCaputreItem,
+            GetMouse,
+        }
+    }
+}
+
+Renderer {
+    Renderer {
+        fn new(vk: &VulkanIntance, window_size: [u32; 2]) -> Result<Self, Error>
+
+        fn render(vk: &VulkanInstance, window_size: [u32; 2], window_scale: f64, mouse_position: [u32; 2], selection: Selection) -> Result<(), Error>
+
+        fn load_capture(&mut self, vk: &VulkanInstance, capture: &HdrCapture)
+
+        fn unload_capture(&mut self)
+
+        enum Error {
+            #[error(transparent)]
+            GenericVulkan
+        }
+    }
+}
+
+VulkanInstance {
+    VulkanInstance {
+        instance: Instance
+        physical_device: PhysicalDevice
+        device: Device
+
+        queue: Queue,
+        queue_family_index: u32,
+
+        command_buffer_pool: CommandBufferPool
+        command_buffer: (CommandBuffer, Fence)
+
+        surface_loader: surface::Instance,
+        surface: SurfaceKHR,
+
+
+        fn new(window: &Window, enable_validation_layers: bool) -> Result<Self, CreateError>
+
+        fn find_memory_type_index(&self, memory_requirements: &vk::MemoryRequirements, flags: vk::MemoryPropertyFlags) -> Option<u32>
+
+        fn record_submit_command_buffer<F: FnOnce(Arc<Device>, vk::CommandBuffer) -> Result<(), GenericVulkanError>>(
+            &self,
+            command_buffer: (CommandBuffer, Fence),
+            wait_semaphores: &[(vk::Semaphore, vk::PipelineStageFlags2)],
+            signal_semaphores: &[(vk::Semaphore, vk::PipelineStageFlags2)],
+            f: F,
+        ) -> Result<(), GenericVulkanError>
+
+        /// memory must be host visible and coherant
+        fn write_to_memory<T>(&self, memory: DeviceMemory, data: &[T], offset: u64, size: u64) -> Result<(), GenericVulkanError>
+
+        fn create_unbound_buffer(&self, size: u64, usage: BufferUsageFlags, memory_flags: MemoryPropertyFlags) -> Result<(Buffer, DeviceMemory), GenericVulkanError>
+        fn create_bound_buffer(&self, size: u64, usage: BufferUsageFlags, memory_flags: MemoryPropertyFlags) -> Result<(Buffer, DeviceMemory), GenericVulkanError>
+
+        /// Provides better defaults for BufferMemoryBarrier2
+        fn buffer_memory_barrier() -> BufferMemoryBarrier2
+        /// Provides better defaults for ImageMemoryBarrier2
+        fn image_memory_barrier() -> ImageMemoryBarrier2
+
+        fn allocate_command_buffers(&self, count: u32) -> Result<Box<[(CommandBuffer, Fence)]>, GenericVulkanError>
+
+        fn create_shader_module(&self, bytes: &[u8]) -> Result<ShaderModule, GenericVulkanError> 
+
+        enum CreateError {
+            LoadLibrary,
+            GetHandle,
+            GenericVulkanError,
+            UnsupportedVulkanVersion,
+            NoSuitableDevices
+        }
+    }
+
+    enum GenericVulkanError {
+        #[error("Encountered vulkan error while {1}:\n{0}")]
+        VkResult(#[source] ash::vk::Result, &'static str),
+
+        #[error("No suitable memory type for {0}")]
+        NoSuitableMemoryType(&'static str)
+    }
+}
+
+HdrCapture {
+    Maximum {
+        fn new(vk: &VulkanInstance) -> Result<Self, Error>
+
+        fn find_maximum(&self, vk: &VulkanInstance, hdr_capture: &HdrCapture) -> Result<f16, Error>
+
+        enum Error {
+            GenericVulkan
+        }
+    }
+
+    Tonemap {
+        fn new(vk: &VulkanInstance) -> Result<Self, Error>
+
+        fn tonemap(&self, vk: &VulkanInstance, hdr_capture: &HdrCapture) -> Result<(Image, DeviceMemory), Error>
+
+        enum Error {
+            GenericVulkan
+        }
+    }
+
+    HdrCapture {
+        size: [u32; 2]
+        whitepoint: f32
+        image_view: ImageView
+
+        fn import_windows_capture(vk: &VulkanInstance, maximum: &Maximum, capture: &WindowsCapture) -> Result<Self, Error>
+
+        enum Error {
+            Vulkan,
+            NoSuitableMemoryType
+        }
+    }
+
+    Selection {
+        start: [u32; 2],
+        end: [u32; 2]
+
+        fn size(&self) -> [u32; 2]
+
+        fn top_left(&self) -> [u32; 2]
+    }
+}

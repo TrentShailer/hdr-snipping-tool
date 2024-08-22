@@ -53,6 +53,8 @@ unsafe extern "system" fn vulkan_debug_callback(
         ffi::CStr::from_ptr(callback_data.p_message).to_string_lossy()
     };
 
+    // TODO panic on error?
+
     match message_severity {
         vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE => {
             debug!("[{message_type:?}] [{message_id_name} ({message_id_number})] {message}")
