@@ -119,12 +119,10 @@ impl Renderer {
             &[(render_semaphore, PipelineStageFlags2::BOTTOM_OF_PIPE)],
             |device, command_buffer| {
                 unsafe {
-                    // TODO Wait for PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT?
-
                     let color_attachments = [RenderingAttachmentInfo::default()
                         .clear_value(ClearValue {
                             color: ClearColorValue {
-                                float32: [0.05, 0.05, 0.05, 1.0],
+                                float32: [0.05, 0.05, 0.05, 0.0],
                             },
                         })
                         .load_op(AttachmentLoadOp::CLEAR)
