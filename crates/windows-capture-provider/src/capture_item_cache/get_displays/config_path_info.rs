@@ -1,4 +1,5 @@
 use thiserror::Error;
+use tracing::instrument;
 use windows::Win32::Devices::Display::{
     DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes, QueryDisplayConfig,
     DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL, DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
@@ -15,6 +16,7 @@ pub struct DisplayConfig {
 }
 
 /// Gets display config using the display config path infos.
+#[instrument(skip_all, err)]
 pub fn get_display_configs() -> Result<Box<[DisplayConfig]>, Error> {
     let display_config_path_infos = get_display_config_path_infos().map_err(Error::DisplayInfos)?;
 

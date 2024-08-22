@@ -12,7 +12,7 @@ use tray_icon::TrayIcon;
 use vulkan_instance::VulkanInstance;
 use vulkan_renderer::renderer::Renderer;
 
-use windows_capture_provider::{DirectXDevices, DisplayCache};
+use windows_capture_provider::{CaptureItemCache, DirectXDevices};
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
 use create_tray_icon::create_tray_icon;
@@ -29,7 +29,7 @@ pub struct ActiveApp {
     pub vk: VulkanInstance,
     pub renderer: Renderer,
     pub dx: DirectXDevices,
-    pub display_cache: DisplayCache,
+    pub display_cache: CaptureItemCache,
     pub maximum: Maximum,
 }
 
@@ -48,7 +48,7 @@ impl ActiveApp {
         let renderer = Renderer::new(&vk, window.clone())?;
 
         let dx = DirectXDevices::new()?;
-        let display_cache = DisplayCache::new(&dx)?;
+        let display_cache = CaptureItemCache::new(&dx)?;
 
         let maximum = Maximum::new(&vk)?;
 
@@ -85,7 +85,7 @@ pub enum Error {
     DxDevices(#[from] windows_capture_provider::directx_devices::Error),
 
     #[error("Failed to create Display Cache:\n{0}")]
-    DisplayCache(#[from] windows_capture_provider::display_cache::Error),
+    DisplayCache(#[from] windows_capture_provider::capture_item_cache::Error),
 
     #[error("Failed to create maximum finder:\n{0}")]
     Maximum(#[from] maximum::Error),

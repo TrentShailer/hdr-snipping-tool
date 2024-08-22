@@ -54,7 +54,7 @@ WindowsCaptureProvider {
     CapureItemCache {
         fn new(devices: &DirectXDevices) -> Result<Self, Error>
 
-        fn hovered(&self) -> Result<Option<(Display, GraphicsCaptureItem)>, Error>
+        fn hovered(&mut self) -> Result<Option<(Display, GraphicsCaptureItem)>, Error>
 
         /// Only refreshes the cached displays and invalidated remove graphics capure items.
         /// New graphics capture items are only created on request.

@@ -17,8 +17,8 @@ use tracing::{info, info_span};
 use vulkan_instance::VulkanInstance;
 use windows::Win32::Foundation::HWND;
 use windows_capture_provider::{
-    display_cache, get_capture::get_capture, hovered, Capture, DirectXDevices, Display,
-    DisplayCache,
+    capture_item_cache, get_capture::get_capture, hovered, Capture, CaptureItemCache,
+    DirectXDevices, Display,
 };
 use winit::dpi::PhysicalPosition;
 
@@ -40,7 +40,7 @@ impl ActiveCapture {
         vk: &VulkanInstance,
         maximum_finder: &Maximum,
         dx: &DirectXDevices,
-        display_cache: &mut DisplayCache,
+        display_cache: &mut CaptureItemCache,
         hdr_whitepoint: f32,
     ) -> Result<Self, Error> {
         let _span = info_span!("ActiveCapture::new").entered();
@@ -107,7 +107,7 @@ impl ActiveCapture {
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Failed to refresh display cache:\n{0}")]
-    RefreshCache(#[from] display_cache::Error),
+    RefreshCache(#[from] capture_item_cache::Error),
 
     #[error("Failed to get hovered display:\n{0}")]
     HoveredDisplay(#[from] hovered::Error),

@@ -6,27 +6,26 @@ use std::collections::HashMap;
 
 use get_displays::get_displays;
 use thiserror::Error;
-use tracing::info_span;
+use tracing::instrument;
 use windows::Graphics::Capture::GraphicsCaptureItem;
 use windows_result::Error as WindowsError;
 
 use crate::{DirectXDevices, Display};
 
 /// A cache for the connected displays and their capture items.
-pub struct DisplayCache {
+pub struct CaptureItemCache {
     /// Set of currently active displays at the time of creation
     /// or last capture.
-    pub displays: Box<[Display]>,
+    displays: Box<[Display]>,
 
     /// A map between HMONITOR handles and their capture item.
-    pub capture_items: HashMap<isize, GraphicsCaptureItem>,
+    capture_items: HashMap<isize, GraphicsCaptureItem>,
 }
 
-impl DisplayCache {
+impl CaptureItemCache {
     /// Create a new display cache and populate it.
+    #[instrument("CaptureItemCache::new", skip_all, err)]
     pub fn new(devices: &DirectXDevices) -> Result<Self, Error> {
-        let _span = info_span!("DisplayCache::new").entered();
-
         let displays = get_displays(devices)?;
         let mut capture_items = HashMap::new();
 
@@ -52,4 +51,7 @@ pub enum Error {
 
     #[error("Failed to create capture item for display:\n{0}")]
     CreateCaputreItem(#[source] WindowsError),
+
+    #[error("Failed to get mouse position:\n{0}")]
+    GetMouse(#[source] WindowsError),
 }

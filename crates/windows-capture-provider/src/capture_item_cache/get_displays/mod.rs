@@ -5,15 +5,14 @@ use config_path_info::get_display_configs;
 use descriptors::get_output_descriptors;
 
 use thiserror::Error;
-use tracing::{info, info_span};
+use tracing::{info, instrument};
 use windows_result::Error as WindowsError;
 
 use crate::{DirectXDevices, Display};
 
 /// Gets the currently attached displays.
+#[instrument(skip_all, err)]
 pub fn get_displays(devices: &DirectXDevices) -> Result<Box<[Display]>, Error> {
-    let _span = info_span!("get_displays").entered();
-
     // Descriptors provide most of the information about the display.
     let descriptors = get_output_descriptors(devices).map_err(Error::GetDescriptors)?;
     // Config Path Infos provide the sdr_reference_white
@@ -32,7 +31,6 @@ pub fn get_displays(devices: &DirectXDevices) -> Result<Box<[Display]>, Error> {
                 descriptor.Monitor,
                 descriptor.DesktopCoordinates,
                 config.sdr_reference_white,
-                descriptor.MaxLuminance,
             );
 
             info!("{}", found_display);
