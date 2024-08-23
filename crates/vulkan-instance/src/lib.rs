@@ -1,6 +1,7 @@
 pub mod buffer;
 pub mod create;
 pub mod find_memory_type_index;
+pub mod host_memory;
 pub mod record_submit_command_buffer;
 
 use ash::{
