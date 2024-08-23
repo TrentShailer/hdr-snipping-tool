@@ -25,7 +25,7 @@ pub fn create_surface(
         )
         .map_err(|e| VulkanError::VkResult(e, "creating surface"))?
     };
-    let surface_loader = surface::Instance::new(&entry, instance);
+    let surface_loader = surface::Instance::new(entry, instance);
 
     Ok((surface, surface_loader))
 }
