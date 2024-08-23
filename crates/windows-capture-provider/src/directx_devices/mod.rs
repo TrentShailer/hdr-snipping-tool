@@ -50,6 +50,7 @@ impl DirectXDevices {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("Failed to create d3d11 device:\n{0}")]
     D3D11Device(#[source] WindowsError),

@@ -38,6 +38,7 @@ pub fn get_display_configs() -> Result<Box<[DisplayConfig]>, Error> {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("Failed to get display infos:\n{0}")]
     DisplayInfos(#[source] WindowsError),

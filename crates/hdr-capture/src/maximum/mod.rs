@@ -205,6 +205,7 @@ impl<'d> Drop for Maximum<'d> {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error(transparent)]
     Vulkan(#[from] VulkanError),

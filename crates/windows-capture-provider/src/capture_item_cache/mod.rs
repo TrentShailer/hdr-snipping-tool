@@ -45,6 +45,7 @@ impl CaptureItemCache {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("Failed to get current displays:\n{0}")]
     GetDisplays(#[from] get_displays::Error),

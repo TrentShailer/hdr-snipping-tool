@@ -318,6 +318,7 @@ impl<'d> Drop for Tonemap<'d> {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error(transparent)]
     Vulkan(#[from] VulkanError),

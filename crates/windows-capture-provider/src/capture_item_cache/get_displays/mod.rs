@@ -43,6 +43,7 @@ pub fn get_displays(devices: &DirectXDevices) -> Result<Box<[Display]>, Error> {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("Failed to get display output descriptors:\n{0}")]
     GetDescriptors(#[source] WindowsError),

@@ -77,6 +77,7 @@ pub fn start_capture_session(
     Ok((framepool, session, receiver))
 }
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("Failed to get capture item size:\n{0}")]
     CaptureSize(#[source] WindowsError),

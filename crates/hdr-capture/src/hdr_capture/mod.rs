@@ -28,6 +28,7 @@ pub struct HdrCapture<'d> {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error(transparent)]
     Vulkan(#[from] VulkanError),
