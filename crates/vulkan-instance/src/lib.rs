@@ -1,8 +1,8 @@
 pub mod buffer;
+pub mod command_buffer;
 pub mod create;
-pub mod find_memory_type_index;
-pub mod host_memory;
-pub mod record_submit_command_buffer;
+pub mod memory;
+pub mod shader;
 
 use ash::{
     ext::debug_utils,
@@ -16,6 +16,7 @@ use thiserror::Error;
 
 /// Bundled objects required to work with vulkan.
 pub struct VulkanInstance {
+    #[allow(unused)]
     entry: Entry,
     pub instance: Instance,
 
@@ -40,6 +41,6 @@ pub enum VulkanError {
     #[error("Encountered vulkan error while {1}:\n{0}")]
     VkResult(#[source] vk::Result, &'static str),
 
-    #[error("No suitable memory type for {0}")]
-    NoSuitableMemoryType(&'static str),
+    #[error("No suitable memory type found")]
+    NoSuitableMemoryType,
 }
