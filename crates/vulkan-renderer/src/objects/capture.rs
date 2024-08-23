@@ -10,7 +10,7 @@ use ash::{
 };
 use bytemuck::bytes_of;
 use hdr_capture::HdrCapture;
-use tracing::instrument;
+use tracing::{instrument, Level};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::pipelines::{
@@ -150,6 +150,7 @@ impl<'d> Capture<'d> {
         })
     }
 
+    #[instrument("Capture::load_capture", level = Level::DEBUG, skip_all, err)]
     pub fn load_capture(
         &mut self,
         vk: &VulkanInstance,
@@ -185,6 +186,7 @@ impl<'d> Capture<'d> {
         self.loaded = false;
     }
 
+    #[instrument("Capture::render", level = Level::DEBUG, skip_all, err)]
     pub fn render(
         &self,
         device: &Device,

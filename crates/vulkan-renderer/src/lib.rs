@@ -15,6 +15,7 @@ use ash::{
 use hdr_capture::HdrCapture;
 use objects::{Capture, MouseGuides, Selection};
 use thiserror::Error;
+use tracing::{instrument, Level};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 /// Renderer for HdrSnippingTool
@@ -51,6 +52,7 @@ impl<'d> Renderer<'d> {
     }
 
     /// Loads a capture into the renderer
+    #[instrument("Renderer::load_capture", level = Level::DEBUG, skip_all, err)]
     pub fn load_capture(&mut self, vk: &VulkanInstance, capture: &HdrCapture) -> Result<(), Error> {
         self.capture.load_capture(vk, capture)
     }

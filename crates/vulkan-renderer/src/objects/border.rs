@@ -6,7 +6,7 @@ use ash::{
     Device,
 };
 use bytemuck::bytes_of;
-use tracing::instrument;
+use tracing::{instrument, Level};
 use vulkan_instance::VulkanInstance;
 
 use crate::{
@@ -129,6 +129,7 @@ impl<'d> Border<'d> {
         })
     }
 
+    #[instrument("Border::render", level = Level::DEBUG, skip_all, err)]
     pub fn render(
         &mut self,
         device: &Device,

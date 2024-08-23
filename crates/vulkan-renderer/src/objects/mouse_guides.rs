@@ -6,6 +6,7 @@ use ash::{
     Device,
 };
 use bytemuck::bytes_of;
+use tracing::{instrument, Level};
 use vulkan_instance::VulkanInstance;
 
 use crate::{
@@ -45,6 +46,7 @@ pub struct MouseGuides<'d> {
 }
 
 impl<'d> MouseGuides<'d> {
+    #[instrument("MouseGuides::new", skip_all, err)]
     pub fn new(
         vk: &'d VulkanInstance,
         pipeline: Pipeline,
@@ -124,6 +126,7 @@ impl<'d> MouseGuides<'d> {
         })
     }
 
+    #[instrument("MouseGuides::render", level = Level::DEBUG, skip_all, err)]
     pub fn render(
         &mut self,
         device: &Device,

@@ -7,11 +7,13 @@ use ash::{
     },
     Device, Instance,
 };
+use tracing::instrument;
 
 use crate::VulkanError;
 
 use super::{physical_device, Error};
 
+#[instrument(skip_all, err)]
 pub fn get_logical_device(
     instance: &Instance,
     physical_device: PhysicalDevice,

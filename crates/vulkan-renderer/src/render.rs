@@ -4,6 +4,7 @@ use ash::vk::{
     Semaphore,
 };
 
+use tracing::{instrument, Level};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use winit::window::Window;
@@ -14,6 +15,7 @@ use super::Renderer;
 
 impl<'d> Renderer<'d> {
     /// Try to queue a frame to be rendered and presented
+    #[instrument("Renderer::render", level = Level::DEBUG, skip_all, err)]
     pub fn render(
         &mut self,
         vk: &VulkanInstance,

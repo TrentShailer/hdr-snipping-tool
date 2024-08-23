@@ -6,6 +6,7 @@ use ash::{
     Device,
 };
 use bytemuck::bytes_of;
+use tracing::{instrument, Level};
 use vulkan_instance::VulkanInstance;
 
 use crate::{
@@ -46,6 +47,7 @@ pub struct Selection<'d> {
 }
 
 impl<'d> Selection<'d> {
+    #[instrument("Selection::new", level = Level::DEBUG, skip_all, err)]
     pub fn new(
         vk: &'d VulkanInstance,
         shading_pipeline: Pipeline,
@@ -138,6 +140,7 @@ impl<'d> Selection<'d> {
         })
     }
 
+    #[instrument("Selection::render", level = Level::DEBUG, skip_all, err)]
     pub fn render(
         &mut self,
         device: &Device,

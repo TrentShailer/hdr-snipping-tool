@@ -2,11 +2,13 @@ use ash::{
     vk::{self, CommandBuffer, CommandBufferAllocateInfo, CommandBufferLevel, CommandPool, Fence},
     Device,
 };
+use tracing::instrument;
 
 use crate::VulkanError;
 
 use super::Error;
 
+#[instrument(skip_all, err)]
 pub fn get_command_buffer(
     device: &Device,
     queue_family_index: u32,

@@ -1,5 +1,5 @@
 use thiserror::Error;
-use tracing::instrument;
+use tracing::{instrument, Level};
 use windows::Win32::Devices::Display::{
     DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes, QueryDisplayConfig,
     DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL, DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
@@ -49,6 +49,7 @@ pub enum Error {
     ReferenceWhite(#[source] WindowsError),
 }
 
+#[instrument(level = Level::DEBUG, skip_all, err)]
 fn get_display_config_path_infos() -> WindowsResult<Box<[DISPLAYCONFIG_PATH_INFO]>> {
     let mut path_elements = 0;
     let mut mode_info_elements = 0;
@@ -80,6 +81,7 @@ fn get_display_config_path_infos() -> WindowsResult<Box<[DISPLAYCONFIG_PATH_INFO
     Ok(paths.into_boxed_slice())
 }
 
+#[instrument(level = Level::DEBUG, skip_all, err)]
 fn get_device_name(path_info: &DISPLAYCONFIG_PATH_INFO) -> WindowsResult<[u16; 32]> {
     let mut device_name = DISPLAYCONFIG_SOURCE_DEVICE_NAME::default();
 
@@ -96,6 +98,7 @@ fn get_device_name(path_info: &DISPLAYCONFIG_PATH_INFO) -> WindowsResult<[u16; 3
     Ok(device_name.viewGdiDeviceName)
 }
 
+#[instrument(level = Level::DEBUG, skip_all, err)]
 fn get_sdr_reference_white(path_info: &DISPLAYCONFIG_PATH_INFO) -> WindowsResult<f32> {
     let mut sdr_white_level = DISPLAYCONFIG_SDR_WHITE_LEVEL::default();
 
