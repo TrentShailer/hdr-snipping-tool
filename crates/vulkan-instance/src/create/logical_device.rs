@@ -8,9 +8,9 @@ use ash::{
     Device, Instance,
 };
 
-use crate::vulkan_instance::physical_device;
+use crate::GenericVulkanError;
 
-use super::Error;
+use super::{physical_device, Error};
 
 pub fn get_logical_device(
     instance: &Instance,
@@ -60,7 +60,7 @@ pub fn get_logical_device(
     let device = unsafe {
         instance
             .create_device(physical_device, &device_create_info, None)
-            .map_err(|e| Error::Vulkan(e, "creating logical device"))?
+            .map_err(|e| GenericVulkanError::VkResult(e, "creating logical device"))?
     };
 
     let queue = unsafe { device.get_device_queue(queue_family_index, 0) };

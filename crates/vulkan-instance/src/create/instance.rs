@@ -1,11 +1,14 @@
-use std::{ffi, sync::Arc};
+use std::ffi;
 
 use ash::{
     ext::{self},
-    vk::{self, ApplicationInfo, InstanceCreateInfo},
+    vk::{self},
     Entry, Instance,
 };
+use tracing::instrument;
 use winit::{raw_window_handle::HasDisplayHandle, window::Window};
+
+use crate::GenericVulkanError;
 
 use super::Error;
 
@@ -24,8 +27,8 @@ const INSTANCE_EXTENSIONS: [*const ffi::c_char; 2] = [
 ];
 
 // -----
-
-pub fn aquire_instance(entry: &Entry, window: Arc<Window>, debug: bool) -> Result<Instance, Error> {
+#[instrument(skip_all, err)]
+pub fn aquire_instance(entry: &Entry, window: &Window, debug: bool) -> Result<Instance, Error> {
     // Get extensions required to create a surface for the window
     let display_handle = window.display_handle()?;
     let mut extension_names = ash_window::enumerate_required_extensions(display_handle.as_raw())
@@ -33,12 +36,12 @@ pub fn aquire_instance(entry: &Entry, window: Arc<Window>, debug: bool) -> Resul
         .to_vec();
     extension_names.extend_from_slice(&INSTANCE_EXTENSIONS);
 
-    let app_info = ApplicationInfo::default()
+    let app_info = vk::ApplicationInfo::default()
         .application_name(APP_NAME)
         .application_version(0)
         .api_version(vk::make_api_version(0, 1, 3, 0));
 
-    let create_info = InstanceCreateInfo::default()
+    let create_info = vk::InstanceCreateInfo::default()
         .application_info(&app_info)
         .enabled_extension_names(&extension_names);
 
@@ -51,7 +54,7 @@ pub fn aquire_instance(entry: &Entry, window: Arc<Window>, debug: bool) -> Resul
     let instance = unsafe {
         entry
             .create_instance(&create_info, None)
-            .map_err(|e| Error::Vulkan(e, "creating instance"))?
+            .map_err(|e| GenericVulkanError::VkResult(e, "creating instance"))?
     };
 
     Ok(instance)

@@ -10,7 +10,9 @@ use ash::{
     },
     Instance,
 };
-use tracing::{error, info};
+use tracing::{error, info, instrument};
+
+use crate::GenericVulkanError;
 
 use super::Error;
 
@@ -20,7 +22,7 @@ pub const REQUIRED_EXTENSIONS: [&ffi::CStr; 2] =
     [khr::swapchain::NAME, khr::external_memory_win32::NAME];
 
 // -----
-
+#[instrument(skip_all, err)]
 pub fn get_physical_device(
     instance: &Instance,
     surface: SurfaceKHR,
@@ -29,7 +31,7 @@ pub fn get_physical_device(
     let physical_devices = unsafe {
         instance
             .enumerate_physical_devices()
-            .map_err(|e| Error::Vulkan(e, "enumerating physical devices"))?
+            .map_err(|e| GenericVulkanError::VkResult(e, "enumerating physical devices"))?
     };
 
     let (physical_device, queue_family_index) = physical_devices

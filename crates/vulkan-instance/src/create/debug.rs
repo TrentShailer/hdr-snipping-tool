@@ -1,10 +1,13 @@
 use std::{borrow::Cow, ffi};
 
 use ash::{ext::debug_utils, vk, Entry, Instance};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
+
+use crate::GenericVulkanError;
 
 use super::Error;
 
+#[instrument(skip_all, err)]
 pub fn setup_debug(
     entry: &Entry,
     instance: &Instance,
@@ -26,7 +29,7 @@ pub fn setup_debug(
     let debug_messenger = unsafe {
         debug_utils_loader
             .create_debug_utils_messenger(&debug_info, None)
-            .map_err(|e| Error::Vulkan(e, "creating debug utils messenger"))?
+            .map_err(|e| GenericVulkanError::VkResult(e, "creating debug utils messenger"))?
     };
 
     Ok((debug_utils_loader, debug_messenger))
