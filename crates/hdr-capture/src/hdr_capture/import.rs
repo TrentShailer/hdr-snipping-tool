@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ash::vk::{
     DependencyInfo, Extent2D, ExternalMemoryHandleTypeFlags, ExternalMemoryImageCreateInfo, Format,
     ImageAspectFlags, ImageCreateInfo, ImageLayout, ImageSubresourceRange, ImageTiling, ImageType,
@@ -14,11 +16,11 @@ use crate::Maximum;
 
 use super::{Error, HdrCapture};
 
-impl<'d> HdrCapture<'d> {
+impl HdrCapture {
     /// Create an Hdr Capture by importing a windows capture
     #[instrument("HdrCapture::import_windows_capture", skip_all, err)]
     pub fn import_windows_capture(
-        vk: &'d VulkanInstance,
+        vk: Arc<VulkanInstance>,
         maximum: &Maximum,
         capture: &WindowsCapture,
         hdr_whitepoint: f32,
@@ -118,7 +120,7 @@ impl<'d> HdrCapture<'d> {
         };
 
         let mut hdr_capture = Self {
-            device: &vk.device,
+            vk: vk.clone(),
             image,
             memory,
             image_view,
@@ -126,7 +128,7 @@ impl<'d> HdrCapture<'d> {
             whitepoint: 0.0,
         };
 
-        let maximum = maximum.find_maximum(vk, &hdr_capture)?;
+        let maximum = maximum.find_maximum(&hdr_capture)?;
         let maximum = if f16::from_bits(maximum.to_bits() - 1).to_f32()
             == capture.display.sdr_referece_white
         {

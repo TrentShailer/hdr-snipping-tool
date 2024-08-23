@@ -13,7 +13,7 @@ use crate::Error;
 
 use super::Renderer;
 
-impl<'d> Renderer<'d> {
+impl Renderer {
     #[instrument("Renderer::get_surface_format", skip_all, err)]
     pub fn get_surface_format(vk: &VulkanInstance) -> Result<SurfaceFormatKHR, ash::vk::Result> {
         let surface_formats = unsafe {
@@ -157,19 +157,16 @@ impl<'d> Renderer<'d> {
     }
 
     #[instrument("Renderer::recreate_swapchain", skip_all, err)]
-    pub fn recreate_swapchain(
-        &mut self,
-        vk: &VulkanInstance,
-        window_size: [u32; 2],
-    ) -> Result<(), Error> {
+    pub fn recreate_swapchain(&mut self, window_size: [u32; 2]) -> Result<(), Error> {
         unsafe {
-            vk.device
+            self.vk
+                .device
                 .device_wait_idle()
                 .map_err(|e| VulkanError::VkResult(e, "waiting for device idle"))?;
         }
 
         let new_swapchain = Self::create_swapchain(
-            vk,
+            &self.vk,
             &self.swapchain_loader,
             window_size,
             Some(self.swapchain),
@@ -183,10 +180,10 @@ impl<'d> Renderer<'d> {
                 .map_err(|e| VulkanError::VkResult(e, "getting swapchain images"))?
         };
         self.attachment_images = swapchain_images;
-        Self::transition_images(vk, &self.attachment_images)?;
+        Self::transition_images(&self.vk, &self.attachment_images)?;
 
         let attachment_views = Self::window_size_dependant_setup(
-            vk,
+            &self.vk,
             &self.attachment_images,
             window_size,
             &mut self.viewport,
@@ -202,7 +199,7 @@ impl<'d> Renderer<'d> {
         unsafe {
             self.attachment_views
                 .iter()
-                .for_each(|&view| self.device.destroy_image_view(view, None));
+                .for_each(|&view| self.vk.device.destroy_image_view(view, None));
             self.attachment_images.clear();
 
             self.swapchain_loader

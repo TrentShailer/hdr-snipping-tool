@@ -1,22 +1,21 @@
-use ash::{
-    vk::{
-        Buffer, CommandBuffer, ComputePipelineCreateInfo, DescriptorBufferInfo,
-        DescriptorImageInfo, DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize,
-        DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
-        DescriptorSetLayoutCreateInfo, DescriptorType, Fence, ImageLayout, ImageView, Pipeline,
-        PipelineBindPoint, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
-        PipelineShaderStageCreateInfo, PipelineStageFlags2, Sampler, Semaphore, ShaderModule,
-        ShaderStageFlags, WriteDescriptorSet,
-    },
-    Device,
+use std::sync::Arc;
+
+use ash::vk::{
+    Buffer, CommandBuffer, ComputePipelineCreateInfo, DescriptorBufferInfo, DescriptorImageInfo,
+    DescriptorPool, DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet,
+    DescriptorSetAllocateInfo, DescriptorSetLayout, DescriptorSetLayoutBinding,
+    DescriptorSetLayoutCreateInfo, DescriptorType, Fence, ImageLayout, ImageView, Pipeline,
+    PipelineBindPoint, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
+    PipelineShaderStageCreateInfo, PipelineStageFlags2, Sampler, Semaphore, ShaderModule,
+    ShaderStageFlags, WriteDescriptorSet,
 };
 use tracing::instrument;
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use super::Error;
 
-pub struct SourcePass<'d> {
-    device: &'d Device,
+pub struct SourcePass {
+    vk: Arc<VulkanInstance>,
     module: ShaderModule,
     layout: PipelineLayout,
     pipeline: Pipeline,
@@ -25,9 +24,9 @@ pub struct SourcePass<'d> {
     descriptor_sets: Vec<DescriptorSet>,
 }
 
-impl<'d> SourcePass<'d> {
+impl SourcePass {
     #[instrument("SourcePass::new", skip_all, err)]
-    pub fn new(vk: &'d VulkanInstance) -> Result<Self, Error> {
+    pub fn new(vk: Arc<VulkanInstance>) -> Result<Self, Error> {
         let (shader_module, shader_entry_name) = unsafe {
             let module =
                 vk.create_shader_module(include_bytes!("./shaders/maximum_source_pass.spv"))?;
@@ -126,7 +125,7 @@ impl<'d> SourcePass<'d> {
         };
 
         Ok(Self {
-            device: &vk.device,
+            vk,
             module: shader_module,
             layout: pipeline_layout,
             pipeline: compute_pipeline,
@@ -139,7 +138,6 @@ impl<'d> SourcePass<'d> {
     #[instrument("SourcePass::run", skip_all, err)]
     pub fn run(
         &self,
-        vk: &VulkanInstance,
         source: ImageView,
         source_size: [u32; 2],
         output_buffer: Buffer,
@@ -175,7 +173,8 @@ impl<'d> SourcePass<'d> {
                     .buffer_info(&output_buffer_descriptor),
             ];
 
-            vk.device
+            self.vk
+                .device
                 .update_descriptor_sets(&write_descriptor_sets, &[]);
         };
 
@@ -184,7 +183,7 @@ impl<'d> SourcePass<'d> {
         let workgroup_y = source_size[1].div_ceil(32).div_ceil(subgroup_size);
 
         let signal_semaphores = [(submission_resources.1, PipelineStageFlags2::BOTTOM_OF_PIPE)];
-        vk.record_submit_command_buffer(
+        self.vk.record_submit_command_buffer(
             submission_resources.0,
             &[],
             &signal_semaphores,
@@ -210,16 +209,18 @@ impl<'d> SourcePass<'d> {
     }
 }
 
-impl<'d> Drop for SourcePass<'d> {
+impl Drop for SourcePass {
     fn drop(&mut self) {
         unsafe {
-            self.device
+            self.vk
+                .device
                 .destroy_descriptor_set_layout(self.descriptor_layouts[0], None);
-            self.device
+            self.vk
+                .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
-            self.device.destroy_pipeline(self.pipeline, None);
-            self.device.destroy_pipeline_layout(self.layout, None);
-            self.device.destroy_shader_module(self.module, None);
+            self.vk.device.destroy_pipeline(self.pipeline, None);
+            self.vk.device.destroy_pipeline_layout(self.layout, None);
+            self.vk.device.destroy_shader_module(self.module, None);
         }
     }
 }

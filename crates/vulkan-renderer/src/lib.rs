@@ -5,12 +5,11 @@ mod render;
 mod swapchain;
 mod units;
 
-use ash::{
-    vk::{
-        CommandBuffer, DescriptorSetLayout, Fence, Image, ImageView, Pipeline, PipelineLayout,
-        Semaphore, ShaderModule, SwapchainKHR, Viewport,
-    },
-    Device,
+use std::sync::Arc;
+
+use ash::vk::{
+    CommandBuffer, DescriptorSetLayout, Fence, Image, ImageView, Pipeline, PipelineLayout,
+    Semaphore, ShaderModule, SwapchainKHR, Viewport,
 };
 use hdr_capture::HdrCapture;
 use objects::{Capture, MouseGuides, Selection};
@@ -19,8 +18,8 @@ use tracing::{instrument, Level};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 /// Renderer for HdrSnippingTool
-pub struct Renderer<'d> {
-    device: &'d Device,
+pub struct Renderer {
+    vk: Arc<VulkanInstance>,
 
     recreate_swapchain: bool,
     command_buffers: Box<[(CommandBuffer, Fence)]>,
@@ -35,9 +34,9 @@ pub struct Renderer<'d> {
 
     viewport: Viewport,
 
-    capture: Capture<'d>,
-    selection: Selection<'d>,
-    mouse_guides: MouseGuides<'d>,
+    capture: Capture,
+    selection: Selection,
+    mouse_guides: MouseGuides,
 
     pipeline_layouts: Vec<PipelineLayout>,
     pipelines: Vec<Pipeline>,
@@ -45,7 +44,7 @@ pub struct Renderer<'d> {
     descriptor_layouts: Vec<DescriptorSetLayout>,
 }
 
-impl<'d> Renderer<'d> {
+impl Renderer {
     /// Flags that the swapchain needs to be recreated
     pub fn queue_recreate_swapchain(&mut self) {
         self.recreate_swapchain = true;
@@ -53,8 +52,8 @@ impl<'d> Renderer<'d> {
 
     /// Loads a capture into the renderer
     #[instrument("Renderer::load_capture", level = Level::DEBUG, skip_all, err)]
-    pub fn load_capture(&mut self, vk: &VulkanInstance, capture: &HdrCapture) -> Result<(), Error> {
-        self.capture.load_capture(vk, capture)
+    pub fn load_capture(&mut self, capture: &HdrCapture) -> Result<(), Error> {
+        self.capture.load_capture(capture)
     }
 
     /// Unloads a capture from the renderer

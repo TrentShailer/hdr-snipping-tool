@@ -1,13 +1,12 @@
-use ash::{
-    vk::{
-        Buffer, CommandBuffer, ComputePipelineCreateInfo, DescriptorBufferInfo, DescriptorPool,
-        DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
-        DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo,
-        DescriptorType, Fence, Pipeline, PipelineBindPoint, PipelineCache, PipelineLayout,
-        PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo, PipelineStageFlags2,
-        PushConstantRange, Semaphore, ShaderModule, ShaderStageFlags, WriteDescriptorSet,
-    },
-    Device,
+use std::sync::Arc;
+
+use ash::vk::{
+    Buffer, CommandBuffer, ComputePipelineCreateInfo, DescriptorBufferInfo, DescriptorPool,
+    DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
+    DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType,
+    Fence, Pipeline, PipelineBindPoint, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
+    PipelineShaderStageCreateInfo, PipelineStageFlags2, PushConstantRange, Semaphore, ShaderModule,
+    ShaderStageFlags, WriteDescriptorSet,
 };
 
 use tracing::instrument;
@@ -15,8 +14,9 @@ use vulkan_instance::{VulkanError, VulkanInstance};
 
 use super::{Error, Maximum, MAXIMUM_SUBMISSIONS};
 
-pub struct BufferPass<'d> {
-    device: &'d Device,
+pub struct BufferPass {
+    vk: Arc<VulkanInstance>,
+
     module: ShaderModule,
     layout: PipelineLayout,
     pipeline: Pipeline,
@@ -25,9 +25,9 @@ pub struct BufferPass<'d> {
     descriptor_sets: Vec<DescriptorSet>,
 }
 
-impl<'d> BufferPass<'d> {
+impl BufferPass {
     #[instrument("BufferPass::new", skip_all, err)]
-    pub fn new(vk: &'d VulkanInstance) -> Result<Self, Error> {
+    pub fn new(vk: Arc<VulkanInstance>) -> Result<Self, Error> {
         let (shader_module, shader_entry_name) = unsafe {
             let module =
                 vk.create_shader_module(include_bytes!("./shaders/maximum_buffer_pass.spv"))?;
@@ -127,7 +127,7 @@ impl<'d> BufferPass<'d> {
         };
 
         Ok(Self {
-            device: &vk.device,
+            vk,
             module: shader_module,
             layout: pipeline_layout,
             pipeline: compute_pipeline,
@@ -140,7 +140,6 @@ impl<'d> BufferPass<'d> {
     #[instrument("BufferPass::run", skip_all, err)]
     pub fn run(
         &self,
-        vk: &VulkanInstance,
         maximum_obj: &Maximum,
 
         read_buffer: Buffer,
@@ -200,7 +199,8 @@ impl<'d> BufferPass<'d> {
                 },
             ];
 
-            vk.device
+            self.vk
+                .device
                 .update_descriptor_sets(&write_descriptor_sets, &[]);
         };
 
@@ -250,7 +250,7 @@ impl<'d> BufferPass<'d> {
                     PipelineStageFlags2::COMPUTE_SHADER,
                 )];
 
-                vk.record_submit_command_buffer(
+                self.vk.record_submit_command_buffer(
                     command_buffer,
                     &wait_semaphores,
                     signal_semaphores,
@@ -305,16 +305,18 @@ impl<'d> BufferPass<'d> {
     }
 }
 
-impl<'d> Drop for BufferPass<'d> {
+impl Drop for BufferPass {
     fn drop(&mut self) {
         unsafe {
-            self.device
+            self.vk
+                .device
                 .destroy_descriptor_set_layout(self.descriptor_layouts[0], None);
-            self.device
+            self.vk
+                .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
-            self.device.destroy_pipeline(self.pipeline, None);
-            self.device.destroy_pipeline_layout(self.layout, None);
-            self.device.destroy_shader_module(self.module, None);
+            self.vk.device.destroy_pipeline(self.pipeline, None);
+            self.vk.device.destroy_pipeline_layout(self.layout, None);
+            self.vk.device.destroy_shader_module(self.module, None);
         }
     }
 }

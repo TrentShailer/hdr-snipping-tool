@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ash::{
     vk::{
         Buffer, CommandBuffer, DeviceMemory, IndexType, Pipeline, PipelineBindPoint,
@@ -30,8 +32,8 @@ const TOP_FLAG: u32 = 0b00000000_00000000_00000000_00000010;
 const LEFT_FLAG: u32 = 0b00000000_00000000_00000000_00000001;
 const NO_FLAGS: u32 = 0b00000000_00000000_00000000_00000000;
 
-pub struct Border<'d> {
-    device: &'d Device,
+pub struct Border {
+    vk: Arc<VulkanInstance>,
 
     vertex_buffer: (Buffer, DeviceMemory),
     index_buffer: (Buffer, DeviceMemory),
@@ -44,10 +46,10 @@ pub struct Border<'d> {
     line_size: f32,
 }
 
-impl<'d> Border<'d> {
+impl Border {
     #[instrument("Border::new", skip_all, err)]
     pub fn new(
-        vk: &'d VulkanInstance,
+        vk: Arc<VulkanInstance>,
         pipeline: Pipeline,
         pipeline_layout: PipelineLayout,
         color: [u8; 4],
@@ -104,7 +106,7 @@ impl<'d> Border<'d> {
         ];
 
         let (vertex_buffer, index_buffer) =
-            create_vertex_and_index_buffer(vk, &verticies, &indicies)?;
+            create_vertex_and_index_buffer(&vk, &verticies, &indicies)?;
 
         let push_constants = PushConstants {
             base_position: [0.0, 0.0],
@@ -115,7 +117,7 @@ impl<'d> Border<'d> {
         };
 
         Ok(Self {
-            device: &vk.device,
+            vk,
 
             vertex_buffer,
             index_buffer,
@@ -169,13 +171,13 @@ impl<'d> Border<'d> {
     }
 }
 
-impl<'d> Drop for Border<'d> {
+impl Drop for Border {
     fn drop(&mut self) {
         unsafe {
-            self.device.destroy_buffer(self.vertex_buffer.0, None);
-            self.device.free_memory(self.vertex_buffer.1, None);
-            self.device.destroy_buffer(self.index_buffer.0, None);
-            self.device.free_memory(self.index_buffer.1, None);
+            self.vk.device.destroy_buffer(self.vertex_buffer.0, None);
+            self.vk.device.free_memory(self.vertex_buffer.1, None);
+            self.vk.device.destroy_buffer(self.index_buffer.0, None);
+            self.vk.device.free_memory(self.index_buffer.1, None);
         }
     }
 }

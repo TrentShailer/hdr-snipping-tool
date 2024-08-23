@@ -1,19 +1,19 @@
 mod drop;
 pub mod import;
 
-use ash::{
-    vk::{DeviceMemory, Image, ImageView},
-    Device,
-};
+use std::sync::Arc;
+
+use ash::vk::{DeviceMemory, Image, ImageView};
 use thiserror::Error;
-use vulkan_instance::VulkanError;
+use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::maximum;
 
 /// An Hdr Caputre Vulkan Object
 #[non_exhaustive]
-pub struct HdrCapture<'d> {
-    device: &'d Device,
+pub struct HdrCapture {
+    vk: Arc<VulkanInstance>,
+
     image: Image,
     memory: DeviceMemory,
 

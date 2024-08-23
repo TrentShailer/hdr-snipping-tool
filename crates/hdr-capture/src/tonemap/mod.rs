@@ -1,16 +1,15 @@
-use ash::{
-    vk::{
-        ComputePipelineCreateInfo, DependencyInfo, DescriptorImageInfo, DescriptorPool,
-        DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
-        DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo,
-        DescriptorType, DeviceMemory, Extent2D, Format, Image, ImageAspectFlags, ImageCreateInfo,
-        ImageLayout, ImageSubresourceRange, ImageTiling, ImageType, ImageUsageFlags, ImageView,
-        ImageViewCreateInfo, ImageViewType, MemoryAllocateInfo, MemoryPropertyFlags, Pipeline,
-        PipelineBindPoint, PipelineCache, PipelineLayout, PipelineLayoutCreateInfo,
-        PipelineShaderStageCreateInfo, PipelineStageFlags2, PushConstantRange, SampleCountFlags,
-        Sampler, ShaderModule, ShaderStageFlags, SharingMode, WriteDescriptorSet,
-    },
-    Device,
+use std::sync::Arc;
+
+use ash::vk::{
+    ComputePipelineCreateInfo, DependencyInfo, DescriptorImageInfo, DescriptorPool,
+    DescriptorPoolCreateInfo, DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo,
+    DescriptorSetLayout, DescriptorSetLayoutBinding, DescriptorSetLayoutCreateInfo, DescriptorType,
+    DeviceMemory, Extent2D, Format, Image, ImageAspectFlags, ImageCreateInfo, ImageLayout,
+    ImageSubresourceRange, ImageTiling, ImageType, ImageUsageFlags, ImageView, ImageViewCreateInfo,
+    ImageViewType, MemoryAllocateInfo, MemoryPropertyFlags, Pipeline, PipelineBindPoint,
+    PipelineCache, PipelineLayout, PipelineLayoutCreateInfo, PipelineShaderStageCreateInfo,
+    PipelineStageFlags2, PushConstantRange, SampleCountFlags, Sampler, ShaderModule,
+    ShaderStageFlags, SharingMode, WriteDescriptorSet,
 };
 use thiserror::Error;
 use tracing::instrument;
@@ -18,8 +17,8 @@ use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::HdrCapture;
 
-pub struct Tonemap<'d> {
-    device: &'d Device,
+pub struct Tonemap {
+    vk: Arc<VulkanInstance>,
     module: ShaderModule,
     layout: PipelineLayout,
     pipeline: Pipeline,
@@ -28,9 +27,9 @@ pub struct Tonemap<'d> {
     descriptor_sets: Vec<DescriptorSet>,
 }
 
-impl<'d> Tonemap<'d> {
+impl Tonemap {
     #[instrument("Tonemap::new", skip_all, err)]
-    pub fn new(vk: &'d VulkanInstance) -> Result<Self, Error> {
+    pub fn new(vk: Arc<VulkanInstance>) -> Result<Self, Error> {
         let (shader_module, shader_entry_name) = unsafe {
             let module = vk.create_shader_module(include_bytes!("./shaders/scRGB_to_sRGB.spv"))?;
             let shader_entry_name = std::ffi::CStr::from_bytes_with_nul_unchecked(b"main\0");
@@ -129,7 +128,7 @@ impl<'d> Tonemap<'d> {
         };
 
         Ok(Self {
-            device: &vk.device,
+            vk,
             layout: pipeline_layout,
             pipeline: compute_pipeline,
             descriptor_sets,
@@ -142,7 +141,6 @@ impl<'d> Tonemap<'d> {
     #[instrument("Tonemap::tonemap", skip_all, err)]
     pub fn tonemap(
         &self,
-        vk: &VulkanInstance,
         hdr_capture: &HdrCapture,
     ) -> Result<(Image, DeviceMemory, ImageView), Error> {
         let (image, image_memory, image_view) = unsafe {
@@ -164,16 +162,18 @@ impl<'d> Tonemap<'d> {
                     .sharing_mode(SharingMode::EXCLUSIVE)
                     .initial_layout(ImageLayout::UNDEFINED);
 
-                vk.device
+                self.vk
+                    .device
                     .create_image(&image_create_info, None)
                     .map_err(|e| VulkanError::VkResult(e, "creating image"))?
             };
 
             // Create and import memory.
             let memory = {
-                let memory_requirement = vk.device.get_image_memory_requirements(image);
+                let memory_requirement = self.vk.device.get_image_memory_requirements(image);
 
-                let memory_index = vk
+                let memory_index = self
+                    .vk
                     .find_memorytype_index(&memory_requirement, MemoryPropertyFlags::DEVICE_LOCAL)
                     .ok_or(VulkanError::NoSuitableMemoryType)?;
 
@@ -181,9 +181,14 @@ impl<'d> Tonemap<'d> {
                     .allocation_size(memory_requirement.size)
                     .memory_type_index(memory_index);
 
-                let device_memory = vk.device.allocate_memory(&allocate_info, None).unwrap();
+                let device_memory = self
+                    .vk
+                    .device
+                    .allocate_memory(&allocate_info, None)
+                    .unwrap();
 
-                vk.device
+                self.vk
+                    .device
                     .bind_image_memory(image, device_memory, 0)
                     .unwrap();
 
@@ -203,7 +208,8 @@ impl<'d> Tonemap<'d> {
                             .layer_count(1),
                     );
 
-                vk.device
+                self.vk
+                    .device
                     .create_image_view(&image_view_create_info, None)
                     .map_err(|e| VulkanError::VkResult(e, "creating image view"))?
             };
@@ -243,7 +249,8 @@ impl<'d> Tonemap<'d> {
                 },
             ];
 
-            vk.device
+            self.vk
+                .device
                 .update_descriptor_sets(&write_descriptor_sets, &[]);
         };
 
@@ -253,8 +260,8 @@ impl<'d> Tonemap<'d> {
 
         let push_constants = hdr_capture.whitepoint.to_le_bytes();
 
-        vk.record_submit_command_buffer(
-            vk.command_buffer,
+        self.vk.record_submit_command_buffer(
+            self.vk.command_buffer,
             &[],
             &[],
             |device, command_buffer| unsafe {
@@ -294,8 +301,9 @@ impl<'d> Tonemap<'d> {
         )?;
 
         unsafe {
-            vk.device
-                .wait_for_fences(&[vk.command_buffer.1], true, u64::MAX)
+            self.vk
+                .device
+                .wait_for_fences(&[self.vk.command_buffer.1], true, u64::MAX)
         }
         .map_err(|e| VulkanError::VkResult(e, "waiting for fence"))?;
 
@@ -303,16 +311,18 @@ impl<'d> Tonemap<'d> {
     }
 }
 
-impl<'d> Drop for Tonemap<'d> {
+impl Drop for Tonemap {
     fn drop(&mut self) {
         unsafe {
-            self.device
+            self.vk
+                .device
                 .destroy_descriptor_set_layout(self.descriptor_layouts[0], None);
-            self.device
+            self.vk
+                .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
-            self.device.destroy_pipeline(self.pipeline, None);
-            self.device.destroy_pipeline_layout(self.layout, None);
-            self.device.destroy_shader_module(self.module, None);
+            self.vk.device.destroy_pipeline(self.pipeline, None);
+            self.vk.device.destroy_pipeline_layout(self.layout, None);
+            self.vk.device.destroy_shader_module(self.module, None);
         }
     }
 }

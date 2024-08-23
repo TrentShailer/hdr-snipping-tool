@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ash::{
     vk::{
         Buffer, CommandBuffer, DeviceMemory, IndexType, Pipeline, PipelineBindPoint,
@@ -31,8 +33,8 @@ const NO_FLAGS: u32 = 0b00000000_00000000_00000000_00000000;
             .2.3
 */
 
-pub struct MouseGuides<'d> {
-    device: &'d Device,
+pub struct MouseGuides {
+    vk: Arc<VulkanInstance>,
 
     vertex_buffer: (Buffer, DeviceMemory),
     index_buffer: (Buffer, DeviceMemory),
@@ -45,10 +47,10 @@ pub struct MouseGuides<'d> {
     line_size: f32,
 }
 
-impl<'d> MouseGuides<'d> {
+impl MouseGuides {
     #[instrument("MouseGuides::new", skip_all, err)]
     pub fn new(
-        vk: &'d VulkanInstance,
+        vk: Arc<VulkanInstance>,
         pipeline: Pipeline,
         pipeline_layout: PipelineLayout,
         line_size: f32,
@@ -104,7 +106,7 @@ impl<'d> MouseGuides<'d> {
         ];
 
         let (vertex_buffer, index_buffer) =
-            create_vertex_and_index_buffer(vk, &verticies, &indicies)?;
+            create_vertex_and_index_buffer(&vk, &verticies, &indicies)?;
 
         let push_constants = PushConstants {
             mouse_position: [0.0, 0.0],
@@ -112,7 +114,7 @@ impl<'d> MouseGuides<'d> {
         };
 
         Ok(Self {
-            device: &vk.device,
+            vk,
 
             vertex_buffer,
             index_buffer,
@@ -164,13 +166,13 @@ impl<'d> MouseGuides<'d> {
     }
 }
 
-impl<'d> Drop for MouseGuides<'d> {
+impl Drop for MouseGuides {
     fn drop(&mut self) {
         unsafe {
-            self.device.destroy_buffer(self.vertex_buffer.0, None);
-            self.device.free_memory(self.vertex_buffer.1, None);
-            self.device.destroy_buffer(self.index_buffer.0, None);
-            self.device.free_memory(self.index_buffer.1, None);
+            self.vk.device.destroy_buffer(self.vertex_buffer.0, None);
+            self.vk.device.free_memory(self.vertex_buffer.1, None);
+            self.vk.device.destroy_buffer(self.index_buffer.0, None);
+            self.vk.device.free_memory(self.index_buffer.1, None);
         }
     }
 }

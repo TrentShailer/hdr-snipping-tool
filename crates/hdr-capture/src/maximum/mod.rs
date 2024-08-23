@@ -1,13 +1,12 @@
 mod buffer_pass;
 mod source_pass;
 
-use ash::{
-    vk::{
-        AccessFlags2, BufferCopy2, BufferUsageFlags, CommandBuffer, CopyBufferInfo2,
-        DependencyInfo, Fence, MemoryPropertyFlags, PhysicalDeviceProperties2,
-        PhysicalDeviceSubgroupProperties, PipelineStageFlags2, Semaphore, SemaphoreCreateInfo,
-    },
-    Device,
+use std::sync::Arc;
+
+use ash::vk::{
+    AccessFlags2, BufferCopy2, BufferUsageFlags, CommandBuffer, CopyBufferInfo2, DependencyInfo,
+    Fence, MemoryPropertyFlags, PhysicalDeviceProperties2, PhysicalDeviceSubgroupProperties,
+    PipelineStageFlags2, Semaphore, SemaphoreCreateInfo,
 };
 use buffer_pass::BufferPass;
 use half::f16;
@@ -20,19 +19,19 @@ use crate::hdr_capture::HdrCapture;
 
 pub(crate) const MAXIMUM_SUBMISSIONS: usize = 3;
 
-pub struct Maximum<'d> {
-    device: &'d Device,
+pub struct Maximum {
+    vk: Arc<VulkanInstance>,
 
     command_buffers: Box<[(CommandBuffer, Fence)]>,
     semaphores: Vec<Semaphore>,
 
-    source_pass: SourcePass<'d>,
-    buffer_pass: BufferPass<'d>,
+    source_pass: SourcePass,
+    buffer_pass: BufferPass,
 }
 
-impl<'d> Maximum<'d> {
+impl Maximum {
     #[instrument("Maximum::new", skip_all, err)]
-    pub fn new(vk: &'d VulkanInstance) -> Result<Self, Error> {
+    pub fn new(vk: Arc<VulkanInstance>) -> Result<Self, Error> {
         // create command buffers
         let command_buffers = vk.allocate_command_buffers(MAXIMUM_SUBMISSIONS as u32)?;
 
@@ -46,11 +45,11 @@ impl<'d> Maximum<'d> {
             })
             .collect::<Result<_, VulkanError>>()?;
 
-        let source_pass = SourcePass::new(vk)?;
-        let buffer_pass = BufferPass::new(vk)?;
+        let source_pass = SourcePass::new(vk.clone())?;
+        let buffer_pass = BufferPass::new(vk.clone())?;
 
         Ok(Self {
-            device: &vk.device,
+            vk,
             command_buffers,
             semaphores,
             source_pass,
@@ -59,17 +58,13 @@ impl<'d> Maximum<'d> {
     }
 
     #[instrument("Maximum::find_maximum", skip_all, err)]
-    pub fn find_maximum(
-        &self,
-        vk: &VulkanInstance,
-        hdr_capture: &HdrCapture,
-    ) -> Result<f16, Error> {
+    pub fn find_maximum(&self, hdr_capture: &HdrCapture) -> Result<f16, Error> {
         let subgroup_size = unsafe {
             let mut subgroup_properties = PhysicalDeviceSubgroupProperties::default();
             let mut physical_device_properties =
                 PhysicalDeviceProperties2::default().push_next(&mut subgroup_properties);
-            vk.instance.get_physical_device_properties2(
-                vk.physical_device,
+            self.vk.instance.get_physical_device_properties2(
+                self.vk.physical_device,
                 &mut physical_device_properties,
             );
 
@@ -82,14 +77,14 @@ impl<'d> Maximum<'d> {
         let buffer_length_bytes = (dispatches_x * dispatches_y) * 2;
 
         // Setup "read" buffer
-        let (read_buffer, read_buffer_memory) = vk.create_bound_buffer(
+        let (read_buffer, read_buffer_memory) = self.vk.create_bound_buffer(
             buffer_length_bytes as u64,
             BufferUsageFlags::TRANSFER_SRC | BufferUsageFlags::STORAGE_BUFFER,
             MemoryPropertyFlags::DEVICE_LOCAL,
         )?;
 
         // Setup "write" buffer
-        let (write_buffer, write_buffer_memory) = vk.create_bound_buffer(
+        let (write_buffer, write_buffer_memory) = self.vk.create_bound_buffer(
             buffer_length_bytes as u64,
             BufferUsageFlags::TRANSFER_SRC | BufferUsageFlags::STORAGE_BUFFER,
             MemoryPropertyFlags::DEVICE_LOCAL,
@@ -97,7 +92,6 @@ impl<'d> Maximum<'d> {
 
         // Perform reduction on source writing results to read buffer
         self.source_pass.run(
-            vk,
             hdr_capture.image_view,
             hdr_capture.size,
             read_buffer,
@@ -107,7 +101,6 @@ impl<'d> Maximum<'d> {
 
         // finish reduction over read and write buffers until final result
         let result_buffer = self.buffer_pass.run(
-            vk,
             self,
             read_buffer,
             write_buffer,
@@ -122,20 +115,21 @@ impl<'d> Maximum<'d> {
             self.command_buffers[2].1,
         ];
         unsafe {
-            vk.device
+            self.vk
+                .device
                 .wait_for_fences(&fences, true, u64::MAX)
                 .map_err(|e| VulkanError::VkResult(e, "waiting for fences"))?
         }
 
         // Retrieve maximum from result buffer
-        let (staging_buffer, staging_buffer_memory) = vk.create_bound_buffer(
+        let (staging_buffer, staging_buffer_memory) = self.vk.create_bound_buffer(
             4,
             BufferUsageFlags::TRANSFER_DST,
             MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
         )?;
 
         // copy from result to staging buffer
-        vk.record_submit_command_buffer(
+        self.vk.record_submit_command_buffer(
             self.command_buffers[0],
             &[],
             &[],
@@ -167,39 +161,40 @@ impl<'d> Maximum<'d> {
         )?;
 
         unsafe {
-            vk.device
+            self.vk
+                .device
                 .wait_for_fences(&fences, true, u64::MAX)
                 .map_err(|e| VulkanError::VkResult(e, "waiting for fences"))?;
         }
 
-        let maximums: &[f16] = unsafe { vk.read_from_memory(staging_buffer_memory, 0, 4)? };
+        let maximums: &[f16] = unsafe { self.vk.read_from_memory(staging_buffer_memory, 0, 4)? };
         let maximum = maximums[0];
 
         unsafe {
-            vk.device.destroy_buffer(read_buffer, None);
-            vk.device.free_memory(read_buffer_memory, None);
+            self.vk.device.destroy_buffer(read_buffer, None);
+            self.vk.device.free_memory(read_buffer_memory, None);
 
-            vk.device.destroy_buffer(write_buffer, None);
-            vk.device.free_memory(write_buffer_memory, None);
+            self.vk.device.destroy_buffer(write_buffer, None);
+            self.vk.device.free_memory(write_buffer_memory, None);
 
-            vk.device.destroy_buffer(staging_buffer, None);
-            vk.device.free_memory(staging_buffer_memory, None);
+            self.vk.device.destroy_buffer(staging_buffer, None);
+            self.vk.device.free_memory(staging_buffer_memory, None);
         }
 
         Ok(maximum)
     }
 }
 
-impl<'d> Drop for Maximum<'d> {
+impl Drop for Maximum {
     fn drop(&mut self) {
         unsafe {
-            self.device.device_wait_idle().unwrap();
+            self.vk.device.device_wait_idle().unwrap();
             self.command_buffers
                 .iter()
-                .for_each(|&(_, fence)| self.device.destroy_fence(fence, None));
+                .for_each(|&(_, fence)| self.vk.device.destroy_fence(fence, None));
             self.semaphores
                 .iter()
-                .for_each(|&semaphore| self.device.destroy_semaphore(semaphore, None));
+                .for_each(|&semaphore| self.vk.device.destroy_semaphore(semaphore, None));
         }
     }
 }

@@ -5,7 +5,7 @@ use ash::vk::{
 };
 
 use tracing::{instrument, Level};
-use vulkan_instance::{VulkanError, VulkanInstance};
+use vulkan_instance::VulkanError;
 
 use winit::window::Window;
 
@@ -13,12 +13,11 @@ use hdr_capture::Selection as SelectionArea;
 
 use super::Renderer;
 
-impl<'d> Renderer<'d> {
+impl Renderer {
     /// Try to queue a frame to be rendered and presented
     #[instrument("Renderer::render", level = Level::DEBUG, skip_all, err)]
     pub fn render(
         &mut self,
-        vk: &VulkanInstance,
         window: &Window,
         mouse_position: [u32; 2],
         selection: SelectionArea,
@@ -33,7 +32,7 @@ impl<'d> Renderer<'d> {
 
         // Handle recreatin the swapchain
         if self.recreate_swapchain {
-            self.recreate_swapchain(vk, window_size)?;
+            self.recreate_swapchain(window_size)?;
         }
 
         // try and find a free acquire fence
@@ -42,7 +41,7 @@ impl<'d> Renderer<'d> {
             .iter()
             .enumerate()
             .find_map(|(index, fence)| unsafe {
-                match vk.device.get_fence_status(*fence) {
+                match self.vk.device.get_fence_status(*fence) {
                     Ok(signalled) => {
                         if !signalled {
                             Some((index, *fence))
@@ -104,10 +103,12 @@ impl<'d> Renderer<'d> {
         // wait for and reset acquire fence
         unsafe {
             let fences = [acquire_fence];
-            vk.device
+            self.vk
+                .device
                 .wait_for_fences(&fences, true, u64::MAX)
                 .map_err(|e| VulkanError::VkResult(e, "waiting for acquire fence"))?;
-            vk.device
+            self.vk
+                .device
                 .reset_fences(&fences)
                 .map_err(|e| VulkanError::VkResult(e, "resetting acquire fence"))?;
         }
@@ -115,7 +116,7 @@ impl<'d> Renderer<'d> {
         let command_buffer = self.command_buffers[sync_index];
         let render_semaphore = self.render_semaphores[sync_index];
 
-        vk.record_submit_command_buffer(
+        self.vk.record_submit_command_buffer(
             command_buffer,
             &[],
             &[(render_semaphore, PipelineStageFlags2::BOTTOM_OF_PIPE)],
@@ -184,8 +185,11 @@ impl<'d> Renderer<'d> {
             .swapchains(&swapchains)
             .image_indices(&image_indicies);
 
-        let suboptimal = unsafe { self.swapchain_loader.queue_present(vk.queue, &present_info) }
-            .map_err(|e| VulkanError::VkResult(e, "queueing present"))?;
+        let suboptimal = unsafe {
+            self.swapchain_loader
+                .queue_present(self.vk.queue, &present_info)
+        }
+        .map_err(|e| VulkanError::VkResult(e, "queueing present"))?;
 
         if suboptimal {
             self.recreate_swapchain = true;

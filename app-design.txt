@@ -1,15 +1,3 @@
-// Notes:
-// All errors should be #[non_exhaustive]
-// Structs that are subject to change/iteration should be #[non_exhaustive]
-
-// objects that create vulkan objects are required to take a RENFERENCE
-// to the VulkanInstance::device and have their own lifetimes to ensure
-// that the child object does not outlive the vulkan instance.
-
-// TODO crush a lot of A{..Default::default} into A::default()...;
-
-// TODO ensure EVERYTHING is instrumented
-
 HdrSnippingTool {
 
 }
@@ -72,13 +60,13 @@ WindowsCaptureProvider {
 
 Renderer {
     Renderer {
-        fn new(vk: &VulkanIntance, window_size: [u32; 2]) -> Result<Self, Error>
+        fn new(vk: Arc<VulkanInstance>, window_size: [u32; 2]) -> Result<Self, Error>
 
         fn queue_recreate_swapchain(&mut self)
 
-        fn render(vk: &VulkanInstance, window_size: [u32; 2], window_scale: f64, mouse_position: [u32; 2], selection: Selection) -> Result<(), Error>
+        fn render(&mut self, window_size: [u32; 2], window_scale: f64, mouse_position: [u32; 2], selection: Selection) -> Result<(), Error>
 
-        fn load_capture(&mut self, vk: &VulkanInstance, capture: &HdrCapture)
+        fn load_capture(&mut self, capture: &HdrCapture)
 
         fn unload_capture(&mut self)
 
@@ -109,7 +97,7 @@ VulkanInstance {
 
         fn find_memory_type_index(&self, memory_requirements: &vk::MemoryRequirements, flags: vk::MemoryPropertyFlags) -> Option<u32>
 
-        fn record_submit_command_buffer<F: FnOnce(Arc<Device>, vk::CommandBuffer) -> Result<(), VulkanError>>(
+        fn record_submit_command_buffer<F: FnOnce(&Device, vk::CommandBuffer) -> Result<(), VulkanError>>(
             &self,
             command_buffer: (CommandBuffer, Fence),
             wait_semaphores: &[(vk::Semaphore, vk::PipelineStageFlags2)],
@@ -153,9 +141,9 @@ VulkanInstance {
 
 HdrCapture {
     Maximum {
-        fn new(vk: &VulkanInstance) -> Result<Self, Error>
+        fn new(vk: Arc<VulkanInstance>) -> Result<Self, Error>
 
-        fn find_maximum(&self, vk: &VulkanInstance, hdr_capture: &HdrCapture) -> Result<f16, Error>
+        fn find_maximum(&self, hdr_capture: &HdrCapture) -> Result<f16, Error>
 
         enum Error {
             Vulkan
@@ -163,9 +151,9 @@ HdrCapture {
     }
 
     Tonemap {
-        fn new(vk: &VulkanInstance) -> Result<Self, Error>
+        fn new(vk: Arc<VulkanInstance>) -> Result<Self, Error>
 
-        fn tonemap(&self, vk: &VulkanInstance, hdr_capture: &HdrCapture) -> Result<(Image, DeviceMemory), Error>
+        fn tonemap(&self, hdr_capture: &HdrCapture) -> Result<(Image, DeviceMemory), Error>
 
         enum Error {
             Vulkan
@@ -177,7 +165,7 @@ HdrCapture {
         whitepoint: f32
         image_view: ImageView
 
-        fn import_windows_capture(vk: &VulkanInstance, maximum: &Maximum, capture: &WindowsCapture, hdr_whitepoint: f32) -> Result<Self, Error>
+        fn import_windows_capture(vk: Arc<VulkanInstance>, maximum: &Maximum, capture: &WindowsCapture, hdr_whitepoint: f32) -> Result<Self, Error>
 
         enum Error {
             Vulkan,

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ash::{
     vk::{
         Buffer, CommandBuffer, DeviceMemory, IndexType, Pipeline, PipelineBindPoint,
@@ -31,10 +33,10 @@ const NO_FLAGS: u32 = 0b00000000_00000000_00000000_00000000;
     .6				.4
 */
 
-pub struct Selection<'d> {
-    device: &'d Device,
+pub struct Selection {
+    vk: Arc<VulkanInstance>,
 
-    border: Border<'d>,
+    border: Border,
 
     vertex_buffer: (Buffer, DeviceMemory),
     index_buffer: (Buffer, DeviceMemory),
@@ -46,10 +48,10 @@ pub struct Selection<'d> {
     push_constants: PushConstants,
 }
 
-impl<'d> Selection<'d> {
+impl Selection {
     #[instrument("Selection::new", level = Level::DEBUG, skip_all, err)]
     pub fn new(
-        vk: &'d VulkanInstance,
+        vk: Arc<VulkanInstance>,
         shading_pipeline: Pipeline,
         shading_pipeline_layout: PipelineLayout,
         border_pipeline: Pipeline,
@@ -107,10 +109,10 @@ impl<'d> Selection<'d> {
         ];
 
         let (vertex_buffer, index_buffer) =
-            create_vertex_and_index_buffer(vk, &verticies, &indicies)?;
+            create_vertex_and_index_buffer(&vk, &verticies, &indicies)?;
 
         let border = Border::new(
-            vk,
+            vk.clone(),
             border_pipeline,
             border_pipeline_layout,
             [255, 255, 255, 255],
@@ -125,7 +127,7 @@ impl<'d> Selection<'d> {
         };
 
         Ok(Self {
-            device: &vk.device,
+            vk,
 
             border,
 
@@ -191,13 +193,13 @@ impl<'d> Selection<'d> {
     }
 }
 
-impl<'d> Drop for Selection<'d> {
+impl Drop for Selection {
     fn drop(&mut self) {
         unsafe {
-            self.device.destroy_buffer(self.vertex_buffer.0, None);
-            self.device.free_memory(self.vertex_buffer.1, None);
-            self.device.destroy_buffer(self.index_buffer.0, None);
-            self.device.free_memory(self.index_buffer.1, None);
+            self.vk.device.destroy_buffer(self.vertex_buffer.0, None);
+            self.vk.device.free_memory(self.vertex_buffer.1, None);
+            self.vk.device.destroy_buffer(self.index_buffer.0, None);
+            self.vk.device.free_memory(self.index_buffer.1, None);
         }
     }
 }

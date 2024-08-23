@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ash::{
     vk::{
         Buffer, CommandBuffer, DescriptorImageInfo, DescriptorPool, DescriptorPoolCreateInfo,
@@ -18,8 +20,8 @@ use crate::pipelines::{
     vertex_index_buffer::create_vertex_and_index_buffer,
 };
 
-pub struct Capture<'d> {
-    device: &'d Device,
+pub struct Capture {
+    vk: Arc<VulkanInstance>,
 
     vertex_buffer: (Buffer, DeviceMemory),
     index_buffer: (Buffer, DeviceMemory),
@@ -37,10 +39,10 @@ pub struct Capture<'d> {
     pub loaded: bool,
 }
 
-impl<'d> Capture<'d> {
+impl Capture {
     #[instrument("Capture::new", skip_all, err)]
     pub fn new(
-        vk: &'d VulkanInstance,
+        vk: Arc<VulkanInstance>,
         pipeline: Pipeline,
         pipeline_layout: PipelineLayout,
         descriptor_layouts: [DescriptorSetLayout; 2],
@@ -67,7 +69,7 @@ impl<'d> Capture<'d> {
         let indicies = vec![0, 1, 2, 2, 3, 0];
 
         let (vertex_buffer, index_buffer) =
-            create_vertex_and_index_buffer(vk, &verticies, &indicies)?;
+            create_vertex_and_index_buffer(&vk, &verticies, &indicies)?;
 
         let sampler_create_info = SamplerCreateInfo::default()
             .mag_filter(Filter::LINEAR)
@@ -131,7 +133,7 @@ impl<'d> Capture<'d> {
         let push_constants = PushConstants { whitepoint: 0.0 };
 
         Ok(Self {
-            device: &vk.device,
+            vk,
 
             vertex_buffer,
             index_buffer,
@@ -151,11 +153,7 @@ impl<'d> Capture<'d> {
     }
 
     #[instrument("Capture::load_capture", level = Level::DEBUG, skip_all, err)]
-    pub fn load_capture(
-        &mut self,
-        vk: &VulkanInstance,
-        capture: &HdrCapture,
-    ) -> Result<(), crate::Error> {
+    pub fn load_capture(&mut self, capture: &HdrCapture) -> Result<(), crate::Error> {
         unsafe {
             let image_descriptor = DescriptorImageInfo {
                 sampler: Sampler::null(),
@@ -172,7 +170,8 @@ impl<'d> Capture<'d> {
                 ..Default::default()
             }];
 
-            vk.device
+            self.vk
+                .device
                 .update_descriptor_sets(&write_descriptor_sets, &[]);
         };
 
@@ -223,17 +222,18 @@ impl<'d> Capture<'d> {
     }
 }
 
-impl<'d> Drop for Capture<'d> {
+impl Drop for Capture {
     fn drop(&mut self) {
         unsafe {
-            self.device.destroy_buffer(self.vertex_buffer.0, None);
-            self.device.free_memory(self.vertex_buffer.1, None);
-            self.device.destroy_buffer(self.index_buffer.0, None);
-            self.device.free_memory(self.index_buffer.1, None);
+            self.vk.device.destroy_buffer(self.vertex_buffer.0, None);
+            self.vk.device.free_memory(self.vertex_buffer.1, None);
+            self.vk.device.destroy_buffer(self.index_buffer.0, None);
+            self.vk.device.free_memory(self.index_buffer.1, None);
 
-            self.device
+            self.vk
+                .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
-            self.device.destroy_sampler(self.sampler, None);
+            self.vk.device.destroy_sampler(self.sampler, None);
         }
     }
 }
