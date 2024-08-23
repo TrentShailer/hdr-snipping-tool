@@ -115,6 +115,7 @@ VulkanInstance {
 
         /// memory must be host visible and coherant
         fn write_to_memory<T>(&self, memory: DeviceMemory, data: &[T], offset: u64, size: u64) -> Result<(), VulkanError>
+        // TODO read from memory?
 
         fn create_unbound_buffer(&self, size: u64, usage: BufferUsageFlags, memory_flags: MemoryPropertyFlags) -> Result<(Buffer, DeviceMemory), VulkanError>
         fn create_bound_buffer(&self, size: u64, usage: BufferUsageFlags, memory_flags: MemoryPropertyFlags) -> Result<(Buffer, DeviceMemory), VulkanError>
@@ -141,8 +142,8 @@ VulkanInstance {
         #[error("Encountered vulkan error while {1}:\n{0}")]
         VkResult(#[source] ash::vk::Result, &'static str),
 
-        #[error("No suitable memory type for {0}")]
-        NoSuitableMemoryType(&'static str)
+        #[error("No suitable memory type")]
+        NoSuitableMemoryType
     }
 }
 
