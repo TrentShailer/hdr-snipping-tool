@@ -154,7 +154,7 @@ HdrCapture {
         fn find_maximum(&self, vk: &VulkanInstance, hdr_capture: &HdrCapture) -> Result<f16, Error>
 
         enum Error {
-            GenericVulkan
+            Vulkan
         }
     }
 
@@ -164,7 +164,7 @@ HdrCapture {
         fn tonemap(&self, vk: &VulkanInstance, hdr_capture: &HdrCapture) -> Result<(Image, DeviceMemory), Error>
 
         enum Error {
-            GenericVulkan
+            Vulkan
         }
     }
 
@@ -173,11 +173,11 @@ HdrCapture {
         whitepoint: f32
         image_view: ImageView
 
-        fn import_windows_capture(vk: &VulkanInstance, maximum: &Maximum, capture: &WindowsCapture) -> Result<Self, Error>
+        fn import_windows_capture(vk: &VulkanInstance, maximum: &Maximum, capture: &WindowsCapture, hdr_whitepoint: f32) -> Result<Self, Error>
 
         enum Error {
             Vulkan,
-            NoSuitableMemoryType
+            Maximum
         }
     }
 

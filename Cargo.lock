@@ -917,6 +917,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
+name = "hdr-capture"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "half",
+ "thiserror",
+ "tracing",
+ "vulkan-instance",
+ "windows-capture-provider",
+]
+
+[[package]]
 name = "hdr-snipping-tool"
 version = "3.2.0"
 dependencies = [
