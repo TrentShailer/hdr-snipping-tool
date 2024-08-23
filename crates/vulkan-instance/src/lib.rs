@@ -1,6 +1,7 @@
 pub mod buffer;
 pub mod command_buffer;
 pub mod create;
+pub mod default;
 pub mod memory;
 pub mod shader;
 
