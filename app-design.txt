@@ -105,39 +105,39 @@ VulkanInstance {
 
         fn find_memory_type_index(&self, memory_requirements: &vk::MemoryRequirements, flags: vk::MemoryPropertyFlags) -> Option<u32>
 
-        fn record_submit_command_buffer<F: FnOnce(Arc<Device>, vk::CommandBuffer) -> Result<(), GenericVulkanError>>(
+        fn record_submit_command_buffer<F: FnOnce(Arc<Device>, vk::CommandBuffer) -> Result<(), VulkanError>>(
             &self,
             command_buffer: (CommandBuffer, Fence),
             wait_semaphores: &[(vk::Semaphore, vk::PipelineStageFlags2)],
             signal_semaphores: &[(vk::Semaphore, vk::PipelineStageFlags2)],
             f: F,
-        ) -> Result<(), GenericVulkanError>
+        ) -> Result<(), VulkanError>
 
         /// memory must be host visible and coherant
-        fn write_to_memory<T>(&self, memory: DeviceMemory, data: &[T], offset: u64, size: u64) -> Result<(), GenericVulkanError>
+        fn write_to_memory<T>(&self, memory: DeviceMemory, data: &[T], offset: u64, size: u64) -> Result<(), VulkanError>
 
-        fn create_unbound_buffer(&self, size: u64, usage: BufferUsageFlags, memory_flags: MemoryPropertyFlags) -> Result<(Buffer, DeviceMemory), GenericVulkanError>
-        fn create_bound_buffer(&self, size: u64, usage: BufferUsageFlags, memory_flags: MemoryPropertyFlags) -> Result<(Buffer, DeviceMemory), GenericVulkanError>
+        fn create_unbound_buffer(&self, size: u64, usage: BufferUsageFlags, memory_flags: MemoryPropertyFlags) -> Result<(Buffer, DeviceMemory), VulkanError>
+        fn create_bound_buffer(&self, size: u64, usage: BufferUsageFlags, memory_flags: MemoryPropertyFlags) -> Result<(Buffer, DeviceMemory), VulkanError>
 
         /// Provides better defaults for BufferMemoryBarrier2
         fn buffer_memory_barrier() -> BufferMemoryBarrier2
         /// Provides better defaults for ImageMemoryBarrier2
         fn image_memory_barrier() -> ImageMemoryBarrier2
 
-        fn allocate_command_buffers(&self, count: u32) -> Result<Box<[(CommandBuffer, Fence)]>, GenericVulkanError>
+        fn allocate_command_buffers(&self, count: u32) -> Result<Box<[(CommandBuffer, Fence)]>, VulkanError>
 
-        fn create_shader_module(&self, bytes: &[u8]) -> Result<ShaderModule, GenericVulkanError> 
+        fn create_shader_module(&self, bytes: &[u8]) -> Result<ShaderModule, VulkanError> 
 
         enum CreateError {
             LoadLibrary,
             GetHandle,
-            GenericVulkanError,
+            GenericVulkan,
             UnsupportedVulkanVersion,
             NoSuitableDevices
         }
     }
 
-    enum GenericVulkanError {
+    enum VulkanError {
         #[error("Encountered vulkan error while {1}:\n{0}")]
         VkResult(#[source] ash::vk::Result, &'static str),
 

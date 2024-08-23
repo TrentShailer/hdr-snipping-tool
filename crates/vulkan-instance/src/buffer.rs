@@ -3,7 +3,7 @@ use ash::vk::{
     MemoryPropertyFlags, SharingMode,
 };
 
-use crate::VulkanInstance;
+use crate::{VulkanError, VulkanInstance};
 
 impl VulkanInstance {
     /// Creates a basic unbound buffer with device memory backing it.
@@ -12,7 +12,7 @@ impl VulkanInstance {
         size: u64,
         usage: BufferUsageFlags,
         memory_flags: MemoryPropertyFlags,
-    ) -> Result<(Buffer, DeviceMemory), ash::vk::Result> {
+    ) -> Result<(Buffer, DeviceMemory), VulkanError> {
         let (buffer, memory) = unsafe {
             let buffer_create_info = BufferCreateInfo::default()
                 .size(size)

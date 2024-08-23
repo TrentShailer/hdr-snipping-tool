@@ -12,7 +12,7 @@ use ash::{
 };
 use tracing::{error, info, instrument};
 
-use crate::GenericVulkanError;
+use crate::VulkanError;
 
 use super::Error;
 
@@ -31,7 +31,7 @@ pub fn get_physical_device(
     let physical_devices = unsafe {
         instance
             .enumerate_physical_devices()
-            .map_err(|e| GenericVulkanError::VkResult(e, "enumerating physical devices"))?
+            .map_err(|e| VulkanError::VkResult(e, "enumerating physical devices"))?
     };
 
     let (physical_device, queue_family_index) = physical_devices

@@ -1,14 +1,14 @@
 use ash::{vk, Entry};
 use tracing::{info, instrument};
 
-use crate::GenericVulkanError;
+use crate::VulkanError;
 
 use super::Error;
 
 #[instrument(skip_all, err)]
 pub fn validate_api_version(entry: &Entry) -> Result<(), Error> {
     let api_version = unsafe { entry.try_enumerate_instance_version() }
-        .map_err(|e| GenericVulkanError::VkResult(e, "enumerating instance version"))?
+        .map_err(|e| VulkanError::VkResult(e, "enumerating instance version"))?
         .unwrap_or(vk::make_api_version(0, 1, 0, 0));
 
     let major = vk::api_version_major(api_version);

@@ -34,7 +34,8 @@ pub struct VulkanInstance {
 }
 
 #[derive(Debug, Error)]
-pub enum GenericVulkanError {
+#[non_exhaustive]
+pub enum VulkanError {
     #[error("Encountered vulkan error while {1}:\n{0}")]
     VkResult(#[source] vk::Result, &'static str),
 

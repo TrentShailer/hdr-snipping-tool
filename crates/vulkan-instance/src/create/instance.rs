@@ -8,7 +8,7 @@ use ash::{
 use tracing::instrument;
 use winit::{raw_window_handle::HasDisplayHandle, window::Window};
 
-use crate::GenericVulkanError;
+use crate::VulkanError;
 
 use super::Error;
 
@@ -54,7 +54,7 @@ pub fn aquire_instance(entry: &Entry, window: &Window, debug: bool) -> Result<In
     let instance = unsafe {
         entry
             .create_instance(&create_info, None)
-            .map_err(|e| GenericVulkanError::VkResult(e, "creating instance"))?
+            .map_err(|e| VulkanError::VkResult(e, "creating instance"))?
     };
 
     Ok(instance)

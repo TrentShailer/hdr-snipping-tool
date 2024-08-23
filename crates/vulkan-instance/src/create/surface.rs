@@ -5,7 +5,7 @@ use winit::{
     window::Window,
 };
 
-use crate::GenericVulkanError;
+use crate::VulkanError;
 
 use super::Error;
 
@@ -23,7 +23,7 @@ pub fn create_surface(
             window.window_handle()?.as_raw(),
             None,
         )
-        .map_err(|e| GenericVulkanError::VkResult(e, "creating surface"))?
+        .map_err(|e| VulkanError::VkResult(e, "creating surface"))?
     };
     let surface_loader = surface::Instance::new(&entry, instance);
 

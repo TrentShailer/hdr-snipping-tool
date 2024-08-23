@@ -19,7 +19,7 @@ use thiserror::Error;
 use tracing::instrument;
 use winit::{raw_window_handle::HandleError, window::Window};
 
-use crate::{GenericVulkanError, VulkanInstance};
+use crate::{VulkanError, VulkanInstance};
 
 impl VulkanInstance {
     #[instrument("VulkanInstance::new", skip_all, err)]
@@ -67,6 +67,7 @@ impl VulkanInstance {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("Failed to load vulkan library:\n{0}")]
     LoadLibrary(#[from] LoadingError),
@@ -75,7 +76,7 @@ pub enum Error {
     GetHandle(#[from] HandleError),
 
     #[error(transparent)]
-    GenericVulkan(#[from] GenericVulkanError),
+    GenericVulkan(#[from] VulkanError),
 
     #[error("Vulkan api version {0}.{1}.{2} is unsupported, only v1.3.x is supported.")]
     UnsupportedVulkanVersion(u32, u32, u32),
