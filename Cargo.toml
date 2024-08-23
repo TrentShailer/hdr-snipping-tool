@@ -30,6 +30,5 @@ image = { version = "0.25", features = [
 
 vulkan-instance = { path = "crates/vulkan-instance" }
 vulkan-renderer = { path = "crates/vulkan-renderer" }
-scrgb-tonemapper = { path = "crates/scrgb-tonemapper" }
 hdr-capture = { path = "crates/hdr-capture" }
 windows-capture-provider = { path = "crates/windows-capture-provider" }

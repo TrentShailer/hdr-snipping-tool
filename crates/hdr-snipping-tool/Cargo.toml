@@ -11,7 +11,7 @@ tracy = ["tracing-tracy"]
 [dependencies]
 vulkan-instance = { workspace = true }
 vulkan-renderer = { workspace = true }
-scrgb-tonemapper = { workspace = true }
+hdr-capture = { workspace = true }
 windows-capture-provider = { workspace = true }
 
 tracing = { workspace = true }
