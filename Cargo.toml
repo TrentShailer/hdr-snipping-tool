@@ -6,6 +6,7 @@ members = ["crates/*"]
 thiserror = "1.0"
 tracing = "0.1"
 
+bytemuck = { version = "1.17", default-features = false, features = ["derive"] }
 half = { version = "2.4" }
 smallvec = "1.13"
 

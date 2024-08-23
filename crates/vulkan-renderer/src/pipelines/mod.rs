@@ -2,6 +2,7 @@ pub mod border;
 pub mod capture;
 pub mod mouse_guides;
 pub mod selection_shading;
+pub mod vertex_index_buffer;
 
 use ash::vk::{
     DynamicState, FrontFace, GraphicsPipelineCreateInfo, LogicOp, Pipeline, PipelineCache,
@@ -13,10 +14,11 @@ use ash::vk::{
     PipelineViewportStateCreateInfo, PolygonMode, PrimitiveTopology, RenderPass, SampleCountFlags,
     Viewport,
 };
-use thiserror::Error;
-use vulkan_instance::VulkanInstance;
+use tracing::instrument;
+use vulkan_instance::{VulkanError, VulkanInstance};
 
 /// Helper function to create a basic graphics pipeline with given inputs.
+#[instrument(skip_all, err)]
 pub fn create_pipeline(
     vk: &VulkanInstance,
     pipeline_rendering_create_info: PipelineRenderingCreateInfo,
@@ -25,7 +27,7 @@ pub fn create_pipeline(
     stages: &[PipelineShaderStageCreateInfo],
     blend: PipelineColorBlendAttachmentState,
     viewport: Viewport,
-) -> Result<(Pipeline, PipelineLayout), Error> {
+) -> Result<(Pipeline, PipelineLayout), VulkanError> {
     let mut pipeline_rendering_create_info = pipeline_rendering_create_info;
 
     let input_assembly_state =
@@ -54,7 +56,7 @@ pub fn create_pipeline(
         vk.device
             .create_pipeline_layout(&pipeline_layout_create_info, None)
     }
-    .map_err(|e| Error::Vulkan(e, "creating pipeline layout"))?;
+    .map_err(|e| VulkanError::VkResult(e, "creating pipeline layout"))?;
 
     let graphics_pipeline_create_info = GraphicsPipelineCreateInfo::default()
         .stages(stages)
@@ -76,19 +78,10 @@ pub fn create_pipeline(
                 &[graphics_pipeline_create_info],
                 None,
             )
-            .map_err(|(_, e)| Error::Vulkan(e, "creating graphics pipline"))?
+            .map_err(|(_, e)| VulkanError::VkResult(e, "creating graphics pipline"))?
     };
 
     let pipeline = pipelines[0];
 
     Ok((pipeline, pipeline_layout))
-}
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("Encountered vulkan error while {1}:\n{0}")]
-    Vulkan(#[source] ash::vk::Result, &'static str),
-
-    #[error("Failed to read shader:\n{0}")]
-    ReadShader(#[source] std::io::Error),
 }

@@ -8,6 +8,8 @@
 
 // TODO crush a lot of A{..Default::default} into A::default()...;
 
+// TODO ensure EVERYTHING is instrumented
+
 HdrSnippingTool {
 
 }
@@ -72,6 +74,8 @@ Renderer {
     Renderer {
         fn new(vk: &VulkanIntance, window_size: [u32; 2]) -> Result<Self, Error>
 
+        fn queue_recreate_swapchain(&mut self)
+
         fn render(vk: &VulkanInstance, window_size: [u32; 2], window_scale: f64, mouse_position: [u32; 2], selection: Selection) -> Result<(), Error>
 
         fn load_capture(&mut self, vk: &VulkanInstance, capture: &HdrCapture)
@@ -80,7 +84,7 @@ Renderer {
 
         enum Error {
             #[error(transparent)]
-            GenericVulkan
+            Vulkan
         }
     }
 }

@@ -1,27 +1,26 @@
-use std::sync::Arc;
-
 use ash::vk::{
     AttachmentLoadOp, AttachmentStoreOp, ClearColorValue, ClearValue, Extent2D, ImageLayout,
     Offset2D, PipelineStageFlags2, PresentInfoKHR, Rect2D, RenderingAttachmentInfo, RenderingInfo,
     Semaphore,
 };
-use thiserror::Error;
-use vulkan_instance::{record_submit_command_buffer, VulkanInstance};
+
+use vulkan_instance::{VulkanError, VulkanInstance};
 
 use winit::window::Window;
 
-use super::{swapchain, Renderer};
+use hdr_capture::Selection as SelectionArea;
 
-impl Renderer {
+use super::Renderer;
+
+impl<'d> Renderer<'d> {
+    /// Try to queue a frame to be rendered and presented
     pub fn render(
         &mut self,
         vk: &VulkanInstance,
-        window: Arc<Window>,
-        selection_top_left: [u32; 2],
-        selection_size: [u32; 2],
+        window: &Window,
         mouse_position: [u32; 2],
-        should_wait: bool,
-    ) -> Result<(), Error> {
+        selection: SelectionArea,
+    ) -> Result<(), crate::Error> {
         let window_size: [u32; 2] = window.inner_size().into();
         let window_scale = window.scale_factor();
 
@@ -34,8 +33,6 @@ impl Renderer {
         if self.recreate_swapchain {
             self.recreate_swapchain(vk, window_size)?;
         }
-
-        // TODO add ability to wait for a fence
 
         // try and find a free acquire fence
         let free_fence = self
@@ -61,7 +58,7 @@ impl Renderer {
         };
 
         // 100μs
-        let aquire_timeout = if should_wait { u64::MAX } else { 100000 };
+        let aquire_timeout = 100000;
 
         let image_index = unsafe {
             let aquire_result = self.swapchain_loader.acquire_next_image(
@@ -92,7 +89,12 @@ impl Renderer {
 
                         return Ok(());
                     }
-                    _ => return Err(Error::Vulkan(e, "aquiring image")),
+                    _ => {
+                        return Err(crate::Error::Vulkan(VulkanError::VkResult(
+                            e,
+                            "aquiring image",
+                        )))
+                    }
                 },
             }
         };
@@ -102,19 +104,17 @@ impl Renderer {
             let fences = [acquire_fence];
             vk.device
                 .wait_for_fences(&fences, true, u64::MAX)
-                .map_err(|e| Error::Vulkan(e, "waiting for acquire fence"))?;
+                .map_err(|e| VulkanError::VkResult(e, "waiting for acquire fence"))?;
             vk.device
                 .reset_fences(&fences)
-                .map_err(|e| Error::Vulkan(e, "resetting acquire fence"))?;
+                .map_err(|e| VulkanError::VkResult(e, "resetting acquire fence"))?;
         }
 
         let command_buffer = self.command_buffers[sync_index];
-        let cb_fence = self.cb_fences[sync_index];
         let render_semaphore = self.render_semaphores[sync_index];
 
         vk.record_submit_command_buffer(
             command_buffer,
-            cb_fence,
             &[],
             &[(render_semaphore, PipelineStageFlags2::BOTTOM_OF_PIPE)],
             |device, command_buffer| {
@@ -148,24 +148,23 @@ impl Renderer {
                     device.cmd_set_scissor_with_count(command_buffer, &scissors);
 
                     if self.capture.loaded {
-                        self.capture.render(&device, command_buffer)?;
+                        self.capture
+                            .render(device, command_buffer)
+                            .map_err(|e| VulkanError::VkResult(e, "rendering capture"))?;
 
-                        self.mouse_guides.render(
-                            &device,
-                            command_buffer,
-                            mouse_position,
-                            window_size,
-                            window_scale,
-                        )?;
+                        self.mouse_guides
+                            .render(
+                                device,
+                                command_buffer,
+                                mouse_position,
+                                window_size,
+                                window_scale,
+                            )
+                            .map_err(|e| VulkanError::VkResult(e, "rendering mouse guides"))?;
 
-                        self.selection.render(
-                            &device,
-                            command_buffer,
-                            selection_top_left,
-                            selection_size,
-                            window_size,
-                            window_scale,
-                        )?;
+                        self.selection
+                            .render(device, command_buffer, selection, window_size, window_scale)
+                            .map_err(|e| VulkanError::VkResult(e, "rendering selection"))?;
                     }
 
                     device.cmd_end_rendering(command_buffer);
@@ -184,7 +183,7 @@ impl Renderer {
             .image_indices(&image_indicies);
 
         let suboptimal = unsafe { self.swapchain_loader.queue_present(vk.queue, &present_info) }
-            .map_err(|e| Error::Vulkan(e, "queueing present"))?;
+            .map_err(|e| VulkanError::VkResult(e, "queueing present"))?;
 
         if suboptimal {
             self.recreate_swapchain = true;
@@ -192,16 +191,4 @@ impl Renderer {
 
         Ok(())
     }
-}
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("Failed to recreate swapchain:\n{0:?}")]
-    RecreateSwapchain(#[from] swapchain::Error),
-
-    #[error("Encountered vulkan error while {1}:\n{0}")]
-    Vulkan(#[source] ash::vk::Result, &'static str),
-
-    #[error("Failed to record and submit command buffer:\n{0}")]
-    RecordSubmit(#[from] record_submit_command_buffer::Error),
 }

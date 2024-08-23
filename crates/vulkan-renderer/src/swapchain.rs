@@ -5,13 +5,16 @@ use ash::vk::{
     PresentModeKHR, SharingMode, SurfaceFormatKHR, SurfaceTransformFlagsKHR,
     SwapchainCreateInfoKHR, SwapchainKHR, Viewport,
 };
-use thiserror::Error;
-use tracing::{info, info_span};
-use vulkan_instance::{record_submit_command_buffer, VulkanInstance};
+
+use tracing::{info, instrument};
+use vulkan_instance::{VulkanError, VulkanInstance};
+
+use crate::Error;
 
 use super::Renderer;
 
-impl Renderer {
+impl<'d> Renderer<'d> {
+    #[instrument("Renderer::get_surface_format", skip_all, err)]
     pub fn get_surface_format(vk: &VulkanInstance) -> Result<SurfaceFormatKHR, ash::vk::Result> {
         let surface_formats = unsafe {
             vk.surface_loader
@@ -33,21 +36,20 @@ impl Renderer {
         Ok(surface_format)
     }
 
+    #[instrument("Renderer::create_swapchain", skip_all, err)]
     pub fn create_swapchain(
         vk: &VulkanInstance,
         swapchain_loader: &ash::khr::swapchain::Device,
         window_size: [u32; 2],
         old_swapchain: Option<SwapchainKHR>,
     ) -> Result<SwapchainKHR, Error> {
-        let _span = info_span!("create_swapchain").entered();
-
-        let surface_format =
-            Self::get_surface_format(vk).map_err(|e| Error::Vulkan(e, "getting surface format"))?;
+        let surface_format = Self::get_surface_format(vk)
+            .map_err(|e| VulkanError::VkResult(e, "getting surface format"))?;
 
         let surface_capabilities = unsafe {
             vk.surface_loader
                 .get_physical_device_surface_capabilities(vk.physical_device, vk.surface)
-                .map_err(|e| Error::Vulkan(e, "querying surface capabilities"))?
+                .map_err(|e| VulkanError::VkResult(e, "querying surface capabilities"))?
         };
 
         let mut swapchain_image_count = surface_capabilities.min_image_count + 1;
@@ -61,7 +63,7 @@ impl Renderer {
             let present_modes = unsafe {
                 vk.surface_loader
                     .get_physical_device_surface_present_modes(vk.physical_device, vk.surface)
-                    .map_err(|e| Error::Vulkan(e, "querying surface present modes"))?
+                    .map_err(|e| VulkanError::VkResult(e, "querying surface present modes"))?
             };
 
             present_modes
@@ -111,7 +113,7 @@ impl Renderer {
         };
 
         let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_create_info, None) }
-            .map_err(|e| Error::Vulkan(e, "creating the swapchain"))?;
+            .map_err(|e| VulkanError::VkResult(e, "creating the swapchain"))?;
 
         info!("Surface format: {:#?}", surface_format.format);
         info!("Surface color space: {:#?}", surface_format.color_space);
@@ -120,63 +122,50 @@ impl Renderer {
         Ok(swapchain)
     }
 
+    #[instrument("Renderer::transition_images", skip_all, err)]
     pub fn transition_images(vk: &VulkanInstance, images: &[Image]) -> Result<(), Error> {
-        vk.record_submit_command_buffer(
-            vk.command_buffer,
-            vk.fence,
-            &[],
-            &[],
-            |device, command_buffer| {
-                unsafe {
-                    let barriers: Box<[ImageMemoryBarrier2]> = images
-                        .iter()
-                        .map(|&image| {
-                            ImageMemoryBarrier2::default()
-                                .image(image)
-                                .dst_access_mask(
-                                    AccessFlags2::COLOR_ATTACHMENT_READ
-                                        | AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                                )
-                                .dst_stage_mask(PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
-                                .old_layout(ImageLayout::UNDEFINED)
-                                .new_layout(ImageLayout::PRESENT_SRC_KHR)
-                                .subresource_range(
-                                    ImageSubresourceRange::default()
-                                        .aspect_mask(ImageAspectFlags::COLOR)
-                                        .layer_count(1)
-                                        .level_count(1),
-                                )
-                        })
-                        .collect();
-                    let dependency_info =
-                        DependencyInfoKHR::default().image_memory_barriers(&barriers);
-                    device.cmd_pipeline_barrier2(command_buffer, &dependency_info);
-                }
-                Ok(())
-            },
-        )?;
+        vk.record_submit_command_buffer(vk.command_buffer, &[], &[], |device, command_buffer| {
+            unsafe {
+                let barriers: Box<[ImageMemoryBarrier2]> = images
+                    .iter()
+                    .map(|&image| {
+                        VulkanInstance::image_memory_barrier()
+                            .image(image)
+                            .dst_access_mask(
+                                AccessFlags2::COLOR_ATTACHMENT_READ
+                                    | AccessFlags2::COLOR_ATTACHMENT_WRITE,
+                            )
+                            .dst_stage_mask(PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
+                            .old_layout(ImageLayout::UNDEFINED)
+                            .new_layout(ImageLayout::PRESENT_SRC_KHR)
+                    })
+                    .collect();
+                let dependency_info = DependencyInfoKHR::default().image_memory_barriers(&barriers);
+                device.cmd_pipeline_barrier2(command_buffer, &dependency_info);
+            }
+            Ok(())
+        })?;
 
-        let fences = [vk.fence];
+        let fences = [vk.command_buffer.1];
         unsafe {
             vk.device
                 .wait_for_fences(&fences, true, u64::MAX)
-                .map_err(|e| Error::Vulkan(e, "waiting for fences"))?;
+                .map_err(|e| VulkanError::VkResult(e, "waiting for fences"))?;
         }
 
         Ok(())
     }
 
+    #[instrument("Renderer::recreate_swapchain", skip_all, err)]
     pub fn recreate_swapchain(
         &mut self,
         vk: &VulkanInstance,
         window_size: [u32; 2],
     ) -> Result<(), Error> {
-        let _span = info_span!("recreate_swapchain").entered();
-
         unsafe {
             vk.device
                 .device_wait_idle()
-                .map_err(|e| Error::Vulkan(e, "waiting for device idle"))?;
+                .map_err(|e| VulkanError::VkResult(e, "waiting for device idle"))?;
         }
 
         let new_swapchain = Self::create_swapchain(
@@ -191,7 +180,7 @@ impl Renderer {
         let swapchain_images = unsafe {
             self.swapchain_loader
                 .get_swapchain_images(self.swapchain)
-                .map_err(|e| Error::Vulkan(e, "getting swapchain images"))?
+                .map_err(|e| VulkanError::VkResult(e, "getting swapchain images"))?
         };
         self.attachment_images = swapchain_images;
         Self::transition_images(vk, &self.attachment_images)?;
@@ -208,6 +197,7 @@ impl Renderer {
         Ok(())
     }
 
+    #[instrument("Renderer::cleanup_swapchain", skip_all)]
     pub fn cleanup_swapchain(&mut self) {
         unsafe {
             self.attachment_views
@@ -220,19 +210,20 @@ impl Renderer {
         }
     }
 
+    #[instrument("Renderer::window_size_dependant_setup", skip_all, err)]
     pub fn window_size_dependant_setup(
         vk: &VulkanInstance,
         images: &[Image],
         window_size: [u32; 2],
         viewport: &mut Viewport,
     ) -> Result<Vec<ImageView>, Error> {
-        let image_format =
-            Self::get_surface_format(vk).map_err(|e| Error::Vulkan(e, "getting surface format"))?;
+        let image_format = Self::get_surface_format(vk)
+            .map_err(|e| VulkanError::VkResult(e, "getting surface format"))?;
 
         viewport.width = window_size[0] as f32;
         viewport.height = window_size[1] as f32;
 
-        let image_views: Result<Vec<ImageView>, Error> = images
+        let image_views: Result<Vec<ImageView>, VulkanError> = images
             .iter()
             .map(|&image| {
                 let create_view_info = ImageViewCreateInfo::default()
@@ -249,20 +240,13 @@ impl Renderer {
                 unsafe {
                     vk.device
                         .create_image_view(&create_view_info, None)
-                        .map_err(|e| Error::Vulkan(e, "creating image view"))
+                        .map_err(|e| VulkanError::VkResult(e, "creating image view"))
                 }
             })
             .collect();
 
-        image_views
+        let image_views = image_views?;
+
+        Ok(image_views)
     }
-}
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("Encountered vulkan error while {1}:\n{0}")]
-    Vulkan(#[source] ash::vk::Result, &'static str),
-
-    #[error("Failed to record and submit command buffer:\n{0}")]
-    RecordSubmit(#[from] record_submit_command_buffer::Error),
 }

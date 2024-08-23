@@ -1,20 +1,16 @@
-use std::{io::Cursor, mem::offset_of};
+use std::mem::{offset_of, size_of};
 
-use ash::{
-    util::read_spv,
-    vk::{
-        BlendFactor, BlendOp, ColorComponentFlags, DescriptorSetLayout, DescriptorSetLayoutBinding,
-        DescriptorSetLayoutCreateInfo, DescriptorType, Format, Pipeline,
-        PipelineColorBlendAttachmentState, PipelineLayout, PipelineLayoutCreateInfo,
-        PipelineRenderingCreateInfo, PipelineShaderStageCreateInfo,
-        PipelineVertexInputStateCreateInfo, PushConstantRange, ShaderModule,
-        ShaderModuleCreateInfo, ShaderStageFlags, VertexInputAttributeDescription,
-        VertexInputBindingDescription, VertexInputRate, Viewport,
-    },
+use ash::vk::{
+    BlendFactor, BlendOp, ColorComponentFlags, DescriptorSetLayout, DescriptorSetLayoutBinding,
+    DescriptorSetLayoutCreateInfo, DescriptorType, Format, Pipeline,
+    PipelineColorBlendAttachmentState, PipelineLayout, PipelineLayoutCreateInfo,
+    PipelineRenderingCreateInfo, PipelineShaderStageCreateInfo, PipelineVertexInputStateCreateInfo,
+    PushConstantRange, ShaderModule, ShaderStageFlags, VertexInputAttributeDescription,
+    VertexInputBindingDescription, VertexInputRate, Viewport,
 };
-use vulkan_instance::VulkanInstance;
-
-use super::Error;
+use bytemuck::{Pod, Zeroable};
+use tracing::instrument;
+use vulkan_instance::{VulkanError, VulkanInstance};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Vertex {
@@ -22,6 +18,13 @@ pub struct Vertex {
     pub uv: [f32; 2],
 }
 
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+#[repr(C)]
+pub struct PushConstants {
+    pub whitepoint: f32,
+}
+
+#[instrument("capture::create_pipeline", skip_all, err)]
 pub fn create_pipeline(
     vk: &VulkanInstance,
     pipeline_rendering_create_info: PipelineRenderingCreateInfo,
@@ -33,7 +36,7 @@ pub fn create_pipeline(
         [ShaderModule; 2],
         [DescriptorSetLayout; 2],
     ),
-    Error,
+    VulkanError,
 > {
     let vertex_input_binding_descriptions = [VertexInputBindingDescription {
         binding: 0,
@@ -71,24 +74,14 @@ pub fn create_pipeline(
     };
 
     let (vs, vs_entry) = unsafe {
-        let mut shader_file = Cursor::new(&include_bytes!("../shaders/capture.vert.spv")[..]);
-        let shader_code = read_spv(&mut shader_file).map_err(Error::ReadShader)?;
-        let shader_info = ShaderModuleCreateInfo::default().code(&shader_code);
-        let shader_module = vk
-            .device
-            .create_shader_module(&shader_info, None)
-            .map_err(|e| Error::Vulkan(e, "creating shader module"))?;
+        let shader_module =
+            vk.create_shader_module(include_bytes!("../shaders/capture.vert.spv"))?;
         let shader_entry_name = std::ffi::CStr::from_bytes_with_nul_unchecked(b"main\0");
         (shader_module, shader_entry_name)
     };
     let (fs, fs_entry) = unsafe {
-        let mut shader_file = Cursor::new(&include_bytes!("../shaders/capture.frag.spv")[..]);
-        let shader_code = read_spv(&mut shader_file).map_err(Error::ReadShader)?;
-        let shader_info = ShaderModuleCreateInfo::default().code(&shader_code);
-        let shader_module = vk
-            .device
-            .create_shader_module(&shader_info, None)
-            .map_err(|e| Error::Vulkan(e, "creating shader module"))?;
+        let shader_module =
+            vk.create_shader_module(include_bytes!("../shaders/capture.frag.spv"))?;
         let shader_entry_name = std::ffi::CStr::from_bytes_with_nul_unchecked(b"main\0");
         (shader_module, shader_entry_name)
     };
@@ -106,7 +99,7 @@ pub fn create_pipeline(
     let push_constant_ranges = [PushConstantRange {
         stage_flags: ShaderStageFlags::FRAGMENT,
         offset: 0,
-        size: 4,
+        size: size_of::<PushConstants>() as u32,
     }];
 
     let descriptor_layouts = unsafe {
@@ -124,7 +117,7 @@ pub fn create_pipeline(
 
             vk.device
                 .create_descriptor_set_layout(&descriptor_info, None)
-                .map_err(|e| Error::Vulkan(e, "creating descriptor set layout"))?
+                .map_err(|e| VulkanError::VkResult(e, "creating descriptor set layout"))?
         };
 
         let view_layout = {
@@ -141,7 +134,7 @@ pub fn create_pipeline(
 
             vk.device
                 .create_descriptor_set_layout(&descriptor_info, None)
-                .map_err(|e| Error::Vulkan(e, "creating descriptor set layout"))?
+                .map_err(|e| VulkanError::VkResult(e, "creating descriptor set layout"))?
         };
 
         [sampler_layout, view_layout]
