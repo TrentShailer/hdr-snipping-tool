@@ -2,8 +2,8 @@ use std::time::{Duration, Instant};
 
 use ash::{
     vk::{
-        self, CommandBuffer, CommandBufferSubmitInfo, Fence, PipelineStageFlags2, Semaphore,
-        SemaphoreSubmitInfo,
+        self, CommandBuffer, CommandBufferAllocateInfo, CommandBufferSubmitInfo, Fence,
+        PipelineStageFlags2, Semaphore, SemaphoreSubmitInfo,
     },
     Device,
 };
@@ -92,5 +92,40 @@ impl VulkanInstance {
         };
 
         Ok(())
+    }
+
+    #[instrument("VulkanInstance::allocate_command_buffers", skip_all, err)]
+    /// Allocates a number of command buffers then creates and bundles a fence for each.
+    pub fn allocate_command_buffers(
+        &self,
+        count: u32,
+    ) -> Result<Box<[(CommandBuffer, Fence)]>, VulkanError> {
+        let command_buffers = unsafe {
+            let allocate_info = CommandBufferAllocateInfo::default()
+                .command_buffer_count(count)
+                .command_pool(self.command_buffer_pool);
+
+            let command_buffers = self
+                .device
+                .allocate_command_buffers(&allocate_info)
+                .map_err(|e| VulkanError::VkResult(e, "allocating command buffers"))?;
+
+            let fence_create_info =
+                vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED);
+
+            command_buffers
+                .into_iter()
+                .map(|command_buffer| {
+                    let fence = self
+                        .device
+                        .create_fence(&fence_create_info, None)
+                        .map_err(|e| VulkanError::VkResult(e, "creating fence"))?;
+
+                    Ok((command_buffer, fence))
+                })
+                .collect()
+        };
+
+        command_buffers
     }
 }
