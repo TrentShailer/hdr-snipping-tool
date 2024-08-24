@@ -1,11 +1,12 @@
 use thiserror::Error;
-use tracing::info_span;
+use tracing::{info_span, instrument};
 
 use crate::windows_helpers::foreground_window::set_foreground_window;
 
 use super::WinitApp;
 
 impl WinitApp {
+    #[instrument("WinitApp::clear_capture", skip_all, err)]
     pub fn clear_capture(&mut self) -> Result<(), Error> {
         let _span = info_span!("WinitApp::clear_capture").entered();
 
@@ -13,18 +14,13 @@ impl WinitApp {
             return Ok(());
         };
 
-        app.renderer.capture.unload_capture();
+        app.renderer.unload_capture();
 
         if let Some(capture) = self.capture.as_ref() {
-            let selection = capture.selection.as_pos_size();
-
             app.renderer.render(
-                &app.vk,
-                app.window.clone(),
-                selection.0.into(),
-                selection.1.into(),
+                &app.window,
                 self.mouse_position.into(),
-                true,
+                capture.selection.rect,
             )?;
 
             set_foreground_window(capture.formerly_focused_window);
@@ -40,5 +36,5 @@ impl WinitApp {
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Failed to clear renderer:\n{0}")]
-    Render(#[from] vulkan_renderer::renderer::render::Error),
+    Render(#[from] vulkan_renderer::Error),
 }

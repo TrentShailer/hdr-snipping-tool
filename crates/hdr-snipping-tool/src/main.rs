@@ -180,7 +180,6 @@ pub fn project_directory() -> PathBuf {
             std::process::exit(-1);
         }
     };
-
     dir.data_dir().to_path_buf()
 }
 

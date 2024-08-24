@@ -2,13 +2,24 @@ mod clear_capture;
 mod report_error;
 mod window_event;
 
-use report_error::{report_new_app_error, report_take_capture_error, report_window_event_error};
+use std::process::Command;
+
+use report_error::make_message;
+use tracing::error;
+use tray_icon::menu::MenuEvent;
+use windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR;
 use winit::{
-    application::ApplicationHandler, dpi::PhysicalPosition, event::WindowEvent,
-    event_loop::ActiveEventLoop, window::WindowId,
+    application::ApplicationHandler,
+    dpi::{PhysicalPosition, PhysicalSize},
+    event::WindowEvent,
+    event_loop::ActiveEventLoop,
+    window::WindowId,
 };
 
-use crate::{active_app::ActiveApp, active_capture::ActiveCapture, settings::Settings};
+use crate::{
+    active_app::ActiveApp, active_capture::ActiveCapture, project_directory, settings::Settings,
+    windows_helpers::display_message,
+};
 
 pub struct WinitApp {
     pub app: Option<ActiveApp>,
@@ -30,10 +41,11 @@ impl WinitApp {
 
 impl ApplicationHandler<()> for WinitApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let app = match ActiveApp::new(event_loop) {
+        let app = match ActiveApp::new(event_loop, self.settings) {
             Ok(app) => app,
             Err(error) => {
-                report_new_app_error(error);
+                error!("{error}");
+                display_message(&make_message("setting up the app"), MB_ICONERROR);
                 event_loop.exit();
                 return;
             }
@@ -45,22 +57,52 @@ impl ApplicationHandler<()> for WinitApp {
     fn user_event(&mut self, event_loop: &ActiveEventLoop, _event: ()) {
         let Some(app) = self.app.as_mut() else { return };
 
-        let capture = match app.take_capture(self.settings.hdr_whitepoint) {
+        let active_capture = match ActiveCapture::new(app) {
             Ok(capture) => capture,
             Err(error) => {
-                report_take_capture_error(error);
+                error!("{error}");
+                display_message(&make_message("taking the capture"), MB_ICONERROR);
                 event_loop.exit();
                 return;
             }
         };
 
-        self.capture = Some(capture);
+        let size: PhysicalSize<u32> = active_capture.capture.size.into();
+        let _ = app.window.request_inner_size(size);
+
+        let position: PhysicalPosition<i32> = active_capture.display.position.into();
+        app.window.set_outer_position(position);
+
+        if let Err(error) = app.renderer.load_capture(&active_capture.capture) {
+            error!("{error}");
+            display_message(&make_message("taking the capture"), MB_ICONERROR);
+            event_loop.exit();
+            return;
+        };
+
+        app.window.set_visible(true);
+        app.window.focus_window();
+
+        self.capture = Some(active_capture);
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let Some(app) = self.app.as_ref() else { return };
 
-        app.handle_tray_icon(event_loop);
+        if let Ok(event) = MenuEvent::receiver().try_recv() {
+            match event.id.0.as_str() {
+                "0" => {
+                    if let Err(e) = Command::new("explorer").arg(project_directory()).spawn() {
+                        error!("{e}");
+                        display_message(&make_message("opening file explorer"), MB_ICONERROR);
+                        event_loop.exit();
+                    }
+                }
+                "1" => event_loop.exit(),
+                _ => {}
+            }
+        }
+
         app.window.request_redraw();
     }
 
@@ -71,7 +113,8 @@ impl ApplicationHandler<()> for WinitApp {
         event: WindowEvent,
     ) {
         if let Err(error) = self.on_window_event(event_loop, window_id, event) {
-            report_window_event_error(error);
+            error!("{error}");
+            display_message(&make_message("handling window events"), MB_ICONERROR);
             event_loop.exit();
         }
     }

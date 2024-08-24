@@ -16,15 +16,10 @@ impl WinitApp {
             return Ok(());
         }
 
-        let selection = capture.selection.as_pos_size();
-
         app.renderer.render(
-            &app.vk,
-            app.window.clone(),
-            selection.0.into(),
-            selection.1.into(),
+            &app.window,
             self.mouse_position.into(),
-            false,
+            capture.selection.rect,
         )?;
 
         Ok(())
