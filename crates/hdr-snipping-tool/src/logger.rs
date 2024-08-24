@@ -18,7 +18,7 @@ pub fn init_tracing() -> Result<(WorkerGuard, WorkerGuard), SetGlobalDefaultErro
     })
     .with_max_level_hint(LevelFilter::INFO);
     let timing_file_appender =
-        tracing_appender::rolling::never(project_directory(), "hdr-snipping-tool.timing");
+        tracing_appender::rolling::never(project_directory(), "hdr-snipping-tool.timing.log");
     let (timing_non_blocking, _timing_guard) = tracing_appender::non_blocking(timing_file_appender);
     let timing_file_logger = tracing_subscriber::fmt::layer()
         .with_writer(timing_non_blocking)
