@@ -9,7 +9,7 @@ use vulkan_instance::VulkanError;
 
 use winit::window::Window;
 
-use hdr_capture::Selection as SelectionArea;
+use hdr_capture::Rect;
 
 use super::Renderer;
 
@@ -20,7 +20,7 @@ impl Renderer {
         &mut self,
         window: &Window,
         mouse_position: [u32; 2],
-        selection: SelectionArea,
+        selection: Rect,
     ) -> Result<(), crate::Error> {
         let window_size: [u32; 2] = window.inner_size().into();
         let window_scale = window.scale_factor();

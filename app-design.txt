@@ -64,7 +64,7 @@ Renderer {
 
         fn queue_recreate_swapchain(&mut self)
 
-        fn render(&mut self, window_size: [u32; 2], window_scale: f64, mouse_position: [u32; 2], selection: Selection) -> Result<(), Error>
+        fn render(&mut self, window_size: [u32; 2], window_scale: f64, mouse_position: [u32; 2], selection: Rect) -> Result<(), Error>
 
         fn load_capture(&mut self, capture: &HdrCapture)
 
@@ -173,7 +173,7 @@ HdrCapture {
         }
     }
 
-    Selection {
+    Rect {
         start: [u32; 2],
         end: [u32; 2]
 

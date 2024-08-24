@@ -20,7 +20,7 @@ use crate::{
     units::{FromPhysical, VkPosition, VkSize},
 };
 
-use hdr_capture::Selection as SelectionArea;
+use hdr_capture::Rect;
 
 const LOCKED_FLAG: u32 = 0b00000000_00000000_00000000_00000001;
 const NO_FLAGS: u32 = 0b00000000_00000000_00000000_00000000;
@@ -147,7 +147,7 @@ impl Selection {
         &mut self,
         device: &Device,
         command_buffer: CommandBuffer,
-        selection: SelectionArea,
+        selection: Rect,
         window_size: [u32; 2],
         window_scale: f64,
     ) -> Result<(), ash::vk::Result> {

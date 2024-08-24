@@ -1,11 +1,11 @@
 #[derive(Clone, Copy, Debug)]
-/// Represents a selection rectangle.
-pub struct Selection {
+/// Represents a rectangle with start and end points.
+pub struct Rect {
     pub start: [u32; 2],
     pub end: [u32; 2],
 }
 
-impl Selection {
+impl Rect {
     /// The size of the selection.
     pub fn size(&self) -> [u32; 2] {
         let x_size = self.end[0].abs_diff(self.start[0]);
