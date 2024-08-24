@@ -1,7 +1,10 @@
+use tracing::info_span;
+
 use crate::VulkanInstance;
 
 impl Drop for VulkanInstance {
     fn drop(&mut self) {
+        let _span = info_span!("VulkanInstance::Drop").entered();
         unsafe {
             self.device.device_wait_idle().unwrap();
 

@@ -103,5 +103,12 @@ pub fn create_vertex_and_index_buffer<V: Copy>(
         Ok(())
     })?;
 
+    unsafe {
+        vk.device.destroy_buffer(vertex_staging, None);
+        vk.device.destroy_buffer(index_staging, None);
+        vk.device.free_memory(vertex_staging_memory, None);
+        vk.device.free_memory(index_staging_memory, None);
+    }
+
     Ok(((vertex, vertex_memory), (index, index_memory)))
 }

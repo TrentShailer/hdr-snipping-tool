@@ -12,7 +12,7 @@ use buffer_pass::BufferPass;
 use half::f16;
 use source_pass::SourcePass;
 use thiserror::Error;
-use tracing::instrument;
+use tracing::{info_span, instrument};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::hdr_capture::HdrCapture;
@@ -187,6 +187,7 @@ impl Maximum {
 
 impl Drop for Maximum {
     fn drop(&mut self) {
+        let _span = info_span!("Maximum::Drop").entered();
         unsafe {
             self.vk.device.device_wait_idle().unwrap();
             self.command_buffers

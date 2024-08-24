@@ -1,4 +1,4 @@
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 /// Represents a rectangle with start and end points.
 pub struct Rect {
     pub start: [u32; 2],

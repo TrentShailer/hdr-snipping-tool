@@ -9,7 +9,7 @@ use ash::vk::{
     PipelineShaderStageCreateInfo, PipelineStageFlags2, Sampler, Semaphore, ShaderModule,
     ShaderStageFlags, WriteDescriptorSet,
 };
-use tracing::instrument;
+use tracing::{info_span, instrument};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use super::Error;
@@ -211,7 +211,9 @@ impl SourcePass {
 
 impl Drop for SourcePass {
     fn drop(&mut self) {
+        let _span = info_span!("SourcePass::Drop").entered();
         unsafe {
+            self.vk.device.device_wait_idle().unwrap();
             self.vk
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_layouts[0], None);

@@ -12,7 +12,7 @@ use ash::{
 };
 use bytemuck::bytes_of;
 use hdr_capture::HdrCapture;
-use tracing::{instrument, Level};
+use tracing::{info_span, instrument, Level};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::pipelines::{
@@ -224,7 +224,9 @@ impl Capture {
 
 impl Drop for Capture {
     fn drop(&mut self) {
+        let _span = info_span!("Capture::Drop").entered();
         unsafe {
+            self.vk.device.device_wait_idle().unwrap();
             self.vk.device.destroy_buffer(self.vertex_buffer.0, None);
             self.vk.device.free_memory(self.vertex_buffer.1, None);
             self.vk.device.destroy_buffer(self.index_buffer.0, None);

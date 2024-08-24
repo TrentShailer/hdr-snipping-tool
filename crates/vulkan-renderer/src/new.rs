@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ash::vk::{
     Fence, FenceCreateInfo, PipelineRenderingCreateInfo, Semaphore, SemaphoreCreateInfo, Viewport,
 };
-use tracing::instrument;
+use tracing::{info_span, instrument};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::{
@@ -158,7 +158,9 @@ impl Renderer {
 
 impl Drop for Renderer {
     fn drop(&mut self) {
+        let _span = info_span!("Renderer::Drop").entered();
         unsafe {
+            self.vk.device.device_wait_idle().unwrap();
             self.descriptor_layouts
                 .iter()
                 .for_each(|&layout| self.vk.device.destroy_descriptor_set_layout(layout, None));
@@ -171,6 +173,15 @@ impl Drop for Renderer {
             self.pipelines
                 .iter()
                 .for_each(|&pipeline| self.vk.device.destroy_pipeline(pipeline, None));
+            self.command_buffers
+                .iter()
+                .for_each(|(_, fence)| self.vk.device.destroy_fence(*fence, None));
+            self.acquire_fences
+                .iter()
+                .for_each(|fence| self.vk.device.destroy_fence(*fence, None));
+            self.render_semaphores
+                .iter()
+                .for_each(|semaphore| self.vk.device.destroy_semaphore(*semaphore, None));
 
             self.cleanup_swapchain();
         }
