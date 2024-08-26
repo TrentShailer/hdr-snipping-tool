@@ -26,11 +26,6 @@ pub fn init_tracing() -> Result<(WorkerGuard, WorkerGuard), SetGlobalDefaultErro
         .with_ansi(false)
         .with_target(false)
         .with_filter(timing_filter.clone());
-    let timing_std_logger = tracing_subscriber::fmt::layer()
-        .with_span_events(FmtSpan::CLOSE)
-        .with_ansi(false)
-        .with_target(false)
-        .with_filter(timing_filter);
 
     // error logger
     let file_appender =
@@ -48,7 +43,6 @@ pub fn init_tracing() -> Result<(WorkerGuard, WorkerGuard), SetGlobalDefaultErro
         .with(error_file_logger)
         .with(error_std_logger)
         .with(timing_file_logger)
-        .with(timing_std_logger)
         .with(filter);
 
     set_global_default(collector)?;
