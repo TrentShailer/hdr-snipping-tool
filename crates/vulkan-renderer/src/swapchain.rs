@@ -139,6 +139,7 @@ impl Renderer {
                                 AccessFlags2::COLOR_ATTACHMENT_READ
                                     | AccessFlags2::COLOR_ATTACHMENT_WRITE,
                             )
+                            .src_stage_mask(PipelineStageFlags2::TOP_OF_PIPE)
                             .dst_stage_mask(PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT)
                             .old_layout(ImageLayout::UNDEFINED)
                             .new_layout(ImageLayout::PRESENT_SRC_KHR)
@@ -149,13 +150,6 @@ impl Renderer {
             }
             Ok(())
         })?;
-
-        let fences = [vk.command_buffer.1];
-        unsafe {
-            vk.device
-                .wait_for_fences(&fences, true, u64::MAX)
-                .map_err(|e| VulkanError::VkResult(e, "waiting for fences"))?;
-        }
 
         Ok(())
     }
