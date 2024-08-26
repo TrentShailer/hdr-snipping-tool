@@ -12,7 +12,7 @@ impl VulkanInstance {
     #[instrument("VulkanInstance::create_shader_module", skip_all, err)]
     pub fn create_shader_module(&self, bytes: &[u8]) -> Result<ShaderModule, VulkanError> {
         let mut shader_file = Cursor::new(bytes);
-        let shader_code = read_spv(&mut shader_file).unwrap();
+        let shader_code = read_spv(&mut shader_file).map_err(VulkanError::IO)?;
 
         let shader_info = ShaderModuleCreateInfo::default().code(&shader_code);
 

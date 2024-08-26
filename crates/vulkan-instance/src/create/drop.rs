@@ -1,4 +1,4 @@
-use tracing::info_span;
+use tracing::{error, info_span};
 
 use crate::VulkanInstance;
 
@@ -6,7 +6,10 @@ impl Drop for VulkanInstance {
     fn drop(&mut self) {
         let _span = info_span!("VulkanInstance::Drop").entered();
         unsafe {
-            self.device.device_wait_idle().unwrap();
+            if self.device.device_wait_idle().is_err() {
+                error!("Failed to wait for device idle on drop");
+                return;
+            };
 
             self.device.destroy_fence(self.command_buffer.1, None);
 

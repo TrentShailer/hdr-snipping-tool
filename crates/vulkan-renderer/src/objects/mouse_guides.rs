@@ -8,7 +8,7 @@ use ash::{
     Device,
 };
 use bytemuck::bytes_of;
-use tracing::{info_span, instrument, Level};
+use tracing::{error, info_span, instrument, Level};
 use vulkan_instance::VulkanInstance;
 
 use crate::{
@@ -170,7 +170,10 @@ impl Drop for MouseGuides {
     fn drop(&mut self) {
         let _span = info_span!("MouseGuides::Drop").entered();
         unsafe {
-            self.vk.device.device_wait_idle().unwrap();
+            if self.vk.device.device_wait_idle().is_err() {
+                error!("Failed to wait for device idle on drop");
+                return;
+            }
             self.vk.device.destroy_buffer(self.vertex_buffer.0, None);
             self.vk.device.free_memory(self.vertex_buffer.1, None);
             self.vk.device.destroy_buffer(self.index_buffer.0, None);

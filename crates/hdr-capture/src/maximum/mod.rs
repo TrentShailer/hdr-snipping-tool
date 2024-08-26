@@ -12,7 +12,7 @@ use buffer_pass::BufferPass;
 use half::f16;
 use source_pass::SourcePass;
 use thiserror::Error;
-use tracing::{info_span, instrument};
+use tracing::{error, info_span, instrument};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::hdr_capture::HdrCapture;
@@ -189,7 +189,10 @@ impl Drop for Maximum {
     fn drop(&mut self) {
         let _span = info_span!("Maximum::Drop").entered();
         unsafe {
-            self.vk.device.device_wait_idle().unwrap();
+            if self.vk.device.device_wait_idle().is_err() {
+                error!("Failed to wait for device idle on drop");
+                return;
+            };
             self.command_buffers
                 .iter()
                 .for_each(|&(_, fence)| self.vk.device.destroy_fence(fence, None));

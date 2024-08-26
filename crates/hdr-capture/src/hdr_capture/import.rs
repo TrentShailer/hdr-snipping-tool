@@ -72,11 +72,14 @@ impl HdrCapture {
                 .push_next(&mut import_info)
                 .push_next(&mut dedicated_allocation);
 
-            let device_memory = vk.device.allocate_memory(&allocate_info, None).unwrap();
+            let device_memory = vk
+                .device
+                .allocate_memory(&allocate_info, None)
+                .map_err(|e| VulkanError::VkResult(e, "allocing memory"))?;
 
             vk.device
                 .bind_image_memory(image, device_memory, 0)
-                .unwrap();
+                .map_err(|e| VulkanError::VkResult(e, "binding image memory"))?;
 
             device_memory
         };

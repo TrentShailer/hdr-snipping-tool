@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ash::vk::{
     Fence, FenceCreateInfo, PipelineRenderingCreateInfo, Semaphore, SemaphoreCreateInfo, Viewport,
 };
-use tracing::{info_span, instrument};
+use tracing::{error, info_span, instrument};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::{
@@ -160,7 +160,10 @@ impl Drop for Renderer {
     fn drop(&mut self) {
         let _span = info_span!("Renderer::Drop").entered();
         unsafe {
-            self.vk.device.device_wait_idle().unwrap();
+            if self.vk.device.device_wait_idle().is_err() {
+                error!("Failed to wait for device idle on drop");
+                return;
+            }
             self.descriptor_layouts
                 .iter()
                 .for_each(|&layout| self.vk.device.destroy_descriptor_set_layout(layout, None));

@@ -9,7 +9,7 @@ use ash::vk::{
     ShaderStageFlags, WriteDescriptorSet,
 };
 
-use tracing::{info_span, instrument};
+use tracing::{error, info_span, instrument};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use super::{Error, Maximum, MAXIMUM_SUBMISSIONS};
@@ -309,7 +309,10 @@ impl Drop for BufferPass {
     fn drop(&mut self) {
         let _span = info_span!("BufferPass::Drop").entered();
         unsafe {
-            self.vk.device.device_wait_idle().unwrap();
+            if self.vk.device.device_wait_idle().is_err() {
+                error!("Failed to wait for device idle on drop");
+                return;
+            };
             self.vk
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_layouts[0], None);

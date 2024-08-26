@@ -12,7 +12,7 @@ use ash::vk::{
     ShaderStageFlags, SharingMode, WriteDescriptorSet,
 };
 use thiserror::Error;
-use tracing::{info_span, instrument};
+use tracing::{error, info_span, instrument};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::HdrCapture;
@@ -185,12 +185,12 @@ impl Tonemap {
                     .vk
                     .device
                     .allocate_memory(&allocate_info, None)
-                    .unwrap();
+                    .map_err(|e| VulkanError::VkResult(e, "allocing memory"))?;
 
                 self.vk
                     .device
                     .bind_image_memory(image, device_memory, 0)
-                    .unwrap();
+                    .map_err(|e| VulkanError::VkResult(e, "binding memory"))?;
 
                 device_memory
             };
@@ -315,7 +315,10 @@ impl Drop for Tonemap {
     fn drop(&mut self) {
         let _span = info_span!("Tonemap::Drop").entered();
         unsafe {
-            self.vk.device.device_wait_idle().unwrap();
+            if self.vk.device.device_wait_idle().is_err() {
+                error!("Failed to wait for device idle on drop");
+                return;
+            };
             self.vk
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_layouts[0], None);

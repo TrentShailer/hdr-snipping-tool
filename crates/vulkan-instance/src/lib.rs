@@ -5,6 +5,8 @@ pub mod default;
 pub mod memory;
 pub mod shader;
 
+use std::io;
+
 use ash::{
     ext::debug_utils,
     khr::surface,
@@ -39,6 +41,9 @@ pub struct VulkanInstance {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum VulkanError {
+    #[error("Encountered IO Error:\n{0}")]
+    IO(#[from] io::Error),
+
     #[error("Encountered vulkan error while {1}:\n{0}")]
     VkResult(#[source] vk::Result, &'static str),
 
