@@ -1,8 +1,8 @@
 use ash::vk::{
     AccessFlags2, ColorSpaceKHR, CompositeAlphaFlagsKHR, DependencyInfoKHR, Extent2D, Format,
     Image, ImageAspectFlags, ImageLayout, ImageMemoryBarrier2, ImageSubresourceRange,
-    ImageUsageFlags, ImageView, ImageViewCreateInfo, ImageViewType, PipelineStageFlags2,
-    PresentModeKHR, SharingMode, SurfaceFormatKHR, SurfaceTransformFlagsKHR,
+    ImageUsageFlags, ImageView, ImageViewCreateInfo, ImageViewType, PipelineRenderingCreateInfo,
+    PipelineStageFlags2, PresentModeKHR, SharingMode, SurfaceFormatKHR, SurfaceTransformFlagsKHR,
     SwapchainCreateInfoKHR, SwapchainKHR, Viewport,
 };
 
@@ -15,7 +15,9 @@ use super::Renderer;
 
 impl Renderer {
     #[instrument("Renderer::get_surface_format", skip_all, err)]
-    pub fn get_surface_format(vk: &VulkanInstance) -> Result<SurfaceFormatKHR, ash::vk::Result> {
+    pub(super) fn get_surface_format(
+        vk: &VulkanInstance,
+    ) -> Result<SurfaceFormatKHR, ash::vk::Result> {
         let surface_formats = unsafe {
             vk.surface_loader
                 .get_physical_device_surface_formats(vk.physical_device, vk.surface)?
@@ -25,11 +27,13 @@ impl Renderer {
                 .into_iter()
                 .min_by_key(|sufrace_format| match sufrace_format.format {
                     Format::R16G16B16A16_SFLOAT => 0,
-                    _ => 1,
+					Format::B8G8R8A8_UNORM => 5,
+                    _ => 10,
                 } +
                 match sufrace_format.color_space {
                     ColorSpaceKHR::EXTENDED_SRGB_LINEAR_EXT => 0,
-                    _ => 1,
+                    ColorSpaceKHR::SRGB_NONLINEAR => 5,
+                    _ => 10,
                 }
             ).unwrap();
 
@@ -37,12 +41,12 @@ impl Renderer {
     }
 
     #[instrument("Renderer::create_swapchain", skip_all, err)]
-    pub fn create_swapchain(
+    pub(super) fn create_swapchain(
         vk: &VulkanInstance,
         swapchain_loader: &ash::khr::swapchain::Device,
         window_size: [u32; 2],
         old_swapchain: Option<SwapchainKHR>,
-    ) -> Result<SwapchainKHR, Error> {
+    ) -> Result<(SwapchainKHR, SurfaceFormatKHR), Error> {
         let surface_format = Self::get_surface_format(vk)
             .map_err(|e| VulkanError::VkResult(e, "getting surface format"))?;
 
@@ -119,11 +123,11 @@ impl Renderer {
         info!("Surface color space: {:#?}", surface_format.color_space);
         info!("Swapchain Size: {}", swapchain_image_count);
 
-        Ok(swapchain)
+        Ok((swapchain, surface_format))
     }
 
     #[instrument("Renderer::transition_images", skip_all, err)]
-    pub fn transition_images(vk: &VulkanInstance, images: &[Image]) -> Result<(), Error> {
+    pub(super) fn transition_images(vk: &VulkanInstance, images: &[Image]) -> Result<(), Error> {
         vk.record_submit_command_buffer(vk.command_buffer, &[], &[], |device, command_buffer| {
             unsafe {
                 let barriers: Box<[ImageMemoryBarrier2]> = images
@@ -157,7 +161,7 @@ impl Renderer {
     }
 
     #[instrument("Renderer::recreate_swapchain", skip_all, err)]
-    pub fn recreate_swapchain(&mut self, window_size: [u32; 2]) -> Result<(), Error> {
+    pub(super) fn recreate_swapchain(&mut self, window_size: [u32; 2]) -> Result<(), Error> {
         unsafe {
             self.vk
                 .device
@@ -165,7 +169,7 @@ impl Renderer {
                 .map_err(|e| VulkanError::VkResult(e, "waiting for device idle"))?;
         }
 
-        let new_swapchain = Self::create_swapchain(
+        let (new_swapchain, swapchain_format) = Self::create_swapchain(
             &self.vk,
             &self.swapchain_loader,
             window_size,
@@ -173,6 +177,9 @@ impl Renderer {
         )?;
         self.cleanup_swapchain();
         self.swapchain = new_swapchain;
+        self.non_linear_swapchain = swapchain_format.color_space == ColorSpaceKHR::SRGB_NONLINEAR;
+
+        self.recreate_pipelines(swapchain_format)?;
 
         let swapchain_images = unsafe {
             self.swapchain_loader
@@ -195,7 +202,7 @@ impl Renderer {
     }
 
     #[instrument("Renderer::cleanup_swapchain", skip_all)]
-    pub fn cleanup_swapchain(&mut self) {
+    pub(super) fn cleanup_swapchain(&mut self) {
         unsafe {
             self.attachment_views
                 .iter()
@@ -208,7 +215,7 @@ impl Renderer {
     }
 
     #[instrument("Renderer::window_size_dependant_setup", skip_all, err)]
-    pub fn window_size_dependant_setup(
+    pub(super) fn window_size_dependant_setup(
         vk: &VulkanInstance,
         images: &[Image],
         window_size: [u32; 2],
@@ -245,5 +252,26 @@ impl Renderer {
         let image_views = image_views?;
 
         Ok(image_views)
+    }
+
+    #[instrument("Renderer::recreate_pipelines", skip_all, err)]
+    pub(super) fn recreate_pipelines(
+        &mut self,
+        swapchain_format: SurfaceFormatKHR,
+    ) -> Result<(), Error> {
+        let surface_formats = [swapchain_format.format];
+        let pipeline_rendering_create_info =
+            PipelineRenderingCreateInfo::default().color_attachment_formats(&surface_formats);
+
+        self.selection_shading_pipeline
+            .recreate(pipeline_rendering_create_info, self.viewport)?;
+        self.capture_pipeline
+            .recreate(pipeline_rendering_create_info, self.viewport)?;
+        self.border_pipeline
+            .recreate(pipeline_rendering_create_info, self.viewport)?;
+        self.mouse_guides_pipeline
+            .recreate(pipeline_rendering_create_info, self.viewport)?;
+
+        Ok(())
     }
 }

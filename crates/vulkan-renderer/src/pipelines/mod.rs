@@ -8,26 +8,28 @@ use ash::vk::{
     DynamicState, FrontFace, GraphicsPipelineCreateInfo, LogicOp, Pipeline, PipelineCache,
     PipelineColorBlendAttachmentState, PipelineColorBlendStateCreateInfo,
     PipelineDynamicStateCreateInfo, PipelineInputAssemblyStateCreateInfo, PipelineLayout,
-    PipelineLayoutCreateInfo, PipelineMultisampleStateCreateInfo,
-    PipelineRasterizationStateCreateInfo, PipelineRenderingCreateInfo,
-    PipelineShaderStageCreateInfo, PipelineVertexInputStateCreateInfo,
+    PipelineMultisampleStateCreateInfo, PipelineRasterizationStateCreateInfo,
+    PipelineRenderingCreateInfo, PipelineShaderStageCreateInfo, PipelineVertexInputStateCreateInfo,
     PipelineViewportStateCreateInfo, PolygonMode, PrimitiveTopology, RenderPass, SampleCountFlags,
     Viewport,
 };
 use tracing::instrument;
 use vulkan_instance::{VulkanError, VulkanInstance};
 
+pub const MAIN_CSTR: &std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"main\0") };
+
 /// Helper function to create a basic graphics pipeline with given inputs.
 #[instrument(skip_all, err)]
 pub fn create_pipeline(
     vk: &VulkanInstance,
     pipeline_rendering_create_info: PipelineRenderingCreateInfo,
-    pipeline_layout_create_info: PipelineLayoutCreateInfo,
+    pipeline_layout: PipelineLayout,
     vertex_input_state: PipelineVertexInputStateCreateInfo,
     stages: &[PipelineShaderStageCreateInfo],
     blend: PipelineColorBlendAttachmentState,
     viewport: Viewport,
-) -> Result<(Pipeline, PipelineLayout), VulkanError> {
+) -> Result<Pipeline, VulkanError> {
     let mut pipeline_rendering_create_info = pipeline_rendering_create_info;
 
     let input_assembly_state =
@@ -51,12 +53,6 @@ pub fn create_pipeline(
 
     let dynamic_states = [DynamicState::VIEWPORT, DynamicState::SCISSOR_WITH_COUNT];
     let dynamic_state = PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_states);
-
-    let pipeline_layout = unsafe {
-        vk.device
-            .create_pipeline_layout(&pipeline_layout_create_info, None)
-    }
-    .map_err(|e| VulkanError::VkResult(e, "creating pipeline layout"))?;
 
     let graphics_pipeline_create_info = GraphicsPipelineCreateInfo::default()
         .stages(stages)
@@ -83,5 +79,5 @@ pub fn create_pipeline(
 
     let pipeline = pipelines[0];
 
-    Ok((pipeline, pipeline_layout))
+    Ok(pipeline)
 }

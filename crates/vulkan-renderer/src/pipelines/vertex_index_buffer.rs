@@ -61,49 +61,69 @@ pub fn create_vertex_and_index_buffer<V: Copy>(
 
     // Copy buffers
 
-    vk.record_submit_command_buffer(vk.command_buffer, &[], &[], |device, command_buffer| {
-        let memory_barriers = [
-            VulkanInstance::buffer_memory_barrier()
-                .dst_access_mask(AccessFlags2::MEMORY_WRITE)
-                .dst_stage_mask(PipelineStageFlags2::TRANSFER)
-                .buffer(vertex)
-                .size(vertex_buffer_size),
-            VulkanInstance::buffer_memory_barrier()
-                .dst_access_mask(AccessFlags2::MEMORY_WRITE)
-                .dst_stage_mask(PipelineStageFlags2::TRANSFER)
-                .buffer(index)
-                .size(index_buffer_size),
-        ];
+    vk.record_submit_command_buffer(
+        vk.command_buffer,
+        &[],
+        &[],
+        |device, command_buffer| unsafe {
+            let memory_barriers = [
+                VulkanInstance::buffer_memory_barrier()
+                    .dst_access_mask(AccessFlags2::MEMORY_WRITE)
+                    .dst_stage_mask(PipelineStageFlags2::TRANSFER)
+                    .buffer(vertex)
+                    .size(vertex_buffer_size),
+                VulkanInstance::buffer_memory_barrier()
+                    .dst_access_mask(AccessFlags2::MEMORY_READ)
+                    .dst_stage_mask(PipelineStageFlags2::TRANSFER)
+                    .buffer(vertex_staging)
+                    .size(vertex_buffer_size),
+                VulkanInstance::buffer_memory_barrier()
+                    .dst_access_mask(AccessFlags2::MEMORY_WRITE)
+                    .dst_stage_mask(PipelineStageFlags2::TRANSFER)
+                    .buffer(index)
+                    .size(index_buffer_size),
+                VulkanInstance::buffer_memory_barrier()
+                    .dst_access_mask(AccessFlags2::MEMORY_READ)
+                    .dst_stage_mask(PipelineStageFlags2::TRANSFER)
+                    .buffer(index_staging)
+                    .size(index_buffer_size),
+            ];
 
-        let dependency_info = DependencyInfo::default().buffer_memory_barriers(&memory_barriers);
+            let dependency_info =
+                DependencyInfo::default().buffer_memory_barriers(&memory_barriers);
 
-        unsafe { device.cmd_pipeline_barrier2(command_buffer, &dependency_info) }
+            device.cmd_pipeline_barrier2(command_buffer, &dependency_info);
 
-        // vertex copy
-        let vertex_buffer_copy = BufferCopy2::default().size(vertex_buffer_size);
-        let vertex_buffer_copy_regions = &[vertex_buffer_copy];
+            // vertex copy
+            let vertex_buffer_copy = BufferCopy2::default().size(vertex_buffer_size);
+            let vertex_buffer_copy_regions = &[vertex_buffer_copy];
 
-        let vertex_buffer_copy_info = CopyBufferInfo2::default()
-            .src_buffer(vertex_staging)
-            .dst_buffer(vertex)
-            .regions(vertex_buffer_copy_regions);
+            let vertex_buffer_copy_info = CopyBufferInfo2::default()
+                .src_buffer(vertex_staging)
+                .dst_buffer(vertex)
+                .regions(vertex_buffer_copy_regions);
 
-        unsafe { device.cmd_copy_buffer2(command_buffer, &vertex_buffer_copy_info) }
+            device.cmd_copy_buffer2(command_buffer, &vertex_buffer_copy_info);
 
-        // index copy
-        let index_buffer_copy = BufferCopy2::default().size(index_buffer_size);
-        let index_buffer_copy_regions = &[index_buffer_copy];
+            // index copy
+            let index_buffer_copy = BufferCopy2::default().size(index_buffer_size);
+            let index_buffer_copy_regions = &[index_buffer_copy];
 
-        let index_buffer_copy_info = CopyBufferInfo2::default()
-            .src_buffer(index_staging)
-            .dst_buffer(index)
-            .regions(index_buffer_copy_regions);
+            let index_buffer_copy_info = CopyBufferInfo2::default()
+                .src_buffer(index_staging)
+                .dst_buffer(index)
+                .regions(index_buffer_copy_regions);
 
-        unsafe { device.cmd_copy_buffer2(command_buffer, &index_buffer_copy_info) }
-        Ok(())
-    })?;
+            device.cmd_copy_buffer2(command_buffer, &index_buffer_copy_info);
+            Ok(())
+        },
+    )?;
 
     unsafe {
+        vk.device
+            .wait_for_fences(&[vk.command_buffer.1], true, u64::MAX)
+            .map_err(|e| VulkanError::VkResult(e, "waiting for fence"))?;
+
         vk.device.destroy_buffer(vertex_staging, None);
         vk.device.destroy_buffer(index_staging, None);
         vk.device.free_memory(vertex_staging_memory, None);

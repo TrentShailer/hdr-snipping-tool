@@ -4,9 +4,8 @@ use ash::{
     vk::{
         Buffer, CommandBuffer, DescriptorImageInfo, DescriptorPool, DescriptorPoolCreateInfo,
         DescriptorPoolSize, DescriptorSet, DescriptorSetAllocateInfo, DescriptorSetLayout,
-        DescriptorType, DeviceMemory, Filter, ImageLayout, ImageView, IndexType, Pipeline,
-        PipelineBindPoint, PipelineLayout, Sampler, SamplerAddressMode, SamplerCreateInfo,
-        ShaderStageFlags, WriteDescriptorSet,
+        DescriptorType, DeviceMemory, Filter, ImageLayout, ImageView, IndexType, PipelineBindPoint,
+        Sampler, SamplerAddressMode, SamplerCreateInfo, ShaderStageFlags, WriteDescriptorSet,
     },
     Device,
 };
@@ -16,7 +15,7 @@ use tracing::{error, info_span, instrument, Level};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::pipelines::{
-    capture::{PushConstants, Vertex},
+    capture::{CapturePipeline, PushConstants, Vertex, ENCODE_AS_SRGB_FLAG},
     vertex_index_buffer::create_vertex_and_index_buffer,
 };
 
@@ -26,9 +25,6 @@ pub struct Capture {
     vertex_buffer: (Buffer, DeviceMemory),
     index_buffer: (Buffer, DeviceMemory),
     indicies: u32,
-
-    pipeline_layout: PipelineLayout,
-    pipeline: Pipeline,
 
     sampler: Sampler,
 
@@ -43,8 +39,6 @@ impl Capture {
     #[instrument("Capture::new", skip_all, err)]
     pub fn new(
         vk: Arc<VulkanInstance>,
-        pipeline: Pipeline,
-        pipeline_layout: PipelineLayout,
         descriptor_layouts: [DescriptorSetLayout; 2],
     ) -> Result<Self, crate::Error> {
         let verticies = vec![
@@ -130,7 +124,10 @@ impl Capture {
                 .update_descriptor_sets(&write_descriptor_sets, &[]);
         };
 
-        let push_constants = PushConstants { whitepoint: 0.0 };
+        let push_constants = PushConstants {
+            whitepoint: 0.0,
+            flags: 0b0,
+        };
 
         Ok(Self {
             vk,
@@ -138,9 +135,6 @@ impl Capture {
             vertex_buffer,
             index_buffer,
             indicies: indicies.len() as u32,
-
-            pipeline_layout,
-            pipeline,
 
             sampler,
 
@@ -187,29 +181,41 @@ impl Capture {
 
     #[instrument("Capture::render", level = Level::DEBUG, skip_all, err)]
     pub fn render(
-        &self,
+        &mut self,
+        pipeline: &CapturePipeline,
         device: &Device,
         command_buffer: CommandBuffer,
+        non_linear_swapchain: bool,
     ) -> Result<(), ash::vk::Result> {
         if !self.loaded {
             return Ok(());
         }
 
+        if non_linear_swapchain {
+            self.push_constants.flags |= ENCODE_AS_SRGB_FLAG;
+        } else {
+            self.push_constants.flags &= !ENCODE_AS_SRGB_FLAG;
+        }
+
         unsafe {
-            device.cmd_bind_pipeline(command_buffer, PipelineBindPoint::GRAPHICS, self.pipeline);
+            device.cmd_bind_pipeline(
+                command_buffer,
+                PipelineBindPoint::GRAPHICS,
+                pipeline.pipeline,
+            );
             device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.0], &[0]);
             device.cmd_bind_index_buffer(command_buffer, self.index_buffer.0, 0, IndexType::UINT32);
             device.cmd_bind_descriptor_sets(
                 command_buffer,
                 PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout,
+                pipeline.layout,
                 0,
                 &self.descriptor_sets,
                 &[],
             );
             device.cmd_push_constants(
                 command_buffer,
-                self.pipeline_layout,
+                pipeline.layout,
                 ShaderStageFlags::FRAGMENT,
                 0,
                 bytes_of(&self.push_constants),

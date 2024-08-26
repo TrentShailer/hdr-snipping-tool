@@ -7,12 +7,13 @@ mod units;
 
 use std::sync::Arc;
 
-use ash::vk::{
-    CommandBuffer, DescriptorSetLayout, Fence, Image, ImageView, Pipeline, PipelineLayout,
-    Semaphore, ShaderModule, SwapchainKHR, Viewport,
-};
+use ash::vk::{CommandBuffer, Fence, Image, ImageView, Semaphore, SwapchainKHR, Viewport};
 use hdr_capture::HdrCapture;
 use objects::{Capture, MouseGuides, Selection};
+use pipelines::{
+    border::BorderPipeline, capture::CapturePipeline, mouse_guides::MouseGuidesPipeline,
+    selection_shading::SelectionShadingPipeline,
+};
 use thiserror::Error;
 use tracing::{instrument, Level};
 use vulkan_instance::{VulkanError, VulkanInstance};
@@ -28,6 +29,7 @@ pub struct Renderer {
 
     swapchain_loader: ash::khr::swapchain::Device,
     swapchain: SwapchainKHR,
+    non_linear_swapchain: bool,
 
     attachment_images: Vec<Image>,
     attachment_views: Vec<ImageView>,
@@ -38,10 +40,10 @@ pub struct Renderer {
     selection: Selection,
     mouse_guides: MouseGuides,
 
-    pipeline_layouts: Vec<PipelineLayout>,
-    pipelines: Vec<Pipeline>,
-    shaders: Vec<ShaderModule>,
-    descriptor_layouts: Vec<DescriptorSetLayout>,
+    capture_pipeline: CapturePipeline,
+    mouse_guides_pipeline: MouseGuidesPipeline,
+    selection_shading_pipeline: SelectionShadingPipeline,
+    border_pipeline: BorderPipeline,
 }
 
 impl Renderer {

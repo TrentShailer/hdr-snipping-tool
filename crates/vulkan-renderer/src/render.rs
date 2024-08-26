@@ -152,11 +152,17 @@ impl Renderer {
 
                     if self.capture.loaded {
                         self.capture
-                            .render(device, command_buffer)
+                            .render(
+                                &self.capture_pipeline,
+                                device,
+                                command_buffer,
+                                self.non_linear_swapchain,
+                            )
                             .map_err(|e| VulkanError::VkResult(e, "rendering capture"))?;
 
                         self.mouse_guides
                             .render(
+                                &self.mouse_guides_pipeline,
                                 device,
                                 command_buffer,
                                 mouse_position,
@@ -166,7 +172,14 @@ impl Renderer {
                             .map_err(|e| VulkanError::VkResult(e, "rendering mouse guides"))?;
 
                         self.selection
-                            .render(device, command_buffer, selection, window_size, window_scale)
+                            .render(
+                                &self.border_pipeline,
+                                &self.selection_shading_pipeline,
+                                device,
+                                command_buffer,
+                                selection,
+                                (window_size, window_scale),
+                            )
                             .map_err(|e| VulkanError::VkResult(e, "rendering selection"))?;
                     }
 

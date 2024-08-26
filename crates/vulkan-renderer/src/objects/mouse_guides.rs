@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use ash::{
-    vk::{
-        Buffer, CommandBuffer, DeviceMemory, IndexType, Pipeline, PipelineBindPoint,
-        PipelineLayout, ShaderStageFlags,
-    },
+    vk::{Buffer, CommandBuffer, DeviceMemory, IndexType, PipelineBindPoint, ShaderStageFlags},
     Device,
 };
 use bytemuck::bytes_of;
@@ -13,7 +10,7 @@ use vulkan_instance::VulkanInstance;
 
 use crate::{
     pipelines::{
-        mouse_guides::{PushConstants, Vertex},
+        mouse_guides::{MouseGuidesPipeline, PushConstants, Vertex},
         vertex_index_buffer::create_vertex_and_index_buffer,
     },
     units::{FromPhysical, VkPosition, VkSize},
@@ -40,21 +37,13 @@ pub struct MouseGuides {
     index_buffer: (Buffer, DeviceMemory),
     indicies: u32,
 
-    pipeline_layout: PipelineLayout,
-    pipeline: Pipeline,
-
     push_constants: PushConstants,
     line_size: f32,
 }
 
 impl MouseGuides {
     #[instrument("MouseGuides::new", skip_all, err)]
-    pub fn new(
-        vk: Arc<VulkanInstance>,
-        pipeline: Pipeline,
-        pipeline_layout: PipelineLayout,
-        line_size: f32,
-    ) -> Result<Self, crate::Error> {
+    pub fn new(vk: Arc<VulkanInstance>, line_size: f32) -> Result<Self, crate::Error> {
         let color = [128, 128, 128, 64];
         let verticies = vec![
             Vertex {
@@ -120,9 +109,6 @@ impl MouseGuides {
             index_buffer,
             indicies: indicies.len() as u32,
 
-            pipeline_layout,
-            pipeline,
-
             push_constants,
             line_size,
         })
@@ -131,6 +117,7 @@ impl MouseGuides {
     #[instrument("MouseGuides::render", level = Level::DEBUG, skip_all, err)]
     pub fn render(
         &mut self,
+        pipeline: &MouseGuidesPipeline,
         device: &Device,
         command_buffer: CommandBuffer,
         mouse_position: [u32; 2],
@@ -148,12 +135,16 @@ impl MouseGuides {
         self.push_constants.mouse_position = mouse_position;
 
         unsafe {
-            device.cmd_bind_pipeline(command_buffer, PipelineBindPoint::GRAPHICS, self.pipeline);
+            device.cmd_bind_pipeline(
+                command_buffer,
+                PipelineBindPoint::GRAPHICS,
+                pipeline.pipeline,
+            );
             device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.0], &[0]);
             device.cmd_bind_index_buffer(command_buffer, self.index_buffer.0, 0, IndexType::UINT32);
             device.cmd_push_constants(
                 command_buffer,
-                self.pipeline_layout,
+                pipeline.layout,
                 ShaderStageFlags::VERTEX,
                 0,
                 bytes_of(&self.push_constants),

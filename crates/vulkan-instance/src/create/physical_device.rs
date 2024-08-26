@@ -18,8 +18,11 @@ use super::Error;
 
 // -----
 
-pub const REQUIRED_EXTENSIONS: [&ffi::CStr; 2] =
-    [khr::swapchain::NAME, khr::external_memory_win32::NAME];
+pub const REQUIRED_EXTENSIONS: [&ffi::CStr; 3] = [
+    khr::swapchain::NAME,
+    khr::external_memory_win32::NAME,
+    khr::swapchain_mutable_format::NAME,
+];
 
 // -----
 #[instrument(skip_all, err)]

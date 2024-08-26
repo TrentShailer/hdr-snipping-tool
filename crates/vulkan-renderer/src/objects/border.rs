@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use ash::{
-    vk::{
-        Buffer, CommandBuffer, DeviceMemory, IndexType, Pipeline, PipelineBindPoint,
-        PipelineLayout, ShaderStageFlags,
-    },
+    vk::{Buffer, CommandBuffer, DeviceMemory, IndexType, PipelineBindPoint, ShaderStageFlags},
     Device,
 };
 use bytemuck::bytes_of;
@@ -13,7 +10,7 @@ use vulkan_instance::VulkanInstance;
 
 use crate::{
     pipelines::{
-        border::{PushConstants, Vertex},
+        border::{BorderPipeline, PushConstants, Vertex},
         vertex_index_buffer::create_vertex_and_index_buffer,
     },
     units::{FromPhysical, VkPosition, VkSize},
@@ -39,9 +36,6 @@ pub struct Border {
     index_buffer: (Buffer, DeviceMemory),
     indicies: u32,
 
-    pipeline_layout: PipelineLayout,
-    pipeline: Pipeline,
-
     push_constants: PushConstants,
     line_size: f32,
 }
@@ -50,8 +44,6 @@ impl Border {
     #[instrument("Border::new", skip_all, err)]
     pub fn new(
         vk: Arc<VulkanInstance>,
-        pipeline: Pipeline,
-        pipeline_layout: PipelineLayout,
         color: [u8; 4],
         line_size: f32,
     ) -> Result<Self, crate::Error> {
@@ -123,9 +115,6 @@ impl Border {
             index_buffer,
             indicies: indicies.len() as u32,
 
-            pipeline_layout,
-            pipeline,
-
             push_constants,
             line_size,
         })
@@ -134,18 +123,18 @@ impl Border {
     #[instrument("Border::render", level = Level::DEBUG, skip_all, err)]
     pub fn render(
         &mut self,
+        pipeline: &BorderPipeline,
         device: &Device,
         command_buffer: CommandBuffer,
-        position: VkPosition,
-        size: VkSize,
-        window_size: [u32; 2],
-        window_scale: f64,
+        border: (VkPosition, VkSize),
+        window_size_scale: ([u32; 2], f64),
     ) -> Result<(), ash::vk::Result> {
         let line_size =
-            VkSize::from_physical([self.line_size, self.line_size], window_size) * window_scale;
+            VkSize::from_physical([self.line_size, self.line_size], window_size_scale.0)
+                * window_size_scale.1;
 
-        let position = position.as_f32_array();
-        let size = size.as_f32_array();
+        let position = border.0.as_f32_array();
+        let size = border.1.as_f32_array();
         let line_size = line_size.as_f32_array();
 
         self.push_constants.target_position = position;
@@ -153,12 +142,16 @@ impl Border {
         self.push_constants.line_size = line_size;
 
         unsafe {
-            device.cmd_bind_pipeline(command_buffer, PipelineBindPoint::GRAPHICS, self.pipeline);
+            device.cmd_bind_pipeline(
+                command_buffer,
+                PipelineBindPoint::GRAPHICS,
+                pipeline.pipeline,
+            );
             device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.0], &[0]);
             device.cmd_bind_index_buffer(command_buffer, self.index_buffer.0, 0, IndexType::UINT32);
             device.cmd_push_constants(
                 command_buffer,
-                self.pipeline_layout,
+                pipeline.layout,
                 ShaderStageFlags::VERTEX,
                 0,
                 bytes_of(&self.push_constants),

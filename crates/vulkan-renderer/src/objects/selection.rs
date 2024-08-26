@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use ash::{
-    vk::{
-        Buffer, CommandBuffer, DeviceMemory, IndexType, Pipeline, PipelineBindPoint,
-        PipelineLayout, ShaderStageFlags,
-    },
+    vk::{Buffer, CommandBuffer, DeviceMemory, IndexType, PipelineBindPoint, ShaderStageFlags},
     Device,
 };
 use bytemuck::bytes_of;
@@ -14,7 +11,8 @@ use vulkan_instance::VulkanInstance;
 use crate::{
     objects::Border,
     pipelines::{
-        selection_shading::{PushConstants, Vertex},
+        border::BorderPipeline,
+        selection_shading::{PushConstants, SelectionShadingPipeline, Vertex},
         vertex_index_buffer::create_vertex_and_index_buffer,
     },
     units::{FromPhysical, VkPosition, VkSize},
@@ -42,21 +40,12 @@ pub struct Selection {
     index_buffer: (Buffer, DeviceMemory),
     indicies: u32,
 
-    shading_pipeline: Pipeline,
-    shading_pipeline_layout: PipelineLayout,
-
     push_constants: PushConstants,
 }
 
 impl Selection {
     #[instrument("Selection::new", level = Level::DEBUG, skip_all, err)]
-    pub fn new(
-        vk: Arc<VulkanInstance>,
-        shading_pipeline: Pipeline,
-        shading_pipeline_layout: PipelineLayout,
-        border_pipeline: Pipeline,
-        border_pipeline_layout: PipelineLayout,
-    ) -> Result<Self, crate::Error> {
+    pub fn new(vk: Arc<VulkanInstance>) -> Result<Self, crate::Error> {
         let color = [0, 0, 0, 127];
         let verticies = vec![
             Vertex {
@@ -111,13 +100,7 @@ impl Selection {
         let (vertex_buffer, index_buffer) =
             create_vertex_and_index_buffer(&vk, &verticies, &indicies)?;
 
-        let border = Border::new(
-            vk.clone(),
-            border_pipeline,
-            border_pipeline_layout,
-            [255, 255, 255, 255],
-            2.0,
-        )?;
+        let border = Border::new(vk.clone(), [255, 255, 255, 255], 2.0)?;
 
         let push_constants = PushConstants {
             base_position: [0.0, 0.0],
@@ -135,9 +118,6 @@ impl Selection {
             index_buffer,
             indicies: indicies.len() as u32,
 
-            shading_pipeline,
-            shading_pipeline_layout,
-
             push_constants,
         })
     }
@@ -145,14 +125,16 @@ impl Selection {
     #[instrument("Selection::render", level = Level::DEBUG, skip_all, err)]
     pub fn render(
         &mut self,
+        border_pipeline: &BorderPipeline,
+        shading_pipeline: &SelectionShadingPipeline,
         device: &Device,
         command_buffer: CommandBuffer,
         selection: Rect,
-        window_size: [u32; 2],
-        window_scale: f64,
+        window_size_scale: ([u32; 2], f64),
     ) -> Result<(), ash::vk::Result> {
-        let selection_top_left = VkPosition::from_physical(selection.left_top(), window_size);
-        let selection_size = VkSize::from_physical(selection.size(), window_size);
+        let selection_top_left =
+            VkPosition::from_physical(selection.left_top(), window_size_scale.0);
+        let selection_size = VkSize::from_physical(selection.size(), window_size_scale.0);
         let selection_position = VkPosition::get_center(selection_top_left, selection_size);
 
         let target_position = selection_position.as_f32_array();
@@ -165,13 +147,13 @@ impl Selection {
             device.cmd_bind_pipeline(
                 command_buffer,
                 PipelineBindPoint::GRAPHICS,
-                self.shading_pipeline,
+                shading_pipeline.pipeline,
             );
             device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.0], &[0]);
             device.cmd_bind_index_buffer(command_buffer, self.index_buffer.0, 0, IndexType::UINT32);
             device.cmd_push_constants(
                 command_buffer,
-                self.shading_pipeline_layout,
+                shading_pipeline.layout,
                 ShaderStageFlags::VERTEX,
                 0,
                 bytes_of(&self.push_constants),
@@ -181,12 +163,11 @@ impl Selection {
         }
 
         self.border.render(
+            border_pipeline,
             device,
             command_buffer,
-            selection_position,
-            selection_size,
-            window_size,
-            window_scale,
+            (selection_position, selection_size),
+            window_size_scale,
         )?;
 
         Ok(())
