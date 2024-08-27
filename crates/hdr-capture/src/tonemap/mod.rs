@@ -158,7 +158,7 @@ impl Tonemap {
                     .array_layers(1)
                     .samples(SampleCountFlags::TYPE_1)
                     .tiling(ImageTiling::OPTIMAL)
-                    .usage(ImageUsageFlags::STORAGE)
+                    .usage(ImageUsageFlags::STORAGE | ImageUsageFlags::TRANSFER_SRC)
                     .sharing_mode(SharingMode::EXCLUSIVE)
                     .initial_layout(ImageLayout::UNDEFINED);
 
@@ -205,7 +205,7 @@ impl Tonemap {
                         ImageSubresourceRange::default()
                             .aspect_mask(ImageAspectFlags::COLOR)
                             .layer_count(1)
-                            .layer_count(1),
+                            .level_count(1),
                     );
 
                 self.vk

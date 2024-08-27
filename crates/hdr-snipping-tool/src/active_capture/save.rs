@@ -45,7 +45,7 @@ impl ActiveCapture {
                         .dst_stage_mask(PipelineStageFlags2::TRANSFER)
                         .dst_access_mask(AccessFlags2::MEMORY_READ)
                         .old_layout(ImageLayout::GENERAL)
-                        .new_layout(ImageLayout::TRANSFER_DST_OPTIMAL)
+                        .new_layout(ImageLayout::TRANSFER_SRC_OPTIMAL)
                         .image(tonemapped_image.0)];
 
                     let dependency_info =
