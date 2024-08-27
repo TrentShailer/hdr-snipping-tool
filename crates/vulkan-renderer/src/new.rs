@@ -30,8 +30,13 @@ impl Renderer {
         Self::transition_images(&vk, &swapchain_images)?;
 
         let mut viewport = Viewport::default().min_depth(0.0).max_depth(1.0);
-        let attachment_views =
-            Self::window_size_dependant_setup(&vk, &swapchain_images, window_size, &mut viewport)?;
+        let attachment_views = Self::window_size_dependant_setup(
+            &vk,
+            swapchain_format,
+            &swapchain_images,
+            window_size,
+            &mut viewport,
+        )?;
 
         let surface_formats = [swapchain_format.format];
         let pipeline_rendering_create_info =

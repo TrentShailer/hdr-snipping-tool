@@ -185,6 +185,7 @@ impl Renderer {
 
         let attachment_views = Self::window_size_dependant_setup(
             &self.vk,
+            swapchain_format,
             &self.attachment_images,
             window_size,
             &mut self.viewport,
@@ -211,22 +212,20 @@ impl Renderer {
     #[instrument("Renderer::window_size_dependant_setup", skip_all, err)]
     pub(super) fn window_size_dependant_setup(
         vk: &VulkanInstance,
-        images: &[Image],
+        swapchain_format: SurfaceFormatKHR,
+        swapchain_images: &[Image],
         window_size: [u32; 2],
         viewport: &mut Viewport,
     ) -> Result<Vec<ImageView>, Error> {
-        let image_format = Self::get_surface_format(vk)
-            .map_err(|e| VulkanError::VkResult(e, "getting surface format"))?;
-
         viewport.width = window_size[0] as f32;
         viewport.height = window_size[1] as f32;
 
-        let image_views: Result<Vec<ImageView>, VulkanError> = images
+        let image_views: Result<Vec<ImageView>, VulkanError> = swapchain_images
             .iter()
             .map(|&image| {
                 let create_view_info = ImageViewCreateInfo::default()
                     .view_type(ImageViewType::TYPE_2D)
-                    .format(image_format.format)
+                    .format(swapchain_format.format)
                     .subresource_range(ImageSubresourceRange {
                         aspect_mask: ImageAspectFlags::COLOR,
                         base_mip_level: 0,
