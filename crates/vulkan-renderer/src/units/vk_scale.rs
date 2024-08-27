@@ -14,6 +14,7 @@ impl VkSize {
         [self.x as f32, self.y as f32]
     }
 
+    #[allow(unused)]
     pub fn as_f64_array(&self) -> [f64; 2] {
         [self.x, self.y]
     }
