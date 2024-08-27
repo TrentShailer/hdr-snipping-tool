@@ -1,5 +1,3 @@
-use std::time::{Duration, Instant};
-
 use ash::{
     vk::{
         self, CommandBuffer, CommandBufferAllocateInfo, CommandBufferSubmitInfo, Fence,
@@ -8,7 +6,7 @@ use ash::{
     Device,
 };
 use smallvec::{smallvec, SmallVec};
-use tracing::{info, instrument, Level};
+use tracing::{instrument, Level};
 
 use crate::{VulkanError, VulkanInstance};
 
@@ -24,17 +22,9 @@ impl VulkanInstance {
         f: F,
     ) -> Result<(), VulkanError> {
         unsafe {
-            let wait_start = Instant::now();
             self.device
                 .wait_for_fences(&[command_buffer.1], true, u64::MAX)
                 .map_err(|e| VulkanError::VkResult(e, "waiting for fences"))?;
-            if wait_start.elapsed() > Duration::from_millis(1) {
-                // TODO
-                // info!(
-                //     "waiting for fence: {:.2}ms",
-                //     wait_start.elapsed().as_secs_f64() * 1000.0
-                // );
-            }
 
             self.device
                 .reset_fences(&[command_buffer.1])
