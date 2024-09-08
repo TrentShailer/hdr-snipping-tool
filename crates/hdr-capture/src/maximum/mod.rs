@@ -115,6 +115,7 @@ impl Maximum {
             self.command_buffers[2].1,
         ];
         unsafe {
+            let _span = info_span!("waiting_completion").entered();
             self.vk
                 .device
                 .wait_for_fences(&fences, true, u64::MAX)
@@ -161,6 +162,7 @@ impl Maximum {
         )?;
 
         unsafe {
+            let _span = info_span!("waiting_copy").entered();
             self.vk
                 .device
                 .wait_for_fences(&fences, true, u64::MAX)
@@ -171,6 +173,7 @@ impl Maximum {
         let maximum = maximums[0];
 
         unsafe {
+            let _span = info_span!("freeing_resources").entered();
             self.vk.device.destroy_buffer(read_buffer, None);
             self.vk.device.free_memory(read_buffer_memory, None);
 
