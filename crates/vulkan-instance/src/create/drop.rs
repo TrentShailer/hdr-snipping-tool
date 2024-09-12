@@ -12,6 +12,7 @@ impl Drop for VulkanInstance {
             };
 
             self.device.destroy_fence(self.command_buffer.1, None);
+            self.device.destroy_fence(self.wake_command_buffer.1, None);
 
             self.device
                 .destroy_command_pool(self.command_buffer_pool, None);

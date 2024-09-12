@@ -4,6 +4,7 @@ pub mod create;
 pub mod default;
 pub mod memory;
 pub mod shader;
+pub mod wake;
 
 use std::io;
 
@@ -34,6 +35,7 @@ pub struct VulkanInstance {
 
     pub command_buffer_pool: vk::CommandPool,
     pub command_buffer: (vk::CommandBuffer, vk::Fence),
+    wake_command_buffer: (vk::CommandBuffer, vk::Fence),
 
     debug_utils: Option<(debug_utils::Instance, vk::DebugUtilsMessengerEXT)>,
 }

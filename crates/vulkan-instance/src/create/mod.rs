@@ -8,7 +8,10 @@ mod physical_device;
 mod surface;
 
 use api_version::validate_api_version;
-use ash::{Entry, LoadingError};
+use ash::{
+    vk::{CommandBufferAllocateInfo, FenceCreateFlags, FenceCreateInfo},
+    Entry, LoadingError,
+};
 use command_buffer::get_command_buffer;
 use debug::setup_debug;
 use instance::aquire_instance;
@@ -46,6 +49,25 @@ impl VulkanInstance {
         let (command_buffer_pool, command_buffer) =
             get_command_buffer(&device, queue_family_index)?;
 
+        // Create wake command buffer
+        let wake_command_buffer = unsafe {
+            let allocate_info = CommandBufferAllocateInfo::default()
+                .command_buffer_count(1)
+                .command_pool(command_buffer_pool);
+
+            let command_buffer = device
+                .allocate_command_buffers(&allocate_info)
+                .map_err(|e| VulkanError::VkResult(e, "allocating command buffers"))?[0];
+
+            let fence_create_info = FenceCreateInfo::default().flags(FenceCreateFlags::SIGNALED);
+
+            let fence = device
+                .create_fence(&fence_create_info, None)
+                .map_err(|e| VulkanError::VkResult(e, "creating fence"))?;
+
+            (command_buffer, fence)
+        };
+
         Ok(Self {
             entry,
             instance,
@@ -60,6 +82,7 @@ impl VulkanInstance {
 
             command_buffer_pool,
             command_buffer,
+            wake_command_buffer,
 
             debug_utils,
         })
