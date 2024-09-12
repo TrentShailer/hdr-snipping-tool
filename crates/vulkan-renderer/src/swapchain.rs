@@ -6,7 +6,7 @@ use ash::vk::{
     SwapchainCreateInfoKHR, SwapchainKHR, Viewport,
 };
 
-use tracing::{info, instrument};
+use tracing::{info, info_span, instrument};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::Error;
@@ -116,8 +116,11 @@ impl Renderer {
             swapchain_create_info
         };
 
-        let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_create_info, None) }
-            .map_err(|e| VulkanError::VkResult(e, "creating the swapchain"))?;
+        let swapchain = unsafe {
+            let _span = info_span!("create_swapchain").entered();
+            swapchain_loader.create_swapchain(&swapchain_create_info, None)
+        }
+        .map_err(|e| VulkanError::VkResult(e, "creating the swapchain"))?;
 
         info!("Surface format: {:#?}", surface_format.format);
         info!("Surface color space: {:#?}", surface_format.color_space);

@@ -30,7 +30,7 @@ impl Renderer {
             return Ok(());
         }
 
-        // Handle recreatin the swapchain
+        // Handle recreating the swapchain
         if self.recreate_swapchain {
             self.recreate_swapchain(window_size)?;
         }
