@@ -6,6 +6,7 @@ use hdr_capture::{hdr_capture::Error as HdrCaptureError, HdrCapture, Rect};
 use selection::Selection;
 use thiserror::Error;
 use tracing::instrument;
+use vulkan_instance::VulkanError;
 use windows::Win32::Foundation::{CloseHandle, HWND};
 use windows_capture_provider::{capture_item_cache, windows_capture, Display, WindowsCapture};
 
@@ -28,6 +29,8 @@ impl ActiveCapture {
             ..
         } = app;
 
+        vk.wake()?;
+
         let formerly_focused_window = get_foreground_window();
 
         capture_item_cache.refresh_displays(dx)?;
@@ -38,6 +41,7 @@ impl ActiveCapture {
         };
 
         let windows_capture = WindowsCapture::take_capture(&app.dx, display)?;
+
         let hdr_capture = HdrCapture::import_windows_capture(
             vk.clone(),
             maximum,
@@ -79,4 +83,7 @@ pub enum Error {
 
     #[error("Failed to close handle:\n{0}")]
     CloseHandle(#[from] windows_result::Error),
+
+    #[error("Failed during vulkan call:\n{0}")]
+    Vulkan(#[from] VulkanError),
 }
