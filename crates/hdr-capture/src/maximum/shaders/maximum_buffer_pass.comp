@@ -42,10 +42,7 @@ void main() {
 	for (uint i = 0; i < gl_SubgroupSize; i++) {
 		uint fetch_index = index + i;
 
-		float16_t fetch_value = OUT_OF_BOUNDS_VALUE; // Handle out of bounds by using a very small number
-		if (fetch_index < input_length) {
-			fetch_value = read_buffer[fetch_index];
-		}
+		float16_t fetch_value = fetch_index < input_length ? read_buffer[fetch_index] : OUT_OF_BOUNDS_VALUE; // Handle out of bounds by using a very small number
 
 		float16_t iteration_maximum = subgroupMax(fetch_value);
 

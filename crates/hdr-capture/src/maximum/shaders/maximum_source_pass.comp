@@ -36,6 +36,7 @@ void main() {
 		uint fetch_y_index = y_index + i;
 
 		vec4 color = imageLoad(source_image, ivec2(x_index, fetch_y_index));
+		// Note: Loading and using right after causes Long Scoreboard Stall while waiting for the load to complete.
 		float value = max(color.r, max(color.g, color.b));
 
 		float iteration_maximum = subgroupMax(value);
