@@ -8,8 +8,8 @@ layout(location = 2) in uint flags;
 layout(location = 0) out vec4 out_color;
 
 layout(push_constant) uniform PushConstants {
-	vec2 base_size;
 	vec2 base_position;
+	vec2 base_size;
 
     vec2 target_position;
 	vec2 target_size;

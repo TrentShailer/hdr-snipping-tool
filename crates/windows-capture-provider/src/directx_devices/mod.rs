@@ -2,6 +2,7 @@ mod create_devices;
 
 use create_devices::{d3d11_context, d3d11_device, d3d_device, dxgi_adapter};
 use thiserror::Error;
+use tracing::instrument;
 use windows::{
     Graphics::DirectX::Direct3D11::IDirect3DDevice,
     Win32::Graphics::{
@@ -29,11 +30,12 @@ pub struct DirectXDevices {
 
 impl DirectXDevices {
     /// Creates a new set of directX devices.
+    #[instrument("DirectXDevices::new", skip_all, err)]
     pub fn new() -> Result<Self, Error> {
         let d3d11_device = d3d11_device().map_err(Error::D3D11Device)?;
         let d3d11_context = d3d11_context(&d3d11_device).map_err(Error::D3D11Context)?;
 
-        let dxgi_device: IDXGIDevice = d3d11_device.cast().map_err(Error::DXGIDevice)?;
+        let dxgi_device: IDXGIDevice = d3d11_device.cast().map_err(Error::DXGIAdapter)?;
         let dxgi_adapter = dxgi_adapter(&dxgi_device).map_err(Error::DXGIAdapter)?;
 
         let d3d_device = d3d_device(&dxgi_device).map_err(Error::D3DDevice)?;
@@ -48,6 +50,7 @@ impl DirectXDevices {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("Failed to create d3d11 device:\n{0}")]
     D3D11Device(#[source] WindowsError),
@@ -57,9 +60,6 @@ pub enum Error {
 
     #[error("Failed to create d3d device:\n{0}")]
     D3DDevice(#[source] WindowsError),
-
-    #[error("Failed to create dxgi device:\n{0}")]
-    DXGIDevice(#[source] WindowsError),
 
     #[error("Failed to create dxgi adapter:\n{0}")]
     DXGIAdapter(#[source] WindowsError),

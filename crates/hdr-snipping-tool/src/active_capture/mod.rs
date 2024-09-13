@@ -1,98 +1,89 @@
 pub mod save;
 pub mod selection;
 
-use std::sync::Arc;
-
-use scrgb::ScRGB;
-use scrgb_tonemapper::{whitepoint::Whitepoint, ScrgbTonemapper};
+use crate::{active_app::ActiveApp, windows_helpers::foreground_window::get_foreground_window};
+use hdr_capture::{hdr_capture::Error as HdrCaptureError, HdrCapture, Rect};
 use selection::Selection;
 use thiserror::Error;
-use uuid::Uuid;
-use vulkan_instance::{texture::Texture, VulkanInstance};
-use windows::Win32::Foundation::HWND;
-use windows_capture_provider::{display::Display, WindowsCaptureProvider};
-use winit::dpi::PhysicalPosition;
-
-use crate::windows_helpers::foreground_window::get_foreground_window;
+use tracing::instrument;
+use vulkan_instance::VulkanError;
+use windows::Win32::Foundation::{CloseHandle, HWND};
+use windows_capture_provider::{capture_item_cache, windows_capture, Display, WindowsCapture};
 
 pub struct ActiveCapture {
     pub display: Display,
-    pub texture: Arc<Texture>,
-    pub tonemapper: ScrgbTonemapper,
+    pub capture: HdrCapture,
     pub selection: Selection,
     pub formerly_focused_window: HWND,
-    pub id: Uuid,
 }
 
 impl ActiveCapture {
-    pub fn new(
-        vk: Arc<VulkanInstance>,
-        capture_provider: &mut WindowsCaptureProvider,
-    ) -> Result<Self, Error> {
-        let id = Uuid::new_v4();
-        log::info!(
-            "[capture_id]
-  {}",
-            id
-        );
+    #[instrument("ActiveCapture::new", skip_all, err)]
+    pub fn new(app: &mut ActiveApp) -> Result<Self, Error> {
+        let ActiveApp {
+            vk,
+            maximum,
+            dx,
+            capture_item_cache,
+            settings,
+            ..
+        } = app;
+
+        vk.wake()?;
+
         let formerly_focused_window = get_foreground_window();
 
-        let capture = capture_provider.take_capture()?;
-        let texture = Arc::new(Texture::new(&vk, capture.display.size)?);
-        let tonemapper = ScrgbTonemapper::new(&vk, texture.image_view.clone(), &capture)?;
-        tonemapper.tonemap(&vk)?;
+        capture_item_cache.refresh_displays(dx)?;
 
-        let selection = Selection::new(
-            PhysicalPosition::new(0, 0),
-            PhysicalPosition::new(capture.display.size[0], capture.display.size[1]),
-        );
+        let display = match app.capture_item_cache.hovered()? {
+            Some(display) => display,
+            None => return Err(Error::NoDisplay),
+        };
 
-        let display = capture.display;
+        let windows_capture = WindowsCapture::take_capture(&app.dx, display)?;
+
+        let hdr_capture = HdrCapture::import_windows_capture(
+            vk.clone(),
+            maximum,
+            &windows_capture,
+            settings.hdr_whitepoint,
+        )?;
+
+        let selection = Selection::new(Rect {
+            start: [0, 0],
+            end: hdr_capture.size,
+        });
+
+        unsafe {
+            CloseHandle(windows_capture.handle)?;
+        }
 
         Ok(Self {
-            display,
             selection,
-            texture,
-            tonemapper,
+            capture: hdr_capture,
             formerly_focused_window,
-            id,
+            display: windows_capture.display,
         })
-    }
-
-    /// Sets the whitepoint to a new setting.
-    pub fn set_whitepoint(
-        &mut self,
-        vk: &VulkanInstance,
-        whitepoint: Whitepoint,
-    ) -> Result<(), scrgb_tonemapper::tonemap::Error> {
-        self.tonemapper.set_curve_target(whitepoint);
-        self.tonemapper.tonemap(vk)?;
-        Ok(())
-    }
-
-    /// Adjusts the whitepoint of the tonemapper by an amount.
-    pub fn adjust_whitepoint(
-        &mut self,
-        vk: &VulkanInstance,
-        amount: ScRGB,
-    ) -> Result<(), scrgb_tonemapper::tonemap::Error> {
-        self.tonemapper.adjust_whitepoint(amount);
-        self.tonemapper.tonemap(vk)?;
-        Ok(())
     }
 }
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Failed while accessing the capture item cache:\n{0}")]
+    HoveredDisplay(#[from] capture_item_cache::Error),
+
+    #[error("No display is being hovered")]
+    NoDisplay,
+
     #[error("Failed to take capture:\n{0}")]
-    TakeCapture(#[from] windows_capture_provider::capture::Error),
+    TakeCapture(#[from] windows_capture::Error),
 
-    #[error("Failed to create texture:\n{0}")]
-    Texture(#[from] vulkan_instance::texture::Error),
+    #[error("Failed to import capture to vulkan:\n{0}")]
+    ImportCapture(#[from] HdrCaptureError),
 
-    #[error("Failed to create tonemapper:\n{0}")]
-    Tonemapper(#[from] scrgb_tonemapper::Error),
+    #[error("Failed to close handle:\n{0}")]
+    CloseHandle(#[from] windows_result::Error),
 
-    #[error("Failed to tonemap:\n{0}")]
-    Tonemap(#[from] scrgb_tonemapper::tonemap::Error),
+    #[error("Failed during vulkan call:\n{0}")]
+    Vulkan(#[from] VulkanError),
 }

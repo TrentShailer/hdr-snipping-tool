@@ -1,91 +1,51 @@
-use debug_helper::{is_debug, is_verbose};
-use log::LevelFilter;
+use tracing::{
+    level_filters::LevelFilter,
+    subscriber::{set_global_default, SetGlobalDefaultError},
+};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::{fmt::format::FmtSpan, layer::SubscriberExt, Layer};
 
 use crate::project_directory;
 
-pub fn init_fern() -> Result<(), fern::InitError> {
-    if is_verbose() {
-        init_verbose_logger()?;
-    } else if is_debug() {
-        init_debug_logger()?;
-    } else {
-        init_default_logger()?;
-    };
+pub fn init_tracing() -> Result<(WorkerGuard, WorkerGuard), SetGlobalDefaultError> {
+    let filter = tracing_subscriber::filter::Targets::new()
+        .with_default(LevelFilter::TRACE)
+        .with_target("winit", LevelFilter::OFF);
 
-    Ok(())
-}
+    // timing logger
+    let timing_filter = tracing_subscriber::filter::FilterFn::new(|metadata| {
+        metadata.level() == &LevelFilter::INFO
+    })
+    .with_max_level_hint(LevelFilter::INFO);
+    let timing_file_appender =
+        tracing_appender::rolling::never(project_directory(), "hdr-snipping-tool.timing.log");
+    let (timing_non_blocking, _timing_guard) = tracing_appender::non_blocking(timing_file_appender);
+    let timing_file_logger = tracing_subscriber::fmt::layer()
+        .with_writer(timing_non_blocking)
+        .with_span_events(FmtSpan::CLOSE)
+        .with_ansi(false)
+        .with_target(false)
+        .with_filter(timing_filter.clone());
 
-fn error_logger() -> fern::Dispatch {
-    fern::Dispatch::new()
-        .format(move |out, message, record| {
-            let time = chrono::Local::now().format("%F %r %:z");
-            let level = record.level();
-            let target = record.target();
+    // error logger
+    let file_appender =
+        tracing_appender::rolling::never(project_directory(), "hdr-snipping-tool.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    let error_file_logger = tracing_subscriber::fmt::layer()
+        .with_writer(non_blocking)
+        .with_ansi(false)
+        .with_target(false);
+    let error_std_logger = tracing_subscriber::fmt::layer()
+        .with_ansi(false)
+        .with_target(false);
 
-            out.finish(format_args!("[{time}] [{level}] [{target}]\n{message}\n",))
-        })
-        .level(LevelFilter::Warn)
-}
+    let collector = tracing_subscriber::registry()
+        .with(error_file_logger)
+        .with(error_std_logger)
+        .with(timing_file_logger)
+        .with(filter);
 
-fn debug_logger() -> fern::Dispatch {
-    fern::Dispatch::new()
-        .format(move |out, message, _record| out.finish(format_args!("{message}")))
-        .level(LevelFilter::Debug)
-        .level_for("scrgb_tonemapper::tonemap", LevelFilter::Off)
-        .level_for("vulkan_renderer::renderer::render", LevelFilter::Off)
-}
+    set_global_default(collector)?;
 
-fn init_default_logger() -> Result<(), fern::InitError> {
-    error_logger()
-        .chain(std::io::stdout())
-        .chain(fern::log_file(project_directory().join("error.log"))?)
-        .apply()?;
-
-    Ok(())
-}
-
-fn init_debug_logger() -> Result<(), fern::InitError> {
-    fern::Dispatch::new()
-        .chain(error_logger().chain(fern::log_file(project_directory().join("error.log"))?))
-        .chain(
-            debug_logger()
-                .chain(std::io::stdout())
-                .chain(fern::log_file(project_directory().join("debug.log"))?),
-        )
-        .apply()?;
-
-    Ok(())
-}
-
-fn init_verbose_logger() -> Result<(), fern::InitError> {
-    fern::Dispatch::new()
-        .chain(error_logger().chain(fern::log_file(project_directory().join("error.log"))?))
-        .chain(debug_logger().chain(fern::log_file(project_directory().join("debug.log"))?))
-        .chain(
-            fern::Dispatch::new()
-                .format(move |out, message, _record| out.finish(format_args!("{message}")))
-                .level(LevelFilter::Info)
-                .level_for("scrgb_tonemapper::tonemap", LevelFilter::Debug)
-                .chain(fern::log_file(
-                    project_directory().join("_tonemap.debug.log"),
-                )?),
-        )
-        .chain(
-            fern::Dispatch::new()
-                .format(move |out, message, _record| out.finish(format_args!("{message}")))
-                .level(LevelFilter::Info)
-                .level_for("vulkan_renderer::renderer::render", LevelFilter::Debug)
-                .chain(fern::log_file(
-                    project_directory().join("_render.debug.log"),
-                )?),
-        )
-        .chain(
-            fern::Dispatch::new()
-                .format(move |out, message, _record| out.finish(format_args!("{message}")))
-                .level(LevelFilter::Debug)
-                .chain(std::io::stdout()),
-        )
-        .apply()?;
-
-    Ok(())
+    Ok((_guard, _timing_guard))
 }

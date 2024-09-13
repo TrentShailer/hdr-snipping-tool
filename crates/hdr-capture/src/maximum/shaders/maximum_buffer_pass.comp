@@ -1,0 +1,69 @@
+#version 450
+
+// glslc --target-spv=spv1.3 maximum_buffer_pass.comp -o maximum_buffer_pass.spv
+
+// Get subgroup f16 capabilities
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+#extension GL_EXT_shader_subgroup_extended_types_float16 : enable
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+const uint WORKGROUP_SIZE = 1024;
+const float16_t OUT_OF_BOUNDS_VALUE = -65504.0hf;
+
+layout(local_size_x = WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer ReadLayout
+{
+    float16_t read_buffer[];
+};
+layout(set = 0, binding = 1) buffer WriteLayout
+{
+    float16_t write_buffer[];
+};
+
+layout(push_constant) uniform PushConstants {
+	uint input_length;
+};
+
+shared float16_t shared_data[WORKGROUP_SIZE];
+
+void main() {
+	uint thread_id = gl_LocalInvocationID.x;
+
+	// The space between each thread
+	uint thread_space = gl_SubgroupSize;
+	// The space between each invocation
+	uint invocation_space = thread_space * WORKGROUP_SIZE;
+
+	// the starting index for this thread
+	uint index = (gl_WorkGroupID.x * invocation_space) + (thread_id * thread_space);
+
+	// Subgroups are used to quickly reduce subgroup_size items for each thread
+	for (uint i = 0; i < gl_SubgroupSize; i++) {
+		uint fetch_index = index + i;
+
+		float16_t fetch_value = fetch_index < input_length ? read_buffer[fetch_index] : OUT_OF_BOUNDS_VALUE; // Handle out of bounds by using a very small number
+
+		float16_t iteration_maximum = subgroupMax(fetch_value);
+
+		// If the maximum value is for this thread, not another, store it
+		if (gl_SubgroupInvocationID == i) {
+			shared_data[thread_id] = iteration_maximum;
+		}
+	}
+	// synchronise threads to ensure shared_data is full before proceding with the reduction
+	barrier();
+
+	// Recusively reduce the numbers in shared memory
+	for (uint s = WORKGROUP_SIZE / 2; s > 0; s>>=1) {
+		if (thread_id < s) {
+			shared_data[thread_id] = max(shared_data[thread_id], shared_data[thread_id + s]);
+		}
+		barrier();
+	}
+
+	// After reduction is complete the first thread can store the value this invocation has computed
+	if (thread_id == 0) {
+		write_buffer[gl_WorkGroupID.x] = shared_data[0];
+	}
+}
