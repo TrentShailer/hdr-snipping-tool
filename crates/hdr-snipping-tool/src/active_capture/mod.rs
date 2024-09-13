@@ -1,117 +1,89 @@
-mod capture_image;
 pub mod save;
 pub mod selection;
 
-use std::sync::Arc;
-
-use half::f16;
-use scrgb_tonemapper::maximum::{self, find_maximum};
+use crate::{active_app::ActiveApp, windows_helpers::foreground_window::get_foreground_window};
+use hdr_capture::{hdr_capture::Error as HdrCaptureError, HdrCapture, Rect};
 use selection::Selection;
 use thiserror::Error;
-use tracing::{info, info_span};
-use vulkan_instance::VulkanInstance;
-use vulkano::image::view::ImageView;
-use windows::Win32::Foundation::HWND;
-use windows_capture_provider::{
-    display_cache, get_capture::get_capture, hovered, DirectXDevices, Display, DisplayCache,
-};
-use winit::dpi::PhysicalPosition;
-
-use crate::windows_helpers::foreground_window::get_foreground_window;
+use tracing::instrument;
+use vulkan_instance::VulkanError;
+use windows::Win32::Foundation::{CloseHandle, HWND};
+use windows_capture_provider::{capture_item_cache, windows_capture, Display, WindowsCapture};
 
 pub struct ActiveCapture {
     pub display: Display,
-    pub capture_image: Arc<ImageView>,
+    pub capture: HdrCapture,
     pub selection: Selection,
     pub formerly_focused_window: HWND,
-    pub whitepoint: f32,
 }
 
 impl ActiveCapture {
-    pub fn new(
-        vk: &VulkanInstance,
-        dx: &DirectXDevices,
-        display_cache: &mut DisplayCache,
-        hdr_whitepoint: f32,
-    ) -> Result<Self, Error> {
-        let _span = info_span!("ActiveCapture::new").entered();
+    #[instrument("ActiveCapture::new", skip_all, err)]
+    pub fn new(app: &mut ActiveApp) -> Result<Self, Error> {
+        let ActiveApp {
+            vk,
+            maximum,
+            dx,
+            capture_item_cache,
+            settings,
+            ..
+        } = app;
+
+        vk.wake()?;
 
         let formerly_focused_window = get_foreground_window();
 
-        display_cache.refresh(dx)?;
+        capture_item_cache.refresh_displays(dx)?;
 
-        let display = match display_cache.hovered()? {
+        let display = match app.capture_item_cache.hovered()? {
             Some(display) => display,
             None => return Err(Error::NoDisplay),
         };
 
-        let capture_item = match display_cache
-            .capture_items
-            .get(&(display.handle.0 as isize))
-        {
-            Some(capture_item) => capture_item,
-            None => return Err(Error::NoCaptureItem(display)),
-        };
+        let windows_capture = WindowsCapture::take_capture(&app.dx, display)?;
 
-        let capture = get_capture(dx, &display, capture_item)?;
-        let capture_image = Self::image_from_capture(vk, &capture)?;
+        let hdr_capture = HdrCapture::import_windows_capture(
+            vk.clone(),
+            maximum,
+            &windows_capture,
+            settings.hdr_whitepoint,
+        )?;
 
-        let maximum = find_maximum(vk, capture_image.clone(), display.size)?;
-        let maximum = if f16::from_bits(maximum.to_bits() - 1).to_f32()
-            == capture.display.sdr_referece_white
-        {
-            capture.display.sdr_referece_white
-        } else {
-            maximum.to_f32()
-        };
+        let selection = Selection::new(Rect {
+            start: [0, 0],
+            end: hdr_capture.size,
+        });
 
-        info!("Maximum: {:.2}", maximum);
-
-        let whitepoint = if maximum > display.sdr_referece_white {
-            hdr_whitepoint
-        } else {
-            display.sdr_referece_white
-        };
-
-        info!("Whitepoint: {:.2}", whitepoint);
-
-        let selection = Selection::new(
-            PhysicalPosition::new(0, 0),
-            PhysicalPosition::new(capture.display.size[0], capture.display.size[1]),
-        );
-
-        let display = capture.display;
+        unsafe {
+            CloseHandle(windows_capture.handle)?;
+        }
 
         Ok(Self {
-            display,
             selection,
-            capture_image,
-            whitepoint,
+            capture: hdr_capture,
             formerly_focused_window,
+            display: windows_capture.display,
         })
     }
 }
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to refresh display cache:\n{0}")]
-    RefreshCache(#[from] display_cache::Error),
-
-    #[error("Failed to get hovered display:\n{0}")]
-    HoveredDisplay(#[from] hovered::Error),
+    #[error("Failed while accessing the capture item cache:\n{0}")]
+    HoveredDisplay(#[from] capture_item_cache::Error),
 
     #[error("No display is being hovered")]
     NoDisplay,
 
-    #[error("No capture item exists for hovered display: {0:?}")]
-    NoCaptureItem(Display),
+    #[error("Failed to take capture:\n{0}")]
+    TakeCapture(#[from] windows_capture::Error),
 
-    #[error("Failed to get capture:\n{0}")]
-    GetCapture(#[from] windows_capture_provider::get_capture::Error),
+    #[error("Failed to import capture to vulkan:\n{0}")]
+    ImportCapture(#[from] HdrCaptureError),
 
-    #[error("Failed to create capture image:\n{0}")]
-    CaptureImage(#[from] capture_image::Error),
+    #[error("Failed to close handle:\n{0}")]
+    CloseHandle(#[from] windows_result::Error),
 
-    #[error("Failed to find maximum capture luminance:\n{0}")]
-    Maximum(#[from] maximum::Error),
+    #[error("Failed during vulkan call:\n{0}")]
+    Vulkan(#[from] VulkanError),
 }

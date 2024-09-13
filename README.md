@@ -2,10 +2,6 @@
 
 A Windows Snipping Tool alternative that handles HDR content better.
 
-## How it works
-
-See [technical details](https://github.com/TrentShailer/hdr-snipping-tool/blob/gpu-version/technical-details.md).
-
 ## Installation
 
 Requires Rust v1.79 or later.
@@ -19,12 +15,6 @@ Run the application.
 The application storage directory is found in `%APPDATA%\Roaming\trentshailer\hdr-snipping-tool\data\` or by using the 'Open Storage Directory' option on the tray icon.
 
 To take a capture press the screenshot key (default PrintSrc). This key can be changed in the config, found in the `hdr-config.toml` in the storage directory. Valid values can be found in the [global-hotkey docs](https://docs.rs/global-hotkey/latest/global_hotkey/hotkey/enum.Code.html), restarting the app is required.
-
-One the capture window appears you are able to tweak the exposure (brightness) of the capture.
-
-You can use '1', '2', or '3' to switch between tonemapping for your displays SDR White, your displays peak brightness, or the captures peak brightness.
-
-You may also used up and down arrows or the scrollwheel to control the manually control the exposure of the output. Holding shift will change the exposure faster.
 
 Use enter to save the entire capture, or click and drag the mouse to save a portion of the capture.
 
@@ -44,7 +34,7 @@ After saving the file is in the storage directory and saved in your clipboard.
 
 ## Limitations
 
-- Imperfect tonemapping, colours, contrast, and brightness will look different even on SDR content.
+- Tonemapping will clip some highlights a little.
 - Screenshots can only be of one display at a time.
 - Windows only.
 - No freeform mode or window mode.

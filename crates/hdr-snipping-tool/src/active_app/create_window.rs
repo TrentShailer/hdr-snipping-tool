@@ -1,7 +1,5 @@
-use std::sync::Arc;
-
 use thiserror::Error;
-use tracing::info;
+use tracing::{info, instrument};
 use winit::{
     dpi::PhysicalSize,
     error::OsError,
@@ -11,7 +9,8 @@ use winit::{
     window::{BadIcon, Icon, Window},
 };
 
-pub fn create_window(event_loop: &ActiveEventLoop) -> Result<Arc<Window>, Error> {
+#[instrument(skip_all, err)]
+pub fn create_window(event_loop: &ActiveEventLoop) -> Result<Window, Error> {
     let window_icon = Icon::from_resource(1, Some(PhysicalSize::new(64, 64)))?;
 
     let window_attributes = Window::default_attributes()
@@ -21,7 +20,7 @@ pub fn create_window(event_loop: &ActiveEventLoop) -> Result<Arc<Window>, Error>
         .with_active(false)
         .with_visible(false);
 
-    let window = Arc::from(event_loop.create_window(window_attributes)?);
+    let window = event_loop.create_window(window_attributes)?;
 
     info!("Window handle: {:?}", window.window_handle());
 

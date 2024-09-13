@@ -1,3 +1,5 @@
+use hdr_capture::Rect;
+
 use crate::winit_app::WinitApp;
 
 use super::Error;
@@ -8,24 +10,21 @@ impl WinitApp {
             return Ok(());
         };
 
-        let Some(capture) = self.capture.as_mut() else {
-            return Ok(());
-        };
-
         if !app.window.is_visible().unwrap_or(true) {
             return Ok(());
         }
 
-        let selection = capture.selection.as_pos_size();
+        let selection_rect = if let Some(capture) = self.capture.as_ref() {
+            capture.selection.rect
+        } else {
+            Rect {
+                start: [0, 0],
+                end: [4096, 4096],
+            }
+        };
 
-        app.renderer.render(
-            &app.vk,
-            app.window.clone(),
-            selection.0.into(),
-            selection.1.into(),
-            self.mouse_position.into(),
-            false,
-        )?;
+        app.renderer
+            .render(&app.window, self.mouse_position.into(), selection_rect)?;
 
         Ok(())
     }

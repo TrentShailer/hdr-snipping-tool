@@ -33,6 +33,7 @@ pub const IS_DEV: bool = true;
 pub const IS_DEV: bool = false;
 
 pub const DEBUG_ENV_VAR: &str = "hdr-snipping-tool-debug";
+pub const VK_DEBUG_ENV_VAR: &str = "hdr-snipping-tool-debug-vk";
 
 pub fn is_debug() -> bool {
     std::env::var(DEBUG_ENV_VAR).is_ok()
@@ -42,9 +43,20 @@ pub fn enable_debug() {
     std::env::set_var(DEBUG_ENV_VAR, "true");
 }
 
+pub fn is_vk_debug() -> bool {
+    std::env::var(VK_DEBUG_ENV_VAR).is_ok()
+}
+
+pub fn enable_vk_debug() {
+    std::env::set_var(VK_DEBUG_ENV_VAR, "true");
+}
+
 fn main() {
     if std::env::args().any(|arg| arg.eq("--debug")) {
         enable_debug();
+    }
+    if std::env::args().any(|arg| arg.eq("--debug-vk")) {
+        enable_vk_debug();
     }
 
     if let Err(e) = fs::create_dir_all(project_directory()) {
@@ -78,8 +90,16 @@ fn main() {
 }
 
 fn init() -> Result<(), AppError> {
-    let _span = if IS_DEV {
-        Some(info_span!("dev_build").entered())
+    let _dev_span = if IS_DEV {
+        Some(info_span!("dev").entered())
+    } else {
+        None
+    };
+
+    let version_span = info_span!(VERSION).entered();
+
+    let _validation_span = if is_vk_debug() {
+        Some(info_span!("validation").entered())
     } else {
         None
     };
@@ -146,6 +166,9 @@ fn init() -> Result<(), AppError> {
 
     // run the app
     event_loop.run_app(&mut app)?;
+
+    version_span.exit();
+
     Ok(())
 }
 
@@ -157,7 +180,6 @@ pub fn project_directory() -> PathBuf {
             std::process::exit(-1);
         }
     };
-
     dir.data_dir().to_path_buf()
 }
 

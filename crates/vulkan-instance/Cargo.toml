@@ -7,5 +7,7 @@ edition = "2021"
 tracing = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
-vulkano = { workspace = true }
+
+ash = { workspace = true }
+ash-window = { workspace = true }
 winit = { workspace = true }

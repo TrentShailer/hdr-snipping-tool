@@ -1,20 +1,54 @@
-pub mod allocators;
-pub mod copy_buffer;
-pub mod vulkan_instance;
+pub mod buffer;
+pub mod command_buffer;
+pub mod create;
+pub mod default;
+pub mod memory;
+pub mod shader;
+pub mod wake;
 
-use std::sync::Arc;
+use std::io;
 
-use allocators::Allocators;
-use vulkano::{
-    device::{physical::PhysicalDevice, Device, Queue},
-    swapchain::Surface,
+use ash::{
+    ext::debug_utils,
+    khr::surface,
+    vk::{self},
+    Device, Entry, Instance,
 };
 
-/// Bundled variables required to work with vulkan.
+pub use create::Error as CreateError;
+use thiserror::Error;
+
+/// Bundled objects required to work with vulkan.
 pub struct VulkanInstance {
-    pub physical_device: Arc<PhysicalDevice>,
-    pub device: Arc<Device>,
-    pub queue: Arc<Queue>,
-    pub surface: Arc<Surface>,
-    pub allocators: Arc<Allocators>,
+    #[allow(unused)]
+    entry: Entry,
+    pub instance: Instance,
+
+    pub physical_device: vk::PhysicalDevice,
+    pub device: Device,
+
+    pub queue: vk::Queue,
+    pub queue_family_index: u32,
+
+    pub surface_loader: surface::Instance,
+    pub surface: vk::SurfaceKHR,
+
+    pub command_buffer_pool: vk::CommandPool,
+    pub command_buffer: (vk::CommandBuffer, vk::Fence),
+    wake_command_buffer: (vk::CommandBuffer, vk::Fence),
+
+    debug_utils: Option<(debug_utils::Instance, vk::DebugUtilsMessengerEXT)>,
+}
+
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum VulkanError {
+    #[error("Encountered IO Error:\n{0}")]
+    IO(#[from] io::Error),
+
+    #[error("Encountered vulkan error while {1}:\n{0}")]
+    VkResult(#[source] vk::Result, &'static str),
+
+    #[error("No suitable memory type found")]
+    NoSuitableMemoryType,
 }

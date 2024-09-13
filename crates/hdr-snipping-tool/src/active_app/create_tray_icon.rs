@@ -1,4 +1,5 @@
 use thiserror::Error;
+use tracing::instrument;
 use tray_icon::{
     menu::{Menu, MenuItem},
     BadIcon, Icon, TrayIcon, TrayIconBuilder,
@@ -6,6 +7,7 @@ use tray_icon::{
 
 use crate::{is_debug, IS_DEV, VERSION};
 
+#[instrument(skip_all, err)]
 pub fn create_tray_icon() -> Result<TrayIcon, Error> {
     let icon = Icon::from_resource(1, Some((24, 24)))?;
 

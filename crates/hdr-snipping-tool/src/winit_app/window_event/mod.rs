@@ -29,7 +29,7 @@ impl WinitApp {
 
         match event {
             WindowEvent::Resized(_) => {
-                app.renderer.recreate_swapchain = true;
+                app.renderer.queue_recreate_swapchain();
                 app.window.request_redraw();
             }
 
@@ -76,7 +76,7 @@ impl WinitApp {
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Failed to render:\n{0}")]
-    Render(#[from] vulkan_renderer::renderer::render::Error),
+    Render(#[from] vulkan_renderer::Error),
 
     #[error("Failed to save capture:\n{0}")]
     SaveCapture(#[from] active_capture::save::Error),

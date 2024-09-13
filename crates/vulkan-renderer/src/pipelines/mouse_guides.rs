@@ -1,77 +1,218 @@
-use std::sync::Arc;
-
-use vulkan_instance::VulkanInstance;
-use vulkano::{
-    buffer::BufferContents,
-    pipeline::{
-        graphics::{
-            color_blend::AttachmentBlend,
-            subpass::PipelineRenderingCreateInfo,
-            vertex_input::{Vertex as VkVertex, VertexDefinition},
-        },
-        GraphicsPipeline, PipelineShaderStageCreateInfo,
-    },
+use std::{
+    mem::{offset_of, size_of},
+    sync::Arc,
 };
 
-use super::Error;
+use ash::vk::{
+    BlendFactor, BlendOp, ColorComponentFlags, Format, Pipeline, PipelineColorBlendAttachmentState,
+    PipelineLayout, PipelineLayoutCreateInfo, PipelineRenderingCreateInfo,
+    PipelineShaderStageCreateInfo, PipelineVertexInputStateCreateInfo, PushConstantRange,
+    ShaderModule, ShaderStageFlags, VertexInputAttributeDescription, VertexInputBindingDescription,
+    VertexInputRate, Viewport,
+};
+use bytemuck::{Pod, Zeroable};
+use tracing::instrument;
+use vulkan_instance::{VulkanError, VulkanInstance};
 
-pub mod vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        bytes: "src/shaders/mouse_guides.vert.spv"
-    }
-}
+use super::MAIN_CSTR;
 
-pub mod fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        bytes: "src/shaders/mouse_guides.frag.spv"
-    }
-}
-
-#[derive(BufferContents, VkVertex, Clone, Copy)]
-#[repr(C)]
+#[derive(Clone, Copy, Debug)]
 pub struct Vertex {
-    #[format(R32G32_SFLOAT)]
     pub position: [f32; 2],
-
-    #[format(R8G8B8A8_UNORM)]
     pub color: [u8; 4],
-
-    #[format(R32_UINT)]
     pub flags: u32,
 }
 
-pub fn create_pipeline(
-    vk: &VulkanInstance,
-    subpass: PipelineRenderingCreateInfo,
-) -> Result<Arc<GraphicsPipeline>, Error> {
-    let vs = vertex_shader::load(vk.device.clone())
-        .map_err(Error::LoadShader)?
-        .entry_point("main")
-        .unwrap();
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+#[repr(C)]
+pub struct PushConstants {
+    pub mouse_position: [f32; 2],
+    pub line_size: [f32; 2],
+}
 
-    let fs = fragment_shader::load(vk.device.clone())
-        .map_err(Error::LoadShader)?
-        .entry_point("main")
-        .unwrap();
+pub struct MouseGuidesPipeline {
+    vk: Arc<VulkanInstance>,
+    pub pipeline: Pipeline,
+    pub layout: PipelineLayout,
+    vertex_shader: ShaderModule,
+    fragment_shader: ShaderModule,
+}
 
-    let vertex_input_state = Vertex::per_vertex()
-        .definition(&vs.info().input_interface)
-        .map_err(Error::VertexDefinition)?;
+impl MouseGuidesPipeline {
+    #[instrument("MouseGuidesPipeline::new", skip_all, err)]
+    pub fn new(
+        vk: Arc<VulkanInstance>,
+        pipeline_rendering_create_info: PipelineRenderingCreateInfo,
+        viewport: Viewport,
+    ) -> Result<Self, VulkanError> {
+        let (vertex_input_binding_descriptions, vertex_attribute_descriptions) =
+            Self::vertex_descriptions();
+        let vertex_input_info = PipelineVertexInputStateCreateInfo::default()
+            .vertex_attribute_descriptions(&vertex_attribute_descriptions[..])
+            .vertex_binding_descriptions(&vertex_input_binding_descriptions[..]);
 
-    let stages = vec![
-        PipelineShaderStageCreateInfo::new(vs),
-        PipelineShaderStageCreateInfo::new(fs),
-    ];
+        let vertex_shader =
+            vk.create_shader_module(include_bytes!("../shaders/mouse_guides.vert.spv"))?;
+        let fragment_shader =
+            vk.create_shader_module(include_bytes!("../shaders/mouse_guides.frag.spv"))?;
 
-    let pipeline = super::create_pipeline(
-        vk,
-        subpass,
-        vertex_input_state,
-        stages,
-        Some(AttachmentBlend::alpha()),
-    )?;
+        let shader_stage_infos = [
+            PipelineShaderStageCreateInfo::default()
+                .stage(ShaderStageFlags::VERTEX)
+                .module(vertex_shader)
+                .name(MAIN_CSTR),
+            PipelineShaderStageCreateInfo::default()
+                .stage(ShaderStageFlags::FRAGMENT)
+                .module(fragment_shader)
+                .name(MAIN_CSTR),
+        ];
 
-    Ok(pipeline)
+        let blend = Self::blend();
+
+        let push_constant_ranges = [PushConstantRange {
+            stage_flags: ShaderStageFlags::VERTEX,
+            offset: 0,
+            size: size_of::<PushConstants>() as u32,
+        }];
+
+        let pipeline_layout_create_info =
+            PipelineLayoutCreateInfo::default().push_constant_ranges(&push_constant_ranges);
+
+        let layout = unsafe {
+            vk.device
+                .create_pipeline_layout(&pipeline_layout_create_info, None)
+        }
+        .map_err(|e| VulkanError::VkResult(e, "creating pipeline layout"))?;
+
+        let pipeline = super::create_pipeline(
+            &vk,
+            pipeline_rendering_create_info,
+            layout,
+            vertex_input_info,
+            &shader_stage_infos,
+            blend,
+            viewport,
+        )?;
+
+        Ok(Self {
+            vk,
+            pipeline,
+            layout,
+            vertex_shader,
+            fragment_shader,
+        })
+    }
+
+    #[instrument("MouseGuidesPipeline::recreate", skip_all, err)]
+    pub fn recreate(
+        &mut self,
+        pipeline_rendering_create_info: PipelineRenderingCreateInfo,
+        viewport: Viewport,
+    ) -> Result<(), VulkanError> {
+        unsafe {
+            self.vk.device.destroy_pipeline(self.pipeline, None);
+        }
+
+        let (vertex_input_binding_descriptions, vertex_attribute_descriptions) =
+            Self::vertex_descriptions();
+        let vertex_input_info = PipelineVertexInputStateCreateInfo::default()
+            .vertex_attribute_descriptions(&vertex_attribute_descriptions[..])
+            .vertex_binding_descriptions(&vertex_input_binding_descriptions[..]);
+
+        let shader_stage_infos = [
+            PipelineShaderStageCreateInfo::default()
+                .stage(ShaderStageFlags::VERTEX)
+                .module(self.vertex_shader)
+                .name(MAIN_CSTR),
+            PipelineShaderStageCreateInfo::default()
+                .stage(ShaderStageFlags::FRAGMENT)
+                .module(self.fragment_shader)
+                .name(MAIN_CSTR),
+        ];
+
+        let blend = Self::blend();
+
+        let pipeline = super::create_pipeline(
+            &self.vk,
+            pipeline_rendering_create_info,
+            self.layout,
+            vertex_input_info,
+            &shader_stage_infos,
+            blend,
+            viewport,
+        )?;
+
+        self.pipeline = pipeline;
+
+        Ok(())
+    }
+
+    fn vertex_descriptions() -> (
+        [VertexInputBindingDescription; 1],
+        [VertexInputAttributeDescription; 3],
+    ) {
+        let vertex_input_binding_descriptions = [VertexInputBindingDescription {
+            binding: 0,
+            stride: std::mem::size_of::<Vertex>() as u32,
+            input_rate: VertexInputRate::VERTEX,
+        }];
+
+        let vertex_attribute_descriptions = [
+            VertexInputAttributeDescription {
+                location: 0,
+                binding: 0,
+                format: Format::R32G32_SFLOAT,
+                offset: offset_of!(Vertex, position) as u32,
+            },
+            VertexInputAttributeDescription {
+                location: 1,
+                binding: 0,
+                format: Format::R8G8B8A8_UNORM,
+                offset: offset_of!(Vertex, color) as u32,
+            },
+            VertexInputAttributeDescription {
+                location: 2,
+                binding: 0,
+                format: Format::R32_UINT,
+                offset: offset_of!(Vertex, flags) as u32,
+            },
+        ];
+
+        (
+            vertex_input_binding_descriptions,
+            vertex_attribute_descriptions,
+        )
+    }
+
+    fn blend() -> PipelineColorBlendAttachmentState {
+        PipelineColorBlendAttachmentState {
+            blend_enable: 1,
+            src_color_blend_factor: BlendFactor::SRC_ALPHA,
+            dst_color_blend_factor: BlendFactor::ONE_MINUS_SRC_ALPHA,
+            color_blend_op: BlendOp::ADD,
+            src_alpha_blend_factor: BlendFactor::SRC_ALPHA,
+            dst_alpha_blend_factor: BlendFactor::ONE_MINUS_SRC_ALPHA,
+            alpha_blend_op: BlendOp::ADD,
+            color_write_mask: ColorComponentFlags::RGBA,
+        }
+    }
+}
+
+impl Drop for MouseGuidesPipeline {
+    fn drop(&mut self) {
+        unsafe {
+            if self.vk.device.device_wait_idle().is_err() {
+                return;
+            }
+
+            self.vk.device.destroy_pipeline(self.pipeline, None);
+            self.vk.device.destroy_pipeline_layout(self.layout, None);
+            self.vk
+                .device
+                .destroy_shader_module(self.vertex_shader, None);
+            self.vk
+                .device
+                .destroy_shader_module(self.fragment_shader, None);
+        }
+    }
 }

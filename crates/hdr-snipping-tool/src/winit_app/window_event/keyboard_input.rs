@@ -45,7 +45,7 @@ impl WinitApp {
             KeyCode::Enter => {
                 info!("Enter pressed");
                 if let Some(capture) = self.capture.as_mut() {
-                    capture.save(&app.vk)?;
+                    capture.save(app)?;
                     self.clear_capture()?;
                 }
             }

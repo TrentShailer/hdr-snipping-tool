@@ -30,7 +30,7 @@ impl WinitApp {
             winit::event::ElementState::Released => {
                 let should_save = capture.selection.end_selection();
                 if should_save {
-                    capture.save(&app.vk)?;
+                    capture.save(app)?;
                     self.clear_capture()?;
                 }
             }

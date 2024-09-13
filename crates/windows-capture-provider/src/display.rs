@@ -11,6 +11,7 @@ use windows_result::Result as WindowsResult;
 
 /// A windows display and related data
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct Display {
     /// The display handle.
     pub handle: HMONITOR,
@@ -24,14 +25,11 @@ pub struct Display {
 
     /// The display's SDR reference white.
     pub sdr_referece_white: f32,
-
-    /// The display's maximum HDR luminance.
-    pub hdr_luminance: f32,
 }
 
 impl Display {
     /// Create a new display.
-    pub fn new(handle: HMONITOR, rect: RECT, sdr_referece_white: f32, hdr_luminance: f32) -> Self {
+    pub(crate) fn new(handle: HMONITOR, rect: RECT, sdr_referece_white: f32) -> Self {
         let (position, size) = Self::position_size_from_rect(rect);
 
         Self {
@@ -39,12 +37,11 @@ impl Display {
             position,
             size,
             sdr_referece_white,
-            hdr_luminance,
         }
     }
 
     /// Returns whether a point is contained within the bounds of the display.
-    pub fn contains(&self, point: [i32; 2]) -> bool {
+    pub(crate) fn contains(&self, point: [i32; 2]) -> bool {
         let left = self.position[0];
         let right = self.position[0] + self.size[0] as i32;
         let top = self.position[1];
@@ -54,7 +51,7 @@ impl Display {
     }
 
     /// Creates a graphics capture item for this display.
-    pub fn create_capture_item(&self) -> WindowsResult<GraphicsCaptureItem> {
+    pub(crate) fn create_capture_item(&self) -> WindowsResult<GraphicsCaptureItem> {
         let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()?;
         let capture_item: GraphicsCaptureItem = unsafe { interop.CreateForMonitor(self.handle)? };
 
@@ -85,8 +82,8 @@ impl std::fmt::Display for Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Display {{handle: {:?}, position: {:?}, size: {:?}, sdr_reference_white: {:?}, hdr_luminance: {:?}}}",
-            self.handle, self.position, self.size, self.sdr_referece_white, self.hdr_luminance
+            "Display {{handle: {:?}, position: {:?}, size: {:?}, sdr_reference_white: {:?}}}",
+            self.handle, self.position, self.size, self.sdr_referece_white
         )
     }
 }

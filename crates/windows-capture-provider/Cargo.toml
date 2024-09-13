@@ -21,6 +21,8 @@ windows = { workspace = true, features = [
 	"Win32_System_Threading",
 	"Win32_System_WinRT_Direct3D11",
 	"Win32_System_WinRT_Graphics_Capture",
+	"Win32_UI",
+	"Win32_UI_WindowsAndMessaging",
 ] }
 windows-core = { workspace = true }
 windows-result = { workspace = true }

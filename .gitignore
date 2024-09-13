@@ -4,3 +4,4 @@ log.txt
 /*.png
 *.afdesign~lock~
 media/details.afdesign
+*.test.png

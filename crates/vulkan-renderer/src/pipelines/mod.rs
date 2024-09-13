@@ -2,83 +2,82 @@ pub mod border;
 pub mod capture;
 pub mod mouse_guides;
 pub mod selection_shading;
+pub mod vertex_index_buffer;
 
-use std::sync::Arc;
-
-use thiserror::Error;
-use vulkan_instance::VulkanInstance;
-use vulkano::{
-    pipeline::{
-        graphics::{
-            color_blend::{AttachmentBlend, ColorBlendAttachmentState, ColorBlendState},
-            input_assembly::InputAssemblyState,
-            multisample::MultisampleState,
-            rasterization::RasterizationState,
-            subpass::PipelineRenderingCreateInfo,
-            vertex_input::VertexInputState,
-            viewport::ViewportState,
-            GraphicsPipelineCreateInfo,
-        },
-        layout::{IntoPipelineLayoutCreateInfoError, PipelineDescriptorSetLayoutCreateInfo},
-        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
-    },
-    Validated, ValidationError, VulkanError,
+use ash::vk::{
+    DynamicState, FrontFace, GraphicsPipelineCreateInfo, LogicOp, Pipeline, PipelineCache,
+    PipelineColorBlendAttachmentState, PipelineColorBlendStateCreateInfo,
+    PipelineDynamicStateCreateInfo, PipelineInputAssemblyStateCreateInfo, PipelineLayout,
+    PipelineMultisampleStateCreateInfo, PipelineRasterizationStateCreateInfo,
+    PipelineRenderingCreateInfo, PipelineShaderStageCreateInfo, PipelineVertexInputStateCreateInfo,
+    PipelineViewportStateCreateInfo, PolygonMode, PrimitiveTopology, RenderPass, SampleCountFlags,
+    Viewport,
 };
+use tracing::instrument;
+use vulkan_instance::{VulkanError, VulkanInstance};
+
+pub const MAIN_CSTR: &std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"main\0") };
 
 /// Helper function to create a basic graphics pipeline with given inputs.
+#[instrument(skip_all, err)]
 pub fn create_pipeline(
     vk: &VulkanInstance,
-    subpass: PipelineRenderingCreateInfo,
-    vertex_input_state: VertexInputState,
-    stages: Vec<PipelineShaderStageCreateInfo>,
-    blend: Option<AttachmentBlend>,
-) -> Result<Arc<GraphicsPipeline>, Error> {
-    let pipeline_ds_layout_create_info =
-        PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
-            .into_pipeline_layout_create_info(vk.device.clone())?;
+    pipeline_rendering_create_info: PipelineRenderingCreateInfo,
+    pipeline_layout: PipelineLayout,
+    vertex_input_state: PipelineVertexInputStateCreateInfo,
+    stages: &[PipelineShaderStageCreateInfo],
+    blend: PipelineColorBlendAttachmentState,
+    viewport: Viewport,
+) -> Result<Pipeline, VulkanError> {
+    let mut pipeline_rendering_create_info = pipeline_rendering_create_info;
 
-    let layout = PipelineLayout::new(vk.device.clone(), pipeline_ds_layout_create_info)
-        .map_err(Error::CreatePipelineLayout)?;
+    let input_assembly_state =
+        PipelineInputAssemblyStateCreateInfo::default().topology(PrimitiveTopology::TRIANGLE_LIST);
 
-    let graphics_pipeline_create_info = GraphicsPipelineCreateInfo {
-        stages: stages.into_iter().collect(),
-        vertex_input_state: Some(vertex_input_state),
-        input_assembly_state: Some(InputAssemblyState::default()), // Triangle list
-        viewport_state: Some(ViewportState::default()),
-        rasterization_state: Some(RasterizationState::default()),
-        multisample_state: Some(MultisampleState::default()),
-        color_blend_state: Some(ColorBlendState::with_attachment_states(
-            subpass.color_attachment_formats.len() as u32,
-            ColorBlendAttachmentState {
-                blend,
-                ..Default::default()
-            },
-        )),
-        dynamic_state: [DynamicState::Viewport].into_iter().collect(),
-        subpass: Some(subpass.into()),
-        ..GraphicsPipelineCreateInfo::layout(layout)
+    let viewports = [viewport];
+    let viewport_state = PipelineViewportStateCreateInfo::default().viewports(&viewports);
+
+    let rasterization_state = PipelineRasterizationStateCreateInfo::default()
+        .front_face(FrontFace::CLOCKWISE)
+        .line_width(1.0)
+        .polygon_mode(PolygonMode::FILL);
+
+    let multisample_state = PipelineMultisampleStateCreateInfo::default()
+        .rasterization_samples(SampleCountFlags::TYPE_1);
+
+    let color_blend_attachment_states = [blend];
+    let color_blend_state = PipelineColorBlendStateCreateInfo::default()
+        .logic_op(LogicOp::CLEAR)
+        .attachments(&color_blend_attachment_states);
+
+    let dynamic_states = [DynamicState::VIEWPORT, DynamicState::SCISSOR_WITH_COUNT];
+    let dynamic_state = PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_states);
+
+    let graphics_pipeline_create_info = GraphicsPipelineCreateInfo::default()
+        .stages(stages)
+        .vertex_input_state(&vertex_input_state)
+        .input_assembly_state(&input_assembly_state)
+        .viewport_state(&viewport_state)
+        .rasterization_state(&rasterization_state)
+        .multisample_state(&multisample_state)
+        .color_blend_state(&color_blend_state)
+        .dynamic_state(&dynamic_state)
+        .layout(pipeline_layout)
+        .render_pass(RenderPass::null())
+        .push_next(&mut pipeline_rendering_create_info);
+
+    let pipelines = unsafe {
+        vk.device
+            .create_graphics_pipelines(
+                PipelineCache::null(),
+                &[graphics_pipeline_create_info],
+                None,
+            )
+            .map_err(|(_, e)| VulkanError::VkResult(e, "creating graphics pipline"))?
     };
 
-    let pipeline = GraphicsPipeline::new(vk.device.clone(), None, graphics_pipeline_create_info)
-        .map_err(Error::CreateGraphicsPipeline)?;
+    let pipeline = pipelines[0];
 
     Ok(pipeline)
-}
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("Failed to load shader:\n{0:?}")]
-    LoadShader(#[source] Validated<VulkanError>),
-
-    #[error("Failed to get vertex definition:\n{0}")]
-    VertexDefinition(#[source] Box<ValidationError>),
-
-    #[error("Failed to create pipline layout:\n{0:?}")]
-    CreatePipelineLayout(#[source] Validated<VulkanError>),
-
-    #[error("Failed to create graphics pipeline:\n{0:?}")]
-    CreateGraphicsPipeline(#[source] Validated<VulkanError>),
-
-    #[error("Failed to create pipeline layout info:\n{0:?}")]
-    CreatePipelineLayoutInfo(#[from] IntoPipelineLayoutCreateInfoError),
 }

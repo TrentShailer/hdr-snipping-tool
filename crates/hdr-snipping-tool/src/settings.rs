@@ -12,7 +12,7 @@ use crate::project_directory;
 
 const SETTINGS_FILE: &str = "hdr-config.toml";
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Settings {
     pub screenshot_key: Code,
     pub hdr_whitepoint: f32,
