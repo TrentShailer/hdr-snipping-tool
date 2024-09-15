@@ -42,7 +42,7 @@ pub struct CapturePipeline {
 }
 
 impl CapturePipeline {
-    #[instrument("CapturePipeline::new", skip_all, err)]
+    #[instrument("CapturePipeline::new", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn new(
         vk: Arc<VulkanInstance>,
         pipeline_rendering_create_info: PipelineRenderingCreateInfo,
@@ -146,7 +146,7 @@ impl CapturePipeline {
         })
     }
 
-    #[instrument("CapturePipeline::recreate", skip_all, err)]
+    #[instrument("CapturePipeline::recreate", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn recreate(
         &mut self,
         pipeline_rendering_create_info: PipelineRenderingCreateInfo,

@@ -20,7 +20,7 @@ pub const MAIN_CSTR: &std::ffi::CStr =
     unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"main\0") };
 
 /// Helper function to create a basic graphics pipeline with given inputs.
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn create_pipeline(
     vk: &VulkanInstance,
     pipeline_rendering_create_info: PipelineRenderingCreateInfo,

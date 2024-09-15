@@ -41,7 +41,7 @@ pub struct SelectionShadingPipeline {
 }
 
 impl SelectionShadingPipeline {
-    #[instrument("SelectionShadingPipeline::new", skip_all, err)]
+    #[instrument("SelectionShadingPipeline::new", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn new(
         vk: Arc<VulkanInstance>,
         pipeline_rendering_create_info: PipelineRenderingCreateInfo,
@@ -105,7 +105,7 @@ impl SelectionShadingPipeline {
         })
     }
 
-    #[instrument("SelectionShadingPipeline::recreate", skip_all, err)]
+    #[instrument("SelectionShadingPipeline::recreate", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn recreate(
         &mut self,
         pipeline_rendering_create_info: PipelineRenderingCreateInfo,

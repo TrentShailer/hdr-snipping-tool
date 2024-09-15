@@ -21,8 +21,8 @@ use create_tray_icon::create_tray_icon;
 use create_window::create_window;
 
 use crate::{
-    is_vk_debug,
     settings::Settings,
+    validation_enabled,
     windows_helpers::foreground_window::{get_foreground_window, set_foreground_window},
 };
 
@@ -52,7 +52,7 @@ impl ActiveApp {
         let tray_icon = create_tray_icon()?;
         tray_icon.set_visible(true)?;
 
-        let vk = Arc::new(VulkanInstance::new(&window, is_vk_debug())?);
+        let vk = Arc::new(VulkanInstance::new(&window, validation_enabled())?);
         let renderer = Renderer::new(vk.clone(), window.inner_size().into())?;
         let maximum = Maximum::new(vk.clone())?;
         let tonemap = Tonemap::new(vk.clone())?;

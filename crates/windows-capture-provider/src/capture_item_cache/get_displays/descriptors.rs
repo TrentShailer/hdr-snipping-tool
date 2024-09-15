@@ -6,7 +6,7 @@ use windows_result::Result as WindowsResult;
 use crate::DirectXDevices;
 
 /// Gets the DXGI output descriptors for the current DXGI outputs.
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn get_output_descriptors(devices: &DirectXDevices) -> WindowsResult<Box<[DXGI_OUTPUT_DESC1]>> {
     let mut output_descs = vec![];
     let mut i = 0;

@@ -17,7 +17,7 @@ use windows::{
 use windows_core::{Interface, HRESULT};
 use windows_result::{Error as WindowsError, Result as WindowsResult};
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn dxgi_adapter(dxgi_device: &IDXGIDevice) -> WindowsResult<IDXGIAdapter1> {
     let dxgi_adapter = unsafe { dxgi_device.GetAdapter()? };
     let dxgi_adapter_1 = dxgi_adapter.cast()?;
@@ -25,20 +25,20 @@ pub fn dxgi_adapter(dxgi_device: &IDXGIDevice) -> WindowsResult<IDXGIAdapter1> {
     Ok(dxgi_adapter_1)
 }
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn d3d_device(dxgi_device: &IDXGIDevice) -> WindowsResult<IDirect3DDevice> {
     let inspectable = unsafe { CreateDirect3D11DeviceFromDXGIDevice(dxgi_device)? };
     let d3d_device = inspectable.cast()?;
     Ok(d3d_device)
 }
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn d3d11_context(d3d11_device: &ID3D11Device) -> WindowsResult<ID3D11DeviceContext> {
     let context = unsafe { d3d11_device.GetImmediateContext()? };
     Ok(context)
 }
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn d3d11_device() -> WindowsResult<ID3D11Device> {
     let mut device = None;
     let mut result = d3d11_device_with_type(
@@ -64,7 +64,7 @@ pub fn d3d11_device() -> WindowsResult<ID3D11Device> {
     Ok(device)
 }
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn d3d11_device_with_type(
     driver_type: D3D_DRIVER_TYPE,
     flags: D3D11_CREATE_DEVICE_FLAG,

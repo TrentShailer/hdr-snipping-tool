@@ -16,7 +16,7 @@ pub struct DisplayConfig {
 }
 
 /// Gets display config using the display config path infos.
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn get_display_configs() -> Result<Box<[DisplayConfig]>, Error> {
     let display_config_path_infos = get_display_config_path_infos().map_err(Error::DisplayInfos)?;
 

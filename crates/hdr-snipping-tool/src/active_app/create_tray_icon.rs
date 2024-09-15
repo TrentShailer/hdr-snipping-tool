@@ -5,7 +5,7 @@ use tray_icon::{
     BadIcon, Icon, TrayIcon, TrayIconBuilder,
 };
 
-use crate::{is_debug, IS_DEV, VERSION};
+use crate::VERSION;
 
 #[instrument(skip_all, err)]
 pub fn create_tray_icon() -> Result<TrayIcon, Error> {
@@ -16,13 +16,7 @@ pub fn create_tray_icon() -> Result<TrayIcon, Error> {
 
     let tray_menu = Menu::with_items(&[&directory_item, &quit_item])?;
 
-    let dev_tooltip = if IS_DEV { "-dev" } else { "" };
-    let debug_tooltip = if is_debug() { "-debug" } else { "" };
-
-    let tooltip = format!(
-        "HDR Snipping Tool v{}{}{}",
-        VERSION, dev_tooltip, debug_tooltip
-    );
+    let tooltip = format!("HDR Snipping Tool v{}", VERSION,);
 
     let tray_icon = TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))

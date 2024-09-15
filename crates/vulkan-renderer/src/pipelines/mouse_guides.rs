@@ -39,7 +39,7 @@ pub struct MouseGuidesPipeline {
 }
 
 impl MouseGuidesPipeline {
-    #[instrument("MouseGuidesPipeline::new", skip_all, err)]
+    #[instrument("MouseGuidesPipeline::new", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn new(
         vk: Arc<VulkanInstance>,
         pipeline_rendering_create_info: PipelineRenderingCreateInfo,
@@ -103,7 +103,7 @@ impl MouseGuidesPipeline {
         })
     }
 
-    #[instrument("MouseGuidesPipeline::recreate", skip_all, err)]
+    #[instrument("MouseGuidesPipeline::recreate", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn recreate(
         &mut self,
         pipeline_rendering_create_info: PipelineRenderingCreateInfo,
