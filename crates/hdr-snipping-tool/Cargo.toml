@@ -35,7 +35,7 @@ chrono = { version = "0.4", features = [
 	"std",
 ], default-features = false }
 directories = "5.0"
-global-hotkey = "0.5"
+global-hotkey = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 tray-icon = "0.14"
