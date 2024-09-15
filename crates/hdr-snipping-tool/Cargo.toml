@@ -30,8 +30,6 @@ half = { workspace = true }
 ash = { workspace = true }
 image = { workspace = true }
 
-# TODO remove tracy
-tracing-tracy = { version = "0.11", optional = true, features = ["enable"] }
 tracing-subscriber = "0.3"
 tracing-appender = "0.2"
 arboard = "3.4"
