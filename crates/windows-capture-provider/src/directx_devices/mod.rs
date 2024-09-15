@@ -3,15 +3,14 @@ mod create_devices;
 use create_devices::{d3d11_context, d3d11_device, d3d_device, dxgi_adapter};
 use thiserror::Error;
 use tracing::instrument;
-use windows::{
-    Graphics::DirectX::Direct3D11::IDirect3DDevice,
-    Win32::Graphics::{
-        Direct3D11::{ID3D11Device, ID3D11DeviceContext},
-        Dxgi::{IDXGIAdapter1, IDXGIDevice},
-    },
+use windows::Win32::Graphics::{
+    Direct3D11::{ID3D11Device, ID3D11DeviceContext},
+    Dxgi::{IDXGIAdapter1, IDXGIDevice},
 };
 use windows_core::Interface;
 use windows_result::Error as WindowsError;
+
+use crate::send_types::SendIDirect3DDevice;
 
 /// Structure containing the various directX devices used in capture aquisition.
 pub struct DirectXDevices {
@@ -19,9 +18,9 @@ pub struct DirectXDevices {
     pub dxgi_adapter: IDXGIAdapter1,
 
     /// Used to create framepool.
-    pub d3d_device: IDirect3DDevice,
+    pub d3d_device: SendIDirect3DDevice,
 
-    /// Used to retrieve capture from the GPU.
+    /// Used to create other dx contexts.
     pub d3d11_device: ID3D11Device,
 
     /// Used to retrieve capture from the GPU.
@@ -42,7 +41,7 @@ impl DirectXDevices {
 
         Ok(Self {
             dxgi_adapter,
-            d3d_device,
+            d3d_device: SendIDirect3DDevice(d3d_device),
             d3d11_device,
             d3d11_context,
         })
