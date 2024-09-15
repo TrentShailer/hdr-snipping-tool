@@ -36,7 +36,7 @@ pub struct ActiveApp {
     pub maximum: Maximum,
     pub tonemap: Tonemap,
 
-    pub dx: DirectXDevices,
+    pub dx: Arc<DirectXDevices>,
     pub capture_item_cache: CaptureItemCache,
 
     pub settings: Settings,
@@ -57,7 +57,7 @@ impl ActiveApp {
         let maximum = Maximum::new(vk.clone())?;
         let tonemap = Tonemap::new(vk.clone())?;
 
-        let dx = DirectXDevices::new()?;
+        let dx = Arc::new(DirectXDevices::new()?);
         let capture_item_cache = CaptureItemCache::new(&dx)?;
 
         Ok(ActiveApp {
