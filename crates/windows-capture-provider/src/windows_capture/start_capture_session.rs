@@ -1,14 +1,11 @@
 use std::sync::mpsc::{channel, Receiver};
 
 use thiserror::Error;
-use tracing::instrument;
+use tracing::{info_span, instrument};
 use windows::{
     Foundation::TypedEventHandler,
     Graphics::{
-        Capture::{
-            Direct3D11CaptureFrame, Direct3D11CaptureFramePool, GraphicsCaptureItem,
-            GraphicsCaptureSession,
-        },
+        Capture::{Direct3D11CaptureFramePool, GraphicsCaptureItem, GraphicsCaptureSession},
         DirectX::DirectXPixelFormat,
     },
     Win32::UI::WindowsAndMessaging::WM_APP,
@@ -16,7 +13,9 @@ use windows::{
 use windows_core::{IInspectable, HRESULT};
 use windows_result::Error as WindowsError;
 
-use crate::DirectXDevices;
+use crate::{DirectXDevices, SendHANDLE};
+
+use super::retrieve_handle::retrieve_handle;
 
 /// Start a capture session for a given capture item.\
 /// Returns the frame pool, the capture session, and a receiver for the capture frame.
@@ -28,14 +27,14 @@ pub fn start_capture_session(
     (
         Direct3D11CaptureFramePool,
         GraphicsCaptureSession,
-        Receiver<Direct3D11CaptureFrame>,
+        Receiver<SendHANDLE>,
     ),
     Error,
 > {
     let capture_size = capture_item.Size().map_err(Error::CaptureSize)?;
 
     let framepool = Direct3D11CaptureFramePool::CreateFreeThreaded(
-        &devices.d3d_device,
+        &devices.d3d_device.0,
         DirectXPixelFormat::R16G16B16A16Float,
         1,
         capture_size,
@@ -58,15 +57,27 @@ pub fn start_capture_session(
         .FrameArrived(
             &TypedEventHandler::<Direct3D11CaptureFramePool, IInspectable>::new({
                 move |frame_pool, _| {
+                    let _span = info_span!("WindowsCapture::take_capture::frame_arrived").entered();
+
                     let frame_pool = frame_pool.as_ref().ok_or(WindowsError::new(
                         HRESULT::from_win32(WM_APP),
                         "Failed to access frame pool, frame_pool is None",
                     ))?;
 
                     let frame = frame_pool.TryGetNextFrame()?;
-                    sender
-                        .send(frame)
-                        .map_err(|e| WindowsError::new(HRESULT::from_win32(WM_APP), e.to_string()))
+
+                    let handle = retrieve_handle(&frame)?;
+                    let send_handle = SendHANDLE(handle);
+
+                    sender.send(send_handle).map_err(|e| {
+                        WindowsError::new(HRESULT::from_win32(WM_APP), e.to_string())
+                    })?;
+
+                    frame.Close().map_err(|e| {
+                        WindowsError::new(HRESULT::from_win32(WM_APP), e.to_string())
+                    })?;
+
+                    Ok(())
                 }
             }),
         )
