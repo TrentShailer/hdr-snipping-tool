@@ -7,7 +7,7 @@ use crate::VulkanError;
 
 use super::Error;
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn setup_debug(
     entry: &Entry,
     instance: &Instance,

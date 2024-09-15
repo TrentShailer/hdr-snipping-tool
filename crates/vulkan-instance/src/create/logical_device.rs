@@ -13,7 +13,7 @@ use crate::VulkanError;
 
 use super::{physical_device, Error};
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn get_logical_device(
     instance: &Instance,
     physical_device: PhysicalDevice,

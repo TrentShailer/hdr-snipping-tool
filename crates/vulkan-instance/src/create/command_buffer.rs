@@ -8,7 +8,7 @@ use crate::VulkanError;
 
 use super::Error;
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn get_command_buffer(
     device: &Device,
     queue_family_index: u32,

@@ -9,7 +9,7 @@ use crate::VulkanError;
 
 use super::Error;
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn create_surface(
     entry: &Entry,
     instance: &Instance,

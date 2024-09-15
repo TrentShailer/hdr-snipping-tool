@@ -5,7 +5,7 @@ use crate::VulkanError;
 
 use super::Error;
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn validate_api_version(entry: &Entry) -> Result<(), Error> {
     let api_version = unsafe { entry.try_enumerate_instance_version() }
         .map_err(|e| VulkanError::VkResult(e, "enumerating instance version"))?
