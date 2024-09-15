@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread};
+use std::{sync::Arc, thread, time::Duration};
 
 use tracing::{info_span, instrument};
 use windows::Graphics::Capture::GraphicsCaptureItem;
@@ -26,11 +26,20 @@ impl WindowsCapture {
 
         // free resources, deferred to background thread to let main thread continue.
         thread::spawn(move || {
-            let _span = info_span!("WindowsCapture::take_capture::free").entered();
-            capture_session.Close().unwrap();
-            framepool.Close().unwrap();
-            unsafe { devices.d3d11_context.ClearState() };
-            (*devices.d3d_device).Trim().unwrap();
+            // Closes must occur ASAP to prevent more frames from being fetched.
+            {
+                let _span = info_span!("WindowsCapture::take_capture::Close").entered();
+                capture_session.Close().unwrap();
+                framepool.Close().unwrap();
+            }
+
+            // Prevent Dx from interrupting performance critical Vk operations
+            thread::sleep(Duration::from_millis(100));
+            {
+                let _span = info_span!("WindowsCapture::take_capture::Trim").entered();
+                unsafe { devices.d3d11_context.ClearState() };
+                (*devices.d3d_device).Trim().unwrap();
+            }
         });
 
         Ok(WindowsCapture {

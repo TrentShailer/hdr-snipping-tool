@@ -1,4 +1,4 @@
-use tracing::instrument;
+use tracing::{instrument, Level};
 use windows::{
     Graphics::Capture::Direct3D11CaptureFrame,
     Win32::{
@@ -14,7 +14,7 @@ use windows_core::Interface;
 use windows_result::Error as WindowsError;
 
 /// Retrieves the capture handle from the GPU.
-#[instrument("retrieve_capture", skip_all, err)]
+#[instrument("retrieve_capture", level = Level::DEBUG, skip_all, err)]
 pub fn retrieve_handle(d3d_capture: &Direct3D11CaptureFrame) -> Result<HANDLE, WindowsError> {
     // Get the surface of the capture
     let surface = d3d_capture.Surface()?;
