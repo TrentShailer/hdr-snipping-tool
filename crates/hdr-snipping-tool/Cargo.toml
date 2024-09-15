@@ -5,9 +5,6 @@ edition = "2021"
 
 build = "build.rs"
 
-[features]
-tracy = ["tracing-tracy"]
-
 [dependencies]
 vulkan-instance = { workspace = true }
 vulkan-renderer = { workspace = true }
