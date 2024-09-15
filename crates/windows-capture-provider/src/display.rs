@@ -9,12 +9,14 @@ use windows::{
 };
 use windows_result::Result as WindowsResult;
 
+use crate::SendHMONITOR;
+
 /// A windows display and related data
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub struct Display {
     /// The display handle.
-    pub handle: HMONITOR,
+    pub handle: SendHMONITOR,
 
     /// The position of the top left corner of the display in pixels.
     /// This is relative to the top left corner of the primary display.
@@ -33,7 +35,7 @@ impl Display {
         let (position, size) = Self::position_size_from_rect(rect);
 
         Self {
-            handle,
+            handle: SendHMONITOR(handle),
             position,
             size,
             sdr_referece_white,
@@ -53,7 +55,7 @@ impl Display {
     /// Creates a graphics capture item for this display.
     pub(crate) fn create_capture_item(&self) -> WindowsResult<GraphicsCaptureItem> {
         let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()?;
-        let capture_item: GraphicsCaptureItem = unsafe { interop.CreateForMonitor(self.handle)? };
+        let capture_item: GraphicsCaptureItem = unsafe { interop.CreateForMonitor(*self.handle)? };
 
         Ok(capture_item)
     }
@@ -72,7 +74,7 @@ impl Display {
 
 impl PartialEq for Display {
     fn eq(&self, other: &Self) -> bool {
-        self.handle == other.handle
+        self.handle.0 == other.handle.0
     }
 }
 

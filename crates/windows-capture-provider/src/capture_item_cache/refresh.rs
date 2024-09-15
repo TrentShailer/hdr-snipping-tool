@@ -16,7 +16,7 @@ impl CaptureItemCache {
         for old_handle in old_displays.iter() {
             if !current_displays
                 .iter()
-                .any(|display| display.handle.0 as isize == *old_handle)
+                .any(|display| (*display.handle).0 as isize == *old_handle)
             {
                 info!("{}: removed capture item", old_handle);
                 self.capture_items.remove(old_handle);
