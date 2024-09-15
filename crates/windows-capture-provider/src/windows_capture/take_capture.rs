@@ -24,15 +24,14 @@ impl WindowsCapture {
         let handle = capture_receiver.recv().unwrap();
         recv_span.exit();
 
-        capture_session.Close().map_err(Error::Cleanup)?;
-        framepool.Close().map_err(Error::Cleanup)?;
-
-        // get the capture from gpu
-        let capture_handle = retrieve_handle(d3d11_capture).map_err(Error::RetrieveHandle)?;
-
-        // free resources
-        unsafe { devices.d3d11_context.ClearState() };
-        devices.d3d_device.Trim().map_err(Error::Cleanup)?;
+        // free resources, deferred to background thread to let main thread continue.
+        thread::spawn(move || {
+            let _span = info_span!("WindowsCapture::take_capture::free").entered();
+            capture_session.Close().unwrap();
+            framepool.Close().unwrap();
+            unsafe { devices.d3d11_context.ClearState() };
+            (*devices.d3d_device).Trim().unwrap();
+        });
 
         Ok(WindowsCapture {
             handle: handle.0,
