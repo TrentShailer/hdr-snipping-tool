@@ -64,7 +64,7 @@ impl HdrCapture {
             let mut dedicated_allocation = MemoryDedicatedAllocateInfo::default().image(image);
             let mut import_info = ImportMemoryWin32HandleInfoKHR::default()
                 .handle_type(ExternalMemoryHandleTypeFlags::OPAQUE_WIN32)
-                .handle(capture.handle.0 as isize);
+                .handle((*capture.handle).0 as isize);
 
             let allocate_info = MemoryAllocateInfo::default()
                 .allocation_size(memory_requirement.size)

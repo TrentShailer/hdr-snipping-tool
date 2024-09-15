@@ -34,7 +34,7 @@ impl WindowsCapture {
         });
 
         Ok(WindowsCapture {
-            handle: handle.0,
+            handle,
             size: display.size,
             display,
         })

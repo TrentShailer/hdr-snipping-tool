@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use windows::Win32::Foundation::HANDLE;
 
+#[derive(Debug, Clone, Copy)]
 pub struct SendHANDLE(pub HANDLE);
 
 unsafe impl Send for SendHANDLE {}
