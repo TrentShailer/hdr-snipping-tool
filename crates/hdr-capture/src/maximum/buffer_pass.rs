@@ -137,7 +137,7 @@ impl BufferPass {
         })
     }
 
-    #[instrument("BufferPass::run", skip_all, err)]
+    #[instrument("BufferPass::run", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn run(
         &self,
         maximum_obj: &Maximum,

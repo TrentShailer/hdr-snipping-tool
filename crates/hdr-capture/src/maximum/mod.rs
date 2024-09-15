@@ -12,7 +12,7 @@ use buffer_pass::BufferPass;
 use half::f16;
 use source_pass::SourcePass;
 use thiserror::Error;
-use tracing::{error, info_span, instrument};
+use tracing::{debug_span, error, info_span, instrument};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::hdr_capture::HdrCapture;
@@ -173,7 +173,7 @@ impl Maximum {
         let maximum = maximums[0];
 
         unsafe {
-            let _span = info_span!("freeing_resources").entered();
+            let _span = debug_span!("freeing_resources").entered();
             self.vk.device.destroy_buffer(read_buffer, None);
             self.vk.device.free_memory(read_buffer_memory, None);
 

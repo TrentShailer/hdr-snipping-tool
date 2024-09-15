@@ -1,11 +1,11 @@
-use tracing::{info, info_span};
+use tracing::{debug_span, info, info_span};
 use windows::Win32::{
     Foundation::HWND,
     UI::WindowsAndMessaging::{GetForegroundWindow, SetForegroundWindow},
 };
 
 pub fn get_foreground_window() -> HWND {
-    let _span = info_span!("get_foreground_window").entered();
+    let _span = debug_span!("get_foreground_window").entered();
 
     let foreground = unsafe { GetForegroundWindow() };
 

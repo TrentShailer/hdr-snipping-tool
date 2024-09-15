@@ -135,7 +135,7 @@ impl SourcePass {
         })
     }
 
-    #[instrument("SourcePass::run", skip_all, err)]
+    #[instrument("SourcePass::run", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn run(
         &self,
         source: ImageView,
