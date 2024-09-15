@@ -55,7 +55,9 @@ impl ActiveCapture {
         });
 
         unsafe {
-            CloseHandle(windows_capture.handle)?;
+            if !windows_capture.handle.is_invalid() {
+                CloseHandle(windows_capture.handle)?;
+            }
         }
 
         Ok(Self {
