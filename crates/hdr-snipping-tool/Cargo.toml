@@ -1,12 +1,9 @@
 [package]
 name = "hdr-snipping-tool"
-version = "3.2.0"
+version = "3.2.1"
 edition = "2021"
 
 build = "build.rs"
-
-[features]
-tracy = ["tracing-tracy"]
 
 [dependencies]
 vulkan-instance = { workspace = true }
@@ -30,8 +27,6 @@ half = { workspace = true }
 ash = { workspace = true }
 image = { workspace = true }
 
-# TODO remove tracy
-tracing-tracy = { version = "0.11", optional = true, features = ["enable"] }
 tracing-subscriber = "0.3"
 tracing-appender = "0.2"
 arboard = "3.4"
@@ -40,7 +35,7 @@ chrono = { version = "0.4", features = [
 	"std",
 ], default-features = false }
 directories = "5.0"
-global-hotkey = "0.5"
+global-hotkey = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 tray-icon = "0.14"

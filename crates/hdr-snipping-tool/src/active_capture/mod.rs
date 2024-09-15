@@ -40,7 +40,7 @@ impl ActiveCapture {
             None => return Err(Error::NoDisplay),
         };
 
-        let windows_capture = WindowsCapture::take_capture(&app.dx, display)?;
+        let windows_capture = WindowsCapture::take_capture(app.dx.clone(), display)?;
 
         let hdr_capture = HdrCapture::import_windows_capture(
             vk.clone(),
@@ -55,7 +55,9 @@ impl ActiveCapture {
         });
 
         unsafe {
-            CloseHandle(windows_capture.handle)?;
+            if !windows_capture.handle.is_invalid() {
+                CloseHandle(*windows_capture.handle)?;
+            }
         }
 
         Ok(Self {

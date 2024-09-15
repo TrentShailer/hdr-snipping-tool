@@ -3,17 +3,16 @@ mod start_capture_session;
 pub mod take_capture;
 
 use thiserror::Error;
-use windows::Win32::Foundation::HANDLE;
 use windows_result::Error as WindowsError;
 
-use crate::display::Display;
+use crate::{display::Display, SendHANDLE};
 
 /// A capture from windows in R16G16B16A16_Float format
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct WindowsCapture {
     /// Handle to the shared Dx11 texture resource.
-    pub handle: HANDLE,
+    pub handle: SendHANDLE,
 
     /// The size of the capture.
     pub size: [u32; 2],

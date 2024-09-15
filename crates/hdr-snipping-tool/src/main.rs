@@ -16,7 +16,7 @@ use logger::init_tracing;
 use report_error::report_app_error;
 use settings::Settings;
 use thiserror::Error;
-use tracing::{error, info, info_span, warn};
+use tracing::{error, info, info_span, level_filters::LevelFilter, warn};
 use windows::{
     Graphics::Capture::GraphicsCaptureSession,
     Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_ICONWARNING},
@@ -26,37 +26,31 @@ use winit::{error::EventLoopError, event_loop::EventLoop};
 use winit_app::WinitApp;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const VALIDATION_ENV_VAR: &str = "hdr-snipping-tool-validation";
 
-#[cfg(debug_assertions)]
-pub const IS_DEV: bool = true;
-#[cfg(not(debug_assertions))]
-pub const IS_DEV: bool = false;
-
-pub const DEBUG_ENV_VAR: &str = "hdr-snipping-tool-debug";
-pub const VK_DEBUG_ENV_VAR: &str = "hdr-snipping-tool-debug-vk";
-
-pub fn is_debug() -> bool {
-    std::env::var(DEBUG_ENV_VAR).is_ok()
+pub fn enable_validation() {
+    std::env::set_var(VALIDATION_ENV_VAR, "true");
 }
 
-pub fn enable_debug() {
-    std::env::set_var(DEBUG_ENV_VAR, "true");
-}
-
-pub fn is_vk_debug() -> bool {
-    std::env::var(VK_DEBUG_ENV_VAR).is_ok()
-}
-
-pub fn enable_vk_debug() {
-    std::env::set_var(VK_DEBUG_ENV_VAR, "true");
+pub fn validation_enabled() -> bool {
+    std::env::var(VALIDATION_ENV_VAR).is_ok()
 }
 
 fn main() {
-    if std::env::args().any(|arg| arg.eq("--debug")) {
-        enable_debug();
-    }
-    if std::env::args().any(|arg| arg.eq("--debug-vk")) {
-        enable_vk_debug();
+    let log_spans = std::env::args().any(|arg| arg.eq("--timing"));
+    let validation = std::env::args().any(|arg| arg.eq("--validation"));
+    let log_level = {
+        if std::env::args().any(|arg| arg.eq("--level-debug")) {
+            LevelFilter::DEBUG
+        } else if std::env::args().any(|arg| arg.eq("--level-info")) || log_spans {
+            LevelFilter::INFO
+        } else {
+            LevelFilter::WARN
+        }
+    };
+
+    if validation {
+        enable_validation();
     }
 
     if let Err(e) = fs::create_dir_all(project_directory()) {
@@ -67,8 +61,8 @@ fn main() {
         return;
     };
 
-    let _guard = match init_tracing() {
-        Ok(guard) => guard,
+    let _guards = match init_tracing(log_level, log_spans) {
+        Ok(guards) => guards,
         Err(e) => {
             display_message(
                 &format!("We encountered an error while initialising the logger.\n{e}"),
@@ -80,8 +74,7 @@ fn main() {
 
     {
         info!("Application Opened");
-        let dev_tooltip = if IS_DEV { "-dev" } else { "" };
-        info!("HDR Snipping Tool v{}{}-debug", VERSION, dev_tooltip);
+        info!("HDR Snipping Tool v{}", VERSION);
     }
 
     if let Err(e) = init() {
@@ -90,19 +83,7 @@ fn main() {
 }
 
 fn init() -> Result<(), AppError> {
-    let _dev_span = if IS_DEV {
-        Some(info_span!("dev").entered())
-    } else {
-        None
-    };
-
     let version_span = info_span!(VERSION).entered();
-
-    let _validation_span = if is_vk_debug() {
-        Some(info_span!("validation").entered())
-    } else {
-        None
-    };
 
     // Ensure no other instances of this app are running
     if !ensure_only_instance()? {

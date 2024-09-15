@@ -6,7 +6,7 @@ use ash::vk::{
     SwapchainCreateInfoKHR, SwapchainKHR, Viewport,
 };
 
-use tracing::{info, info_span, instrument};
+use tracing::{info, instrument};
 use vulkan_instance::{VulkanError, VulkanInstance};
 
 use crate::Error;
@@ -14,7 +14,7 @@ use crate::Error;
 use super::Renderer;
 
 impl Renderer {
-    #[instrument("Renderer::get_surface_format", skip_all, err)]
+    #[instrument("Renderer::get_surface_format", level = tracing::Level::DEBUG, skip_all, err)]
     pub(super) fn get_surface_format(
         vk: &VulkanInstance,
     ) -> Result<SurfaceFormatKHR, ash::vk::Result> {
@@ -116,11 +116,8 @@ impl Renderer {
             swapchain_create_info
         };
 
-        let swapchain = unsafe {
-            let _span = info_span!("create_swapchain").entered();
-            swapchain_loader.create_swapchain(&swapchain_create_info, None)
-        }
-        .map_err(|e| VulkanError::VkResult(e, "creating the swapchain"))?;
+        let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_create_info, None) }
+            .map_err(|e| VulkanError::VkResult(e, "creating the swapchain"))?;
 
         info!("Surface format: {:#?}", surface_format.format);
         info!("Surface color space: {:#?}", surface_format.color_space);
@@ -129,7 +126,7 @@ impl Renderer {
         Ok((swapchain, surface_format))
     }
 
-    #[instrument("Renderer::transition_images", skip_all, err)]
+    #[instrument("Renderer::transition_images", level = tracing::Level::DEBUG, skip_all, err)]
     pub(super) fn transition_images(vk: &VulkanInstance, images: &[Image]) -> Result<(), Error> {
         vk.record_submit_command_buffer(vk.command_buffer, &[], &[], |device, command_buffer| {
             unsafe {
@@ -212,7 +209,7 @@ impl Renderer {
         }
     }
 
-    #[instrument("Renderer::window_size_dependant_setup", skip_all, err)]
+    #[instrument("Renderer::window_size_dependant_setup", level = tracing::Level::DEBUG, skip_all, err)]
     pub(super) fn window_size_dependant_setup(
         vk: &VulkanInstance,
         swapchain_format: SurfaceFormatKHR,

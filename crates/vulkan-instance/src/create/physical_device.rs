@@ -25,7 +25,7 @@ pub const REQUIRED_EXTENSIONS: [&ffi::CStr; 3] = [
 ];
 
 // -----
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn get_physical_device(
     instance: &Instance,
     surface: SurfaceKHR,

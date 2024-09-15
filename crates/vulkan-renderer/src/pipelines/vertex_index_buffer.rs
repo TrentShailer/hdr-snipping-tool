@@ -9,7 +9,7 @@ pub type VertexIndexBuffer = ((Buffer, DeviceMemory), (Buffer, DeviceMemory));
 
 /// Creates device local vertex and index buffers
 /// from a set of verticies and indicies.
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn create_vertex_and_index_buffer<V: Copy>(
     vk: &VulkanInstance,
     verticies: &[V],

@@ -8,7 +8,7 @@ use crate::{VulkanError, VulkanInstance};
 
 impl VulkanInstance {
     /// Creates a basic unbound buffer with device memory backing it.
-    #[instrument("VulkanInstance::create_unbound_buffer", skip_all, err)]
+    #[instrument("VulkanInstance::create_unbound_buffer", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn create_unbound_buffer(
         &self,
         size: u64,
@@ -48,7 +48,7 @@ impl VulkanInstance {
     }
 
     /// Creates a basic bound buffer with device memory backing it.
-    #[instrument("VulkanInstance::create_bound_buffer", skip_all, err)]
+    #[instrument("VulkanInstance::create_bound_buffer", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn create_bound_buffer(
         &self,
         size: u64,

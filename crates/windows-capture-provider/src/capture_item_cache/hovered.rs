@@ -31,7 +31,7 @@ impl CaptureItemCache {
         info!("{}", hovered_display);
 
         // Retrieve or create capture item
-        let handle = hovered_display.handle.0 as isize;
+        let handle = (*hovered_display.handle).0 as isize;
         let capture_item = match self.capture_items.entry(handle) {
             Entry::Occupied(entry) => entry.get().clone(),
             Entry::Vacant(vacancy) => {

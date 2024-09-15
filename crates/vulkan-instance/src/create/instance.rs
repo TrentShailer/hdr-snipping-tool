@@ -27,7 +27,7 @@ const INSTANCE_EXTENSIONS: [*const ffi::c_char; 2] = [
 ];
 
 // -----
-#[instrument(skip_all, err)]
+#[instrument(skip_all, level = tracing::Level::DEBUG, err)]
 pub fn aquire_instance(entry: &Entry, window: &Window, debug: bool) -> Result<Instance, Error> {
     // Get extensions required to create a surface for the window
     let display_handle = window.display_handle()?;

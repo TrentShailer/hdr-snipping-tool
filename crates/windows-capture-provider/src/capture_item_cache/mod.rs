@@ -34,7 +34,7 @@ impl CaptureItemCache {
                 .create_capture_item()
                 .map_err(Error::CreateCaputreItem)?;
 
-            capture_items.insert(display.handle.0 as isize, capture_item);
+            capture_items.insert((*display.handle).0 as isize, capture_item);
         }
 
         Ok(Self {

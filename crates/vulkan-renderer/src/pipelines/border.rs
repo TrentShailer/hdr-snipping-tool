@@ -42,7 +42,7 @@ pub struct BorderPipeline {
 }
 
 impl BorderPipeline {
-    #[instrument("BorderPipeline::new", skip_all, err)]
+    #[instrument("BorderPipeline::new", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn new(
         vk: Arc<VulkanInstance>,
         pipeline_rendering_create_info: PipelineRenderingCreateInfo,
@@ -106,7 +106,7 @@ impl BorderPipeline {
         })
     }
 
-    #[instrument("BorderPipeline::recreate", skip_all, err)]
+    #[instrument("BorderPipeline::recreate", level = tracing::Level::DEBUG, skip_all, err)]
     pub fn recreate(
         &mut self,
         pipeline_rendering_create_info: PipelineRenderingCreateInfo,

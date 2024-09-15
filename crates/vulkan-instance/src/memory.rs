@@ -8,7 +8,7 @@ use crate::{VulkanError, VulkanInstance};
 
 impl VulkanInstance {
     /// Writes some data to some device memory. The device memory must be host visible and coherant.
-    #[instrument("VulkanInstance::write_to_memory", skip_all, err)]
+    #[instrument("VulkanInstance::write_to_memory", level = tracing::Level::DEBUG, skip_all, err)]
     pub unsafe fn write_to_memory<T: Copy>(
         &self,
         memory: DeviceMemory,
@@ -30,7 +30,7 @@ impl VulkanInstance {
     }
 
     /// Reads some data from device memory. The device memory must be host visible and coherant.
-    #[instrument("VulkanInstance::read_from_memory", skip_all, err)]
+    #[instrument("VulkanInstance::read_from_memory", level = tracing::Level::DEBUG, skip_all, err)]
     pub unsafe fn read_from_memory<T: Copy>(
         &self,
         memory: DeviceMemory,
