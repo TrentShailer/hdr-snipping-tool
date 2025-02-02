@@ -12,7 +12,7 @@ use std::{
 };
 
 use tracing::{debug, error, info_span};
-use vulkan::{HdrImage, HdrScanner, Vulkan};
+use vulkan::{HdrImage, HdrScanner, HistogramGenerator, Vulkan, BIN_COUNT};
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, MonitorError, WindowsCapture};
 use winit::event_loop::EventLoopProxy;
 
@@ -57,7 +57,7 @@ pub struct CaptureTaker {
 }
 
 impl CaptureTaker {
-    pub fn new(vulkan: Arc<Vulkan>, whitepoint: f32) -> Self {
+    pub fn new(vulkan: Arc<Vulkan>) -> Self {
         let (sender, receiver) = channel();
 
         // Start the thread to handle taking the capture
@@ -65,7 +65,7 @@ impl CaptureTaker {
             .name("Capture Taker".into())
             .spawn(move || {
                 let _span = info_span!("[Capture Taker]").entered();
-                let mut inner = InnerCaptureTaker::new(vulkan, whitepoint);
+                let mut inner = InnerCaptureTaker::new(vulkan);
 
                 loop {
                     // unwrap should never happen, CaptureTaker owns the sender and calls shutdown on drop.
@@ -136,24 +136,26 @@ struct InnerCaptureTaker {
     vulkan: Arc<Vulkan>,
 
     hdr_scanner: HdrScanner,
-
-    whitepoint: f32,
+    histogram_generator: HistogramGenerator,
 }
 
 impl InnerCaptureTaker {
-    pub fn new(vulkan: Arc<Vulkan>, whitepoint: f32) -> Self {
+    pub fn new(vulkan: Arc<Vulkan>) -> Self {
         let direct_x = DirectX::new().report_and_panic("Could not create DirectX devices");
         let cache = CaptureItemCache::new();
 
         let hdr_scanner = unsafe { HdrScanner::new(vulkan.clone()) }
             .report_and_panic("Could not create the HDR Scanner");
 
+        let histogram_generator = unsafe { HistogramGenerator::new(vulkan.clone()) }
+            .report_and_panic("Could not create the Histogram Generator");
+
         Self {
             direct_x,
             cache,
             vulkan,
             hdr_scanner,
-            whitepoint,
+            histogram_generator,
         }
     }
 
@@ -302,7 +304,7 @@ impl InnerCaptureTaker {
 
             let (is_hdr, maximum) = match unsafe {
                 self.hdr_scanner
-                    .contains_hdr(hdr_capture, windows_capture.monitor.sdr_white)
+                    .contains_hdr(hdr_capture, monitor.sdr_white)
             } {
                 Ok(is_hdr) => is_hdr,
                 Err(e) => {
@@ -313,19 +315,72 @@ impl InnerCaptureTaker {
                 }
             };
 
-            let whitepoint = if is_hdr {
-                self.whitepoint.min(maximum)
+            if !is_hdr {
+                debug!("Selected SDR whitepoint: {}", monitor.sdr_white);
+
+                proxy
+                    .send_event(WindowMessage::CaptureProgress(
+                        CaptureProgress::FoundWhitepoint(monitor.sdr_white),
+                    ))
+                    .report_and_panic("Eventloop exited");
             } else {
-                windows_capture.monitor.sdr_white
-            };
+                // TODO should a preliminary value be sent first incase the user's GPU does not match mine in atomic speed?
 
-            debug!("Selected whitepoint: {}", whitepoint);
+                let histogram = match unsafe {
+                    self.histogram_generator.generate(hdr_capture, maximum)
+                } {
+                    Ok(histogram) => histogram,
+                    Err(e) => {
+                        report(e, "Encountered an error while analysing the screenshot");
+                        let _ = proxy
+                            .send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
+                        return;
+                    }
+                };
 
-            proxy
-                .send_event(WindowMessage::CaptureProgress(
-                    CaptureProgress::FoundWhitepoint(whitepoint),
-                ))
-                .report_and_panic("Eventloop exited");
+                // if should_debug() {
+                //     let mut message = String::from("Histogram:");
+                //     for (index, count) in histogram.iter().enumerate() {
+                //         message += &format!("\n[{:3}] {count}", index);
+                //     }
+                //     debug!("{message}");
+                // }
+
+                let whitepoint = {
+                    let threshold: f64 = 0.99;
+
+                    let total = windows_capture.size[0] * windows_capture.size[1] * 3;
+
+                    let mut running_total = 0;
+                    let mut selected_bin_index = BIN_COUNT as usize;
+
+                    for (index, count) in histogram.iter().enumerate() {
+                        running_total += count;
+
+                        if running_total as f64 / total as f64 >= threshold {
+                            debug!("Selected bin: {index}");
+                            selected_bin_index = index;
+                            break;
+                        }
+                    }
+
+                    (maximum / BIN_COUNT as f32) * selected_bin_index as f32
+                };
+
+                let whitepoint = if whitepoint <= monitor.sdr_white {
+                    debug!("Selected HDR Whitepoint (SDR) {}", monitor.sdr_white);
+                    monitor.sdr_white
+                } else {
+                    debug!("Selected HDR Whitepoint (HDR) {}", whitepoint);
+                    whitepoint
+                };
+
+                proxy
+                    .send_event(WindowMessage::CaptureProgress(
+                        CaptureProgress::FoundWhitepoint(whitepoint),
+                    ))
+                    .report_and_panic("Eventloop exited");
+            }
         }
 
         // Clean up

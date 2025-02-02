@@ -131,7 +131,7 @@ impl Application {
         };
 
         let renderer = Renderer::new(vulkan.clone(), &window);
-        let capture_taker = CaptureTaker::new(vulkan.clone(), config.hdr_whitepoint);
+        let capture_taker = CaptureTaker::new(vulkan.clone());
         let capture_saver = CaptureSaver::new(vulkan.clone());
 
         Self {

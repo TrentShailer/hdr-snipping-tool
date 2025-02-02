@@ -71,6 +71,12 @@ impl Vulkan {
             QueuePurpose::Graphics => self.queues.last().unwrap(),
         }
     }
+
+    /// Returns the queue family index as a reference.
+    #[inline]
+    pub fn queue_family_index_as_ref(&self) -> &u32 {
+        &self.queue_family_index
+    }
 }
 
 impl VulkanContext for Vulkan {

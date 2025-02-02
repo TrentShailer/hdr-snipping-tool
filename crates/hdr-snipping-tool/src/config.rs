@@ -13,7 +13,6 @@ const FILE_NAME: &str = "hdr-config.toml";
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub screenshot_key: Code,
-    pub hdr_whitepoint: f32,
 }
 
 impl Config {
@@ -58,7 +57,6 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             screenshot_key: Code::PrintScreen,
-            hdr_whitepoint: 6.25,
         }
     }
 }

@@ -38,7 +38,7 @@ Requires Rust v1.84 or later.
 
 ## Limitations
 
-* The screenshots will be slightly overexposed to preserve screenshot details.
+* The screenshots will slightly clip highlights to preserve screenshot details.
 * Screenshots can only be of one monitor at a time.
 * Windows only.
 
@@ -52,8 +52,8 @@ Requires Rust v1.84 or later.
 
 ![HDR example 1][hdr-example-1]
 
-[win-example-1]: media/windows-snipping-tool-example.jpg "Windows Snipping Tool Screenshot of Cyberpunk 2077 with overexposed highlights."
-[hdr-example-1]: media/hdr-snipping-tool-example.jpg "HDR Snipping Tool Screenshot showing the same content as the Windows Snipping Tool but without any overexposed highlights."
+[win-example-1]: media/windows-snipping-tool-example.jpg "Windows Snipping Tool Screenshot of Death Standing that is overexposed hiding a mountain."
+[hdr-example-1]: media/hdr-snipping-tool-example.jpg "HDR Snipping Tool Screenshot showing the same content as the Windows Snipping Tool but is not overexposed and shows the mountain."
 
 ## Thank You
 
