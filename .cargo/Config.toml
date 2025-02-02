@@ -1,0 +1,2 @@
+[env]
+VULKAN_PROFILES_PATH = { value = "crates/vulkan/vulkan_profiles", force = true, relative = true }

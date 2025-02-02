@@ -1,45 +1,48 @@
 # HDR Snipping Tool
 
-A Windows Snipping Tool alternative that handles HDR content better.
+A Windows Snipping Tool alternative that doesn't overexpose HDR content.
+
+> [!CAUTION] 
+> ### This is a personal project
+>
+> Maintanance, bug fixes, new features, and support will only be provided when/if I feel like it.
+>
 
 ## Installation
 
-Requires Rust v1.79 or later.
+Requires Rust v1.84 or later.
 
 `cargo install --git 'https://github.com/TrentShailer/hdr-snipping-tool.git' --locked`
 
 ## Usage
 
-Run the application.
-
-The application storage directory is found in `%APPDATA%\Roaming\trentshailer\hdr-snipping-tool\data\` or by using the 'Open Storage Directory' option on the tray icon.
-
-To take a capture press the screenshot key (default PrintSrc). This key can be changed in the config, found in the `hdr-config.toml` in the storage directory. Valid values can be found in the [global-hotkey docs](https://docs.rs/global-hotkey/latest/global_hotkey/hotkey/enum.Code.html), restarting the app is required.
-
-Use enter to save the entire capture, or click and drag the mouse to save a portion of the capture.
-
-Use escape to cancel a capture.
-
-After saving the file is in the storage directory and saved in your clipboard.
+* Run the application.
+* Take a screenshot using the screenshot key (default `PrintScr`).
+  * This key can be changed in the config located in `%APPDATA%\Roaming\HDR Snipping Tool` or by using the `Open Config Directory` option in the tray icon.
+  * Valid keys are found in the [global-hotkey docs](https://docs.rs/global-hotkey/latest/global_hotkey/hotkey/enum.Code.html).
+* Use the `Enter` key to save the entire screenshot, or click and drag the mouse to save a portion of the screenshot.
+* Use the `Escape` key to cancel a screenshot.
+* After saving the file is saved to `Pictures\Screenshots` and copied to your clipboard.
 
 ## Goals
 
-- Allow control over the HDR to SDR tonemapping of screenshots.
-- Provide similar features to the Windows Snipping Tool.
+* Take screenshots of HDR content that isn't overexposed.
+* Provide similar basic features to Windows Snipping Tool.
+  * Cropping to a user-selected area of the screen.
+  * Copying to clipboard.
 
 ### Non-Goals
 
-- Save HDR versions of screenshots. This use case is mostly covered by Windows Game Bar or other applications.
-- Built-in uploading to image-sharing websites.
+* Save HDR versions of screenshots. This use case is mostly covered by Windows Game Bar or other applications.
+* Built-in uploading to image-sharing websites.
 
 ## Limitations
 
-- Tonemapping will clip some highlights a little.
-- Screenshots can only be of one display at a time.
-- Windows only.
-- No freeform mode or window mode.
+* The screenshots will be slightly overexposed to preserve screenshot details.
+* Screenshots can only be of one monitor at a time.
+* Windows only.
 
-## Windows Snipping Tool Comparison
+## Screenshot Comparison
 
 ### Windows Snipping Tool
 
@@ -49,5 +52,12 @@ After saving the file is in the storage directory and saved in your clipboard.
 
 ![HDR example 1][hdr-example-1]
 
-[win-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/gpu-version/media/windows-snipping-tool-example.jpg "Windows Snipping Tool Screenshot of Cyberpunk 2077 with blown out highlights."
-[hdr-example-1]: https://github.com/TrentShailer/hdr-snipping-tool/blob/gpu-version/media/hdr-snipping-tool-example.jpg "HDR Snipping Tool Screenshot showing the same content as the Windows Snipping Tool but without any blown out highlights."
+[win-example-1]: media/windows-snipping-tool-example.jpg "Windows Snipping Tool Screenshot of Cyberpunk 2077 with overexposed highlights."
+[hdr-example-1]: media/hdr-snipping-tool-example.jpg "HDR Snipping Tool Screenshot showing the same content as the Windows Snipping Tool but without any overexposed highlights."
+
+## Thank You
+
+* [ash](https://github.com/ash-rs/ash)
+* [winit](https://github.com/rust-windowing/winit)
+* [windows-rs](https://github.com/microsoft/windows-rs)
+* [Vulkan-Profiles](https://github.com/KhronosGroup/Vulkan-Profiles)

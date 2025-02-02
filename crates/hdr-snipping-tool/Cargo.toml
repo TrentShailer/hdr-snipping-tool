@@ -1,44 +1,47 @@
 [package]
 name = "hdr-snipping-tool"
-version = "3.2.1"
+version = "4.0.0"
 edition = "2021"
 
 build = "build.rs"
 
 [dependencies]
-vulkan-instance = { workspace = true }
-vulkan-renderer = { workspace = true }
-hdr-capture = { workspace = true }
-windows-capture-provider = { workspace = true }
-
-tracing = { workspace = true }
-thiserror = { workspace = true }
-windows = { workspace = true, features = [
-	"Foundation",
-	"Graphics_Capture",
-	"Win32_Foundation",
-	"Win32_Security",
-	"Win32_System_Threading",
-	"Win32_UI_WindowsAndMessaging",
-] }
-windows-result = { workspace = true }
-winit = { workspace = true }
-half = { workspace = true }
+# Taking Screenshot
 ash = { workspace = true }
-image = { workspace = true }
+vulkan = { workspace = true }
+ash-helper = { workspace = true }
+parking_lot = { workspace = true }
+windows-capture-provider = { workspace = true }
+global-hotkey = "0.6"
 
-tracing-subscriber = "0.3"
-tracing-appender = "0.2"
+# User config
+serde = { workspace = true }
+toml = { workspace = true }
+# See also dirs-rs
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+
+# Error Handling
+thiserror = { workspace = true }
+
+# Saving Screenshot
+image = { workspace = true }
 arboard = "3.4"
 chrono = { version = "0.4", features = [
 	"clock",
-	"std",
+	"alloc",
 ], default-features = false }
-directories = "5.0"
-global-hotkey = "0.6"
-serde = { version = "1.0", features = ["derive"] }
-toml = "0.8"
-tray-icon = "0.14"
+dirs = "6.0"
+
+# Windowing
+winit = { workspace = true }
+tray-icon = { version = "0.19", default-features = false }
+
+# Windows API
+windows = { workspace = true, features = ["Win32_System_Threading"] }
 
 [build-dependencies]
-embed-resource = "2.4"
+embed-resource = "3.0"

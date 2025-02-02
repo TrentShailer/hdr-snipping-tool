@@ -1,189 +1,143 @@
+//! # HDR Snipping Tool
+//! Main application logic for HDR Snipping Tool.
+//!
+
+#![warn(missing_docs)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-mod active_app;
-mod active_capture;
-mod logger;
-mod report_error;
-mod settings;
-mod windows_helpers;
-mod winit_app;
+pub use utilities::directories::{config_dir, screenshot_dir};
 
-use std::{fs, path::PathBuf};
-
-use directories::ProjectDirs;
+use application::{WindowMessage, WinitApp};
+use config::Config;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
-use logger::init_tracing;
-use report_error::report_app_error;
-use settings::Settings;
-use thiserror::Error;
-use tracing::{error, info, info_span, level_filters::LevelFilter, warn};
-use windows::{
-    Graphics::Capture::GraphicsCaptureSession,
-    Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_ICONWARNING},
+use logger::setup_logger;
+use tracing::{info, info_span, warn};
+use utilities::{
+    directories::create_dirs,
+    failure::{report_and_panic, Failure},
+    windows_helpers::{display_message, is_first_instance},
 };
-use windows_helpers::{display_message, ensure_only_instance};
-use winit::{error::EventLoopError, event_loop::EventLoop};
-use winit_app::WinitApp;
+use windows::Win32::UI::WindowsAndMessaging::{
+    IDNO, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNO,
+};
+use winit::event_loop::EventLoop;
 
+mod application;
+mod config;
+mod logger;
+mod selection;
+mod utilities;
+
+/// The Cargo package version.
+#[cfg(not(debug_assertions))]
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const VALIDATION_ENV_VAR: &str = "hdr-snipping-tool-validation";
 
-pub fn enable_validation() {
-    std::env::set_var(VALIDATION_ENV_VAR, "true");
-}
+/// The Cargo package version or '0.0.0' if a non-release build.
+#[cfg(debug_assertions)]
+pub const VERSION: &str = "0.0.0";
 
-pub fn validation_enabled() -> bool {
-    std::env::var(VALIDATION_ENV_VAR).is_ok()
+/// If this instance should have debug enabled.
+pub fn should_debug() -> bool {
+    std::env::args().any(|arg| arg.eq("--debug"))
 }
 
 fn main() {
-    let log_spans = std::env::args().any(|arg| arg.eq("--timing"));
-    let validation = std::env::args().any(|arg| arg.eq("--validation"));
-    let log_level = {
-        if std::env::args().any(|arg| arg.eq("--level-debug")) {
-            LevelFilter::DEBUG
-        } else if std::env::args().any(|arg| arg.eq("--level-info")) || log_spans {
-            LevelFilter::INFO
-        } else {
-            LevelFilter::WARN
-        }
-    };
+    create_dirs().report_and_panic("The config and screenshots folders could not be created");
 
-    if validation {
-        enable_validation();
-    }
+    // Set up logger
+    let _logger_guards = setup_logger(should_debug());
 
-    if let Err(e) = fs::create_dir_all(project_directory()) {
-        display_message(
-            &format!("We encountered an error while creating necessary files.\n{e}"),
-            MB_ICONERROR,
-        );
-        return;
-    };
+    // Log application start
+    let _span = info_span!("[Main Thread]").entered();
+    info!("HDR Snipping Tool v{}", VERSION);
 
-    let _guards = match init_tracing(log_level, log_spans) {
-        Ok(guards) => guards,
-        Err(e) => {
-            display_message(
-                &format!("We encountered an error while initialising the logger.\n{e}"),
-                MB_ICONERROR,
-            );
+    // Ensure this instance is the first instance running.
+    {
+        let is_fist_instance = is_first_instance()
+            .report_and_panic("Could not check if HDR Snipping Tool was already running");
+
+        if !is_fist_instance {
+            warn!("Exiting: HDR Snipping Tool is already running.");
             return;
         }
-    };
-
-    {
-        info!("Application Opened");
-        info!("HDR Snipping Tool v{}", VERSION);
     }
 
-    if let Err(e) = init() {
-        report_app_error(e);
-    };
-}
-
-fn init() -> Result<(), AppError> {
-    let version_span = info_span!(VERSION).entered();
-
-    // Ensure no other instances of this app are running
-    if !ensure_only_instance()? {
-        warn!("Another instance is already running.");
-        display_message("Another instance is already running.", MB_ICONWARNING);
-        return Ok(());
-    }
-
-    // Ensure we have graphics captuer support
-    if !GraphicsCaptureSession::IsSupported().map_err(AppError::GraphicsCaptureSupport)? {
-        return Err(AppError::NoCaptureSupport);
-    }
-
-    // Load or create the settings
-    let settings = match Settings::load_or_create() {
-        Ok(v) => v,
-        Err(e) => match e {
-            // If the settings file is invalid then tell the user and replace
-            // it with a default one
-            settings::LoadError::Deserialize(e) => {
-                warn!("{e}");
-                display_message(
-                    "Invalid settings file, it will be replaced with a new one.",
-                    MB_ICONWARNING,
+    // Load config
+    let config = {
+        let maybe_config = match Config::try_load_config() {
+            Ok(maybe_config) => maybe_config,
+            Err(error) => {
+                warn!("Could not deserialize config file:\n{error}");
+                let action = display_message(
+                    "Your config file is invalid.\nMore details are in the logs.\n\nClear and reset your config file?",
+                    MB_SETFOREGROUND | MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
                 );
-                let settings = Settings::default();
-                settings.save()?;
-                settings
+
+                match action {
+                    // If user wants default config, maybe_config should be none for a new one to be
+                    // created.
+                    IDYES => {
+                        info!("Resetting config file.");
+                        None
+                    }
+
+                    IDNO => {
+                        warn!("Exiting: Invalid config.");
+                        return;
+                    }
+
+                    value => report_and_panic(
+                        format!("Message box returned an unexpected response:\n{:?}", value),
+                        "Message box returned an unexpected response",
+                    ),
+                }
             }
-            _ => return Err(AppError::LoadSettings(e)),
-        },
+        };
+
+        match maybe_config {
+            Some(config) => config,
+            None => {
+                let config = Config::default();
+                config.save();
+                config
+            }
+        }
     };
-    info!("{:?}", settings);
 
     // Create event loop
-    let event_loop: EventLoop<()> = EventLoop::with_user_event().build()?;
+    let event_loop: EventLoop<WindowMessage> = EventLoop::with_user_event()
+        .build()
+        .report_and_panic("Could not create the application window");
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Wait);
 
     // Register screenshot hotkey
-    let hotkey_manager = GlobalHotKeyManager::new()?;
-    let hotkey = HotKey::new(None, settings.screenshot_key);
-    hotkey_manager.register(hotkey)?;
-    let proxy = event_loop.create_proxy();
+    let _hotkey_manager = {
+        let hotkey_manager =
+            GlobalHotKeyManager::new().report_and_panic("Could not setup screenshot hotkey");
 
-    GlobalHotKeyEvent::set_event_handler(Some(move |event: GlobalHotKeyEvent| {
-        if event.state == HotKeyState::Pressed {
-            info!("Hotkey pressed");
-            if let Err(e) = proxy.send_event(()) {
-                error!("Failed to send event to event loop:\n{e}");
-                display_message(
-                    "We encountered an error while handling your hotkey.\nMore details are in the logs.",
-                    MB_ICONERROR,
-                );
-                std::process::exit(-1);
+        let hotkey = HotKey::new(None, config.screenshot_key);
+        hotkey_manager
+            .register(hotkey)
+            .report_and_panic("Could not register screenshot hotkey");
+
+        hotkey_manager
+    };
+
+    // Setup hotkey event handler
+    {
+        let proxy = event_loop.create_proxy();
+
+        GlobalHotKeyEvent::set_event_handler(Some(move |event: GlobalHotKeyEvent| {
+            if event.state == HotKeyState::Pressed {
+                info!("Hotkey pressed");
+                let _ = proxy.send_event(WindowMessage::TakeCapture);
             }
-        }
-    }));
+        }));
+    }
 
     // Create the app
-    let mut app = WinitApp::new(settings);
+    let mut app = WinitApp::new(config, event_loop.create_proxy());
 
-    // run the app
-    event_loop.run_app(&mut app)?;
-
-    version_span.exit();
-
-    Ok(())
-}
-
-pub fn project_directory() -> PathBuf {
-    let dir = match ProjectDirs::from("com", "trentshailer", "hdr-snipping-tool") {
-        Some(v) => v,
-        None => {
-            display_message("We were unable to get the app directory.", MB_ICONERROR);
-            std::process::exit(-1);
-        }
-    };
-    dir.data_dir().to_path_buf()
-}
-
-#[derive(Debug, Error)]
-enum AppError {
-    #[error("Failed to ensure only one instance:\n{0}")]
-    OnlyInstance(#[from] windows_helpers::only_instance::Error),
-
-    #[error("Failed to check if graphics capture is supported:\n{0}")]
-    GraphicsCaptureSupport(#[source] windows_result::Error),
-
-    #[error("Graphics capture is not supported on your device.")]
-    NoCaptureSupport,
-
-    #[error("Failed to load settings:\n{0}")]
-    LoadSettings(#[from] settings::LoadError),
-
-    #[error("Failed to save settings:\n{0}")]
-    SaveSettings(#[from] settings::SaveError),
-
-    #[error("Failed to build event loop:\n{0}")]
-    EventLoop(#[from] EventLoopError),
-
-    #[error("Failed to register screenshot hotkey:\n{0}")]
-    Hotkey(#[from] global_hotkey::Error),
+    // Run the app
+    let _ = event_loop.run_app(&mut app);
 }

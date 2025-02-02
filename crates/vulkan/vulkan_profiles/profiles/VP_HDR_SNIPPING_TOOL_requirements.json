@@ -1,0 +1,130 @@
+{
+    "$schema": "https://schema.khronos.org/vulkan/profiles-0.8.2-304.json#",
+    "capabilities": {
+        "baseline": {
+            "features": {
+                "VkPhysicalDeviceTimelineSemaphoreFeatures": {
+                    "timelineSemaphore": true
+                },
+                "VkPhysicalDeviceDynamicRenderingFeaturesKHR": {
+                    "dynamicRendering": true
+                },
+                "VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures": {
+                    "shaderSubgroupExtendedTypes": true
+                },
+                "VkPhysicalDeviceShaderFloat16Int8Features": {
+                    "shaderFloat16": true
+                },
+                "VkPhysicalDevice16BitStorageFeatures": {
+                    "storageBuffer16BitAccess": true,
+                    "uniformAndStorageBuffer16BitAccess": true
+                },
+                "VkPhysicalDeviceFeatures": {
+                    "fillModeNonSolid": true,
+                    "wideLines": true
+                }
+            },
+            "extensions": {
+                "VK_KHR_dynamic_rendering": 1,
+                "VK_KHR_external_memory_win32": 1,
+                "VK_EXT_swapchain_colorspace": 1,
+                "VK_KHR_swapchain_mutable_format": 1,
+                "VK_KHR_swapchain": 1,
+                "VK_KHR_surface": 1,
+                "VK_KHR_push_descriptor": 1,
+                "VK_KHR_shader_non_semantic_info": 1
+            },
+            "properties": {
+                "VkPhysicalDeviceSubgroupProperties": {
+                    "subgroupSize": 4,
+                    "supportedStages": [
+                        "VK_SHADER_STAGE_COMPUTE_BIT"
+                    ],
+                    "supportedOperations": [
+                        "VK_SUBGROUP_FEATURE_BALLOT_BIT",
+                        "VK_SUBGROUP_FEATURE_ARITHMETIC_BIT"
+                    ]
+                },
+                "VkPhysicalDevicePushDescriptorPropertiesKHR": {
+                    "maxPushDescriptors": 2
+                }
+            },
+            "formats": {
+                "VK_FORMAT_R16G16B16A16_SFLOAT": {
+                    "VkFormatProperties": {
+                        "optimalTilingFeatures": [
+                            "VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT",
+                            "VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT"
+                        ]
+                    }
+                },
+                "VK_FORMAT_B8G8R8A8_UNORM": {
+                    "VkFormatProperties": {
+                        "optimalTilingFeatures": [
+                            "VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT"
+                        ]
+                    }
+                },
+                "VK_FORMAT_R8G8B8A8_UNORM": {
+                    "VkFormatProperties": {
+                        "optimalTilingFeatures": [
+                            "VK_FORMAT_FEATURE_TRANSFER_SRC_BIT",
+                            "VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT"
+                        ]
+                    }
+                }
+            }
+        },
+        "debug": {
+            "extensions": {
+                "VK_EXT_debug_utils": 1
+            }
+        }
+    },
+    "profiles": {
+        "VP_HDR_SNIPPING_TOOL_requirements": {
+            "version": 1,
+            "api-version": "1.2.198",
+            "label": "HDR Snipping Tool Requirements",
+            "description": "Profile ecapsulating the requirements to run HDR Snipping Tool.",
+            "capabilities": [
+                "baseline"
+            ],
+            "contributors": {
+                "Trent Shailer": {
+                    "company": "N/A"
+                }
+            },
+            "history": [
+                {
+                    "revision": 1,
+                    "date": "2025-01-13",
+                    "author": "Trent Shailer",
+                    "comment": "Initial revision"
+                }
+            ]
+        },
+        "VP_HDR_SNIPPING_TOOL_requirements_debug": {
+            "version": 1,
+            "api-version": "1.0.0",
+            "label": "Debug Profile",
+            "description": "Profile enabling debug support.",
+            "capabilities": [
+                "debug"
+            ],
+            "contributors": {
+                "Trent Shailer": {
+                    "company": "N/A"
+                }
+            },
+            "history": [
+                {
+                    "revision": 1,
+                    "date": "2025-01-13",
+                    "author": "Trent Shailer",
+                    "comment": "Initial revision"
+                }
+            ]
+        }
+    }
+}

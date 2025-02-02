@@ -1,7 +1,13 @@
+# Rust target
 /target
-hdr-config.toml
-log.txt
-/*.png
+
+# Log files
+*.log
+
+# Unneeded Vulkan Profiles file
+vulkan_profiles.hpp
+
+# Assets
 *.afdesign~lock~
 media/details.afdesign
-*.test.png
+crates/testing/src/assets

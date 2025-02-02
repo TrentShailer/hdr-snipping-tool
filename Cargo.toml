@@ -2,34 +2,69 @@
 resolver = "2"
 members = ["crates/*"]
 
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Trent Shailer"]
+
 [workspace.dependencies]
-thiserror = "1.0"
+# Logging
 tracing = "0.1"
+tracing-subscriber = "0.3"
+tracing-appender = "0.2"
 
-bytemuck = { version = "1.17", default-features = false, features = ["derive"] }
+# Error Handling
+thiserror = "2"
+windows-result = { version = "0.3" }
+
+# Primitive types
+bytemuck = { version = "1.21", default-features = false, features = ["derive"] }
 half = { version = "2.4" }
-smallvec = "1.13"
 
-windows = { version = "0.58" }
-windows-core = { version = "0.58" }
-windows-result = { version = "0.2" }
+# Windows API
+windows = { version = "0.59" }
+windows-core = { version = "0.59" }
 
+# Windowing
 winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
 raw-window-handle = "0.6"
 
-ash = { version = "0.38.0", default-features = false, features = [
-	"debug",
+# Vulkan
+ash-helper = { git = "https://github.com/trentshailer/ash-helper", rev = "ebb4ae8" }
+vulkan = { path = "crates/vulkan" }
+ash = { version = "0.38", default-features = false, features = [
 	"std",
-	"loaded",
+	"debug",
 ] }
-ash-window = { version = "0.13.0" }
+ash-window = { version = "0.13" }
+parking_lot = "0.12"
 
-image = { version = "0.25", features = [
-	"rayon",
-	"png",
-], default-features = false }
+# Config
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
 
-vulkan-instance = { path = "crates/vulkan-instance" }
-vulkan-renderer = { path = "crates/vulkan-renderer" }
-hdr-capture = { path = "crates/hdr-capture" }
+# Saving Screenshot
+image = { version = "0.25", default-features = false }
+
+# Taking Screenshot
 windows-capture-provider = { path = "crates/windows-capture-provider" }
+
+# Random data
+rand = "0.9"
+
+
+[workspace.lints.clippy]
+"alloc_instead_of_core" = "warn"
+"std_instead_of_alloc" = "warn"
+"std_instead_of_core" = "warn"
+
+"missing_docs" = "warn"
+
+"trivial_numeric_casts" = "warn"
+"unused_qualifications" = "warn"
+"deprecated_in_future" = "warn"
+"rust_2018_idioms" = "warn"
+"trivial_casts" = "warn"
+"use_self" = "warn"
+
+"missing_safety_doc" = "allow"

@@ -1,11 +1,21 @@
-pub mod capture_item_cache;
-pub mod directx_devices;
-pub mod display;
-pub mod send_types;
-pub mod windows_capture;
+//! # Windows Capture Provider
+//! Library to take and return a handle to a screenshot of a monitor in `R16G16B16A16Float` format.
+//!
 
-pub use capture_item_cache::{hovered, refresh, CaptureItemCache};
-pub use directx_devices::DirectXDevices;
-pub use display::Display;
-pub use send_types::{SendHANDLE, SendHMONITOR, SendIDirect3DDevice};
-pub use windows_capture::WindowsCapture;
+#![warn(missing_docs)]
+
+extern crate alloc;
+
+pub use capture::{WindowsCapture, WindowsCaptureResources};
+pub use capture_item_cache::CaptureItemCache;
+pub use directx::DirectX;
+pub use monitor::{Error as MonitorError, Monitor};
+pub use result::{LabelledWinResult, WinError, WinErrorSource};
+pub use send::{SendHANDLE, SendHMONITOR, SendHWND};
+
+mod capture;
+mod capture_item_cache;
+mod directx;
+mod monitor;
+mod result;
+mod send;
