@@ -293,8 +293,12 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                     }
 
                     // Save
-                    ElementState::Released => {
-                        if capture.selection.state == SelectionState::Selecting {
+                    ElementState::Released => match capture.selection.state {
+                        SelectionState::Clicked(_) => {
+                            capture.selection.state = SelectionState::None
+                        }
+
+                        SelectionState::Selecting => {
                             debug!("Requested save");
                             set_foreground_window(capture.formerly_focused_window.0);
                             application.window.set_visible(false);
@@ -306,7 +310,9 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
 
                             return;
                         }
-                    }
+
+                        SelectionState::None => {}
+                    },
                 }
 
                 application.capture = Some(capture);
