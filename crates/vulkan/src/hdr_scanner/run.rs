@@ -4,46 +4,130 @@ use std::time::Instant;
 use ash::vk;
 use ash_helper::{
     cmd_try_begin_label, cmd_try_end_label, queue_try_begin_label, queue_try_end_label, try_name,
-    VkError, VulkanContext,
+    LabelledVkResult, VkError, VulkanContext,
 };
-use half::f16;
 use tracing::debug;
 
 use crate::{HdrImage, QueuePurpose};
 
-use super::{Error, HdrScanner};
+use super::HdrScanner;
 
 impl HdrScanner {
-    /// Find if an image contains HDR content based on the SDR white of the monitor the image is
-    /// from.
-    pub unsafe fn contains_hdr(
-        &mut self,
-        hdr_image: HdrImage,
-        sdr_white: f32,
-    ) -> Result<(bool, f32), Error> {
-        let resources = self
-            .resources
-            .as_mut()
-            .expect("HdrScanner::resources was None");
+    /// Scans an `HdrImage` to find the value of the brightest colour component.
+    pub unsafe fn scan(&mut self, image: HdrImage) -> LabelledVkResult<f32> {
+        let image_descriptor = vk::DescriptorImageInfo::default()
+            .image_layout(vk::ImageLayout::GENERAL)
+            .image_view(image.view)
+            .sampler(vk::Sampler::null());
 
-        // Record and submit image scan.
-        self.image_scanner.run(
-            &self.vulkan,
-            &self.command_objects,
-            self.semaphore,
-            &mut self.semaphore_value,
-            resources,
-            hdr_image.view,
-        )?;
+        let buffer_descriptor = vk::DescriptorBufferInfo::default()
+            .buffer(self.buffer)
+            .offset(0)
+            .range(4);
 
-        // Record and submit buffer scan.
-        self.buffer_scanner.run(
-            &self.vulkan,
-            &self.command_objects,
-            self.semaphore,
-            &mut self.semaphore_value,
-            resources,
-        )?;
+        // Reset command pool
+        unsafe {
+            self.vulkan
+                .device()
+                .reset_command_pool(self.command_pool, vk::CommandPoolResetFlags::empty())
+                .map_err(|e| VkError::new(e, "vkResetCommandPool"))?;
+        }
+
+        // Write commands.
+        unsafe {
+            let begin_info = vk::CommandBufferBeginInfo::default()
+                .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+            self.vulkan
+                .device()
+                .begin_command_buffer(self.command_buffer, &begin_info)
+                .map_err(|e| VkError::new(e, "vkBeginCommandBuffer"))?;
+
+            cmd_try_begin_label(self.vulkan.as_ref(), self.command_buffer, "HDR Scan");
+
+            // Zero initialize the buffer
+            {
+                self.vulkan
+                    .device()
+                    .cmd_fill_buffer(self.command_buffer, self.buffer, 0, 4, 0);
+            }
+
+            {
+                let descriptor_writes = [
+                    // Image
+                    vk::WriteDescriptorSet::default()
+                        .dst_set(vk::DescriptorSet::null())
+                        .dst_binding(0)
+                        .descriptor_count(1)
+                        .descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
+                        .image_info(slice::from_ref(&image_descriptor)),
+                    // Buffer
+                    vk::WriteDescriptorSet::default()
+                        .dst_set(vk::DescriptorSet::null())
+                        .dst_binding(1)
+                        .descriptor_count(1)
+                        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                        .buffer_info(slice::from_ref(&buffer_descriptor)),
+                ];
+
+                self.vulkan
+                    .push_descriptor_device()
+                    .cmd_push_descriptor_set(
+                        self.command_buffer,
+                        vk::PipelineBindPoint::COMPUTE,
+                        self.layout,
+                        0,
+                        &descriptor_writes,
+                    );
+            }
+
+            self.vulkan.device().cmd_bind_pipeline(
+                self.command_buffer,
+                vk::PipelineBindPoint::COMPUTE,
+                self.pipeline,
+            );
+
+            // Dispatch
+            {
+                let dispatches_x = image.extent.width.div_ceil(16);
+                let dispatches_y = image.extent.height.div_ceil(16);
+
+                self.vulkan.device().cmd_dispatch(
+                    self.command_buffer,
+                    dispatches_x,
+                    dispatches_y,
+                    1,
+                );
+            }
+
+            cmd_try_end_label(self.vulkan.as_ref(), self.command_buffer);
+
+            self.vulkan
+                .device()
+                .end_command_buffer(self.command_buffer)
+                .map_err(|e| VkError::new(e, "vkEndCommandBuffer"))?;
+        }
+
+        // Submit work
+        {
+            self.semaphore_value += 1;
+
+            let mut semaphore_submit_info = vk::TimelineSemaphoreSubmitInfo::default()
+                .signal_semaphore_values(slice::from_ref(&self.semaphore_value));
+
+            let submit_info = vk::SubmitInfo::default()
+                .signal_semaphores(slice::from_ref(&self.semaphore))
+                .command_buffers(slice::from_ref(&self.command_buffer))
+                .push_next(&mut semaphore_submit_info);
+
+            unsafe {
+                let queue = self.vulkan.queue(QueuePurpose::Compute).lock();
+                self.vulkan
+                    .device()
+                    .queue_submit(*queue, slice::from_ref(&submit_info), vk::Fence::null())
+                    .map_err(|e| VkError::new(e, "vkQueueSubmit"))?;
+                drop(queue);
+            }
+        }
 
         // Get the result
         let maximum = {
@@ -66,17 +150,10 @@ impl HdrScanner {
                 try_name(
                     self.vulkan.as_ref(),
                     buffer,
-                    "HdrScanner Result Command Buffer",
+                    "HDR Scanner Result Command Buffer",
                 );
 
                 buffer
-            };
-
-            // find result offset
-            let output_offset_bytes = if resources.result_in_read {
-                0
-            } else {
-                resources.read_size
             };
 
             // Record Copy
@@ -95,14 +172,14 @@ impl HdrScanner {
                 );
 
                 let buffer_copy = vk::BufferCopy::default()
-                    .size(size_of::<f16>() as u64)
-                    .src_offset(output_offset_bytes)
+                    .size(4)
+                    .src_offset(0)
                     .dst_offset(0);
 
                 self.vulkan.device().cmd_copy_buffer(
                     command_buffer,
-                    resources.buffer,
-                    self.host_buffer,
+                    self.buffer,
+                    self.staging_buffer,
                     slice::from_ref(&buffer_copy),
                 );
 
@@ -133,7 +210,7 @@ impl HdrScanner {
 
                 unsafe {
                     let queue = self.vulkan.queue(QueuePurpose::Compute).lock();
-                    queue_try_begin_label(self.vulkan.as_ref(), *queue, "HdrScanner Read Result");
+                    queue_try_begin_label(self.vulkan.as_ref(), *queue, "HDR Scanner Read Result");
 
                     self.vulkan
                         .device()
@@ -160,7 +237,7 @@ impl HdrScanner {
                     .map_err(|e| VkError::new(e, "vkWaitSemaphores"))?;
 
                 debug!(
-                    "Waiting for HdrScanner took {}ms",
+                    "Waiting for HDR Scanner took {}ms",
                     start.elapsed().as_millis()
                 );
             }
@@ -169,18 +246,17 @@ impl HdrScanner {
             let maximum = {
                 let pointer = unsafe {
                     self.vulkan.device().map_memory(
-                        self.host_memory,
+                        self.staging_memory,
                         0,
-                        size_of::<f16>() as u64,
+                        4,
                         vk::MemoryMapFlags::empty(),
                     )
                 }
                 .map_err(|e| VkError::new(e, "vkMapMemory"))?;
 
-                let raw_output: &[f16] = unsafe { slice::from_raw_parts(pointer.cast(), 1) };
-                let maximum = raw_output[0];
+                let maximum: f32 = slice::from_raw_parts(pointer.cast(), 1)[0];
 
-                unsafe { self.vulkan.device().unmap_memory(self.host_memory) };
+                unsafe { self.vulkan.device().unmap_memory(self.staging_memory) };
 
                 maximum
             };
@@ -196,13 +272,6 @@ impl HdrScanner {
             maximum
         };
 
-        debug!("HDR Scanner found largest value: {:.3}", maximum);
-
-        // The capture contains HDR if the largest colour component is > sdr_white.
-        if maximum > f16::from_f32(sdr_white) {
-            Ok((true, maximum.to_f32()))
-        } else {
-            Ok((false, maximum.to_f32()))
-        }
+        Ok(maximum)
     }
 }

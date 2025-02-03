@@ -63,7 +63,7 @@ impl Drop for HistogramGenerator {
     }
 }
 
-/// Error variants from using image maximum.
+/// Error variants from creating the histogram generator.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {

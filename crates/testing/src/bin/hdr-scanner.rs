@@ -12,7 +12,7 @@ use rand::Rng;
 use rand_distr::Distribution;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use testing::setup_logger;
-use tracing::info;
+use tracing::{info, info_span};
 use vulkan::{HdrImage, HdrScanner, QueuePurpose, Vulkan};
 
 const EXTENT: vk::Extent2D = vk::Extent2D {
@@ -21,7 +21,6 @@ const EXTENT: vk::Extent2D = vk::Extent2D {
 };
 const VALUES: u64 = EXTENT.width as u64 * EXTENT.height as u64 * 4;
 const TRUE_MAX: f16 = f16::from_f32_const(15.53125);
-const SDR_WHITE: f32 = 15.5;
 
 fn main() {
     let _logger = setup_logger().unwrap();
@@ -29,8 +28,6 @@ fn main() {
     let vulkan = unsafe { Arc::new(Vulkan::new(true, None).unwrap()) };
 
     let mut hdr_scanner = unsafe { HdrScanner::new(vulkan.clone()).unwrap() };
-
-    unsafe { hdr_scanner.prepare(EXTENT).unwrap() };
 
     let (image, image_memory) = {
         let queue_family = vulkan.queue_family_index();
@@ -212,16 +209,14 @@ fn main() {
         extent: EXTENT,
     };
 
-    let (contains_hdr, maximum) =
-        { unsafe { hdr_scanner.contains_hdr(hdr_image, SDR_WHITE).unwrap() } };
+    let maximum = {
+        let _span = info_span!("Running Scanner").entered();
 
-    {
-        unsafe { hdr_scanner.free_resources() };
-    }
+        unsafe { hdr_scanner.scan(hdr_image).unwrap() }
+    };
 
-    assert!(contains_hdr);
     assert_eq!(f16::from_f32(maximum), TRUE_MAX);
-    info!("Result: {contains_hdr} | {maximum}");
+    info!("Result: {maximum}");
 
     unsafe {
         vulkan.device().destroy_buffer(staging_buffer, None);

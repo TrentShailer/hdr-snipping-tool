@@ -2,7 +2,6 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 
-use ash::vk;
 use testing::setup_logger;
 use tracing::info;
 use vulkan::{HdrImage, HdrScanner, Vulkan};
@@ -18,12 +17,6 @@ fn main() {
 
     // Get capture
     let monitor = Monitor::get_hovered_monitor(&dx).unwrap().unwrap();
-    let size = monitor.size();
-    unsafe {
-        hdr_scanner
-            .prepare(vk::Extent2D::default().width(size[0]).height(size[1]))
-            .unwrap();
-    }
     let capture_item = { cache.get_capture_item(monitor).unwrap() };
     let capture = { WindowsCapture::take_capture(&dx, monitor, &capture_item).unwrap() };
 
@@ -37,20 +30,15 @@ fn main() {
         .unwrap()
     };
 
-    let (is_hdr, maximum) = unsafe {
-        hdr_scanner
-            .contains_hdr(hdr_image, capture.0.monitor.sdr_white)
-            .unwrap()
-    };
+    let maximum = unsafe { hdr_scanner.scan(hdr_image).unwrap() };
 
     info!(
-        "HDR: {} | Maximum: {} | SDR White: {:.3}",
-        is_hdr, maximum, capture.0.monitor.sdr_white
+        "Maximum: {} | SDR White: {:.3}",
+        maximum, capture.0.monitor.sdr_white
     );
 
     unsafe {
         hdr_image.destroy(&vulkan);
-        hdr_scanner.free_resources();
     }
 
     {

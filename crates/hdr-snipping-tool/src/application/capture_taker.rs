@@ -159,9 +159,7 @@ impl InnerCaptureTaker {
         }
     }
 
-    pub fn shutdown(&mut self) {
-        unsafe { self.hdr_scanner.free_resources() };
-    }
+    pub fn shutdown(&mut self) {}
 
     pub fn refresh_cache(&mut self) {
         if let Err(e) = self.cache.prune(&self.direct_x) {
@@ -293,20 +291,8 @@ impl InnerCaptureTaker {
 
         // Find the whitepoint
         {
-            if let Err(e) = unsafe { self.hdr_scanner.prepare(hdr_capture.extent) } {
-                report(
-                    e,
-                    "Encountered an error while creating resources to analyse the screenshot",
-                );
-                let _ = proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
-                return;
-            }
-
-            let (is_hdr, maximum) = match unsafe {
-                self.hdr_scanner
-                    .contains_hdr(hdr_capture, monitor.sdr_white)
-            } {
-                Ok(is_hdr) => is_hdr,
+            let maximum = match unsafe { self.hdr_scanner.scan(hdr_capture) } {
+                Ok(maximum) => maximum,
                 Err(e) => {
                     report(e, "Encountered an error while analysing the screenshot");
                     let _ =
@@ -314,6 +300,8 @@ impl InnerCaptureTaker {
                     return;
                 }
             };
+
+            let is_hdr = maximum <= monitor.sdr_white;
 
             if !is_hdr {
                 debug!("Selected SDR whitepoint: {}", monitor.sdr_white);
@@ -385,7 +373,6 @@ impl InnerCaptureTaker {
 
         // Clean up
         {
-            unsafe { self.hdr_scanner.free_resources() };
             if let Err(e) = windows_capture_resources.destroy(&self.direct_x) {
                 error!("Failed to destroy Windows Capture Resources:\n{e}");
             }
