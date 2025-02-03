@@ -9,16 +9,6 @@
                 "VkPhysicalDeviceDynamicRenderingFeaturesKHR": {
                     "dynamicRendering": true
                 },
-                "VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures": {
-                    "shaderSubgroupExtendedTypes": true
-                },
-                "VkPhysicalDeviceShaderFloat16Int8Features": {
-                    "shaderFloat16": true
-                },
-                "VkPhysicalDevice16BitStorageFeatures": {
-                    "storageBuffer16BitAccess": true,
-                    "uniformAndStorageBuffer16BitAccess": true
-                },
                 "VkPhysicalDeviceFeatures": {
                     "fillModeNonSolid": true,
                     "wideLines": true
@@ -35,33 +25,47 @@
                 "VK_KHR_shader_non_semantic_info": 1
             },
             "properties": {
-                "VkPhysicalDeviceSubgroupProperties": {
-                    "subgroupSize": 4,
-                    "supportedStages": [
-                        "VK_SHADER_STAGE_COMPUTE_BIT"
-                    ],
-                    "supportedOperations": [
-                        "VK_SUBGROUP_FEATURE_BALLOT_BIT",
-                        "VK_SUBGROUP_FEATURE_ARITHMETIC_BIT"
-                    ]
-                },
                 "VkPhysicalDevicePushDescriptorPropertiesKHR": {
                     "maxPushDescriptors": 2
                 }
             },
             "formats": {
+                "VK_FORMAT_R32G32_SFLOAT": {
+                    "VkFormatProperties": {
+                        "bufferFeatures": [
+                            "VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT"
+                        ]
+                    }
+                },
+                "VK_FORMAT_R32G32B32A32_SFLOAT": {
+                    "VkFormatProperties": {
+                        "bufferFeatures": [
+                            "VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT"
+                        ]
+                    }
+                },
+                "VK_FORMAT_R32_UINT": {
+                    "VkFormatProperties": {
+                        "bufferFeatures": [
+                            "VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT"
+                        ]
+                    }
+                },
                 "VK_FORMAT_R16G16B16A16_SFLOAT": {
                     "VkFormatProperties": {
                         "optimalTilingFeatures": [
                             "VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT",
-                            "VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT"
+                            "VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT",
+                            "VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT",
+                            "VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT"
                         ]
                     }
                 },
                 "VK_FORMAT_B8G8R8A8_UNORM": {
                     "VkFormatProperties": {
                         "optimalTilingFeatures": [
-                            "VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT"
+                            "VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT",
+                            "VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT"
                         ]
                     }
                 },
@@ -69,7 +73,9 @@
                     "VkFormatProperties": {
                         "optimalTilingFeatures": [
                             "VK_FORMAT_FEATURE_TRANSFER_SRC_BIT",
-                            "VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT"
+                            "VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT",
+                            "VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT",
+                            "VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT"
                         ]
                     }
                 }
