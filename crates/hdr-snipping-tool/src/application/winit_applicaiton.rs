@@ -81,33 +81,8 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                 debug!("Capture Progress: {}", message);
 
                 match message {
-                    CaptureProgress::Imported(hdr_image) => {
-                        if let Some(capture) = application.capture.as_mut() {
-                            capture.hdr_capture = Some(hdr_image);
-                            application.renderer.set_hdr_capture(capture.hdr_capture);
-                            // application.capture = Some(capture)
-                        }
-                    }
-
-                    CaptureProgress::FoundWhitepoint(whitepoint) => {
-                        if let Some(capture) = application.capture.as_mut() {
-                            capture.whitepoint = whitepoint;
-                            application.renderer.set_whitepoint(capture.whitepoint);
-                        }
-                    }
-
-                    CaptureProgress::CaptureTaken(windows_capture) => {
-                        if let Some(capture) = application.capture.as_mut() {
-                            capture.windows_capture = Some(windows_capture);
-
-                            application.window.set_visible(true);
-                            application.window.focus_window();
-                        }
-                    }
-
                     CaptureProgress::FoundMonitor(monitor) => {
                         let capture = Capture::new(application.vulkan.clone(), monitor);
-                        application.capture = Some(capture);
 
                         // Update window
                         {
@@ -120,6 +95,43 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                             let _ = application
                                 .window
                                 .request_inner_size(PhysicalSize::new(size[0], size[1]));
+                        }
+
+                        // Update renderer
+                        {
+                            application.renderer.set_mouse_position(self.mouse_position);
+                            application.renderer.set_selection(capture.selection);
+                        }
+
+                        // Request redraw
+                        if application.renderer.render().is_err() {
+                            event_loop.exit();
+                            warn!("Exiting: Renderer::render returned Err");
+                        }
+
+                        application.capture = Some(capture);
+                    }
+
+                    CaptureProgress::CaptureTaken(windows_capture) => {
+                        if let Some(capture) = application.capture.as_mut() {
+                            capture.windows_capture = Some(windows_capture);
+
+                            application.window.set_visible(true);
+                            application.window.focus_window();
+                        }
+                    }
+
+                    CaptureProgress::Imported(hdr_image) => {
+                        if let Some(capture) = application.capture.as_mut() {
+                            capture.hdr_capture = Some(hdr_image);
+                            application.renderer.set_hdr_capture(capture.hdr_capture);
+                        }
+                    }
+
+                    CaptureProgress::FoundWhitepoint(whitepoint) => {
+                        if let Some(capture) = application.capture.as_mut() {
+                            capture.whitepoint = whitepoint;
+                            application.renderer.set_whitepoint(capture.whitepoint);
                         }
                     }
 
