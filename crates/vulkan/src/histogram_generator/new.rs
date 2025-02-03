@@ -50,7 +50,7 @@ impl HistogramGenerator {
         let layout = {
             let push_constant_range = vk::PushConstantRange::default()
                 .offset(0)
-                .size(4)
+                .size(8)
                 .stage_flags(vk::ShaderStageFlags::COMPUTE);
 
             let layout_info = vk::PipelineLayoutCreateInfo::default()

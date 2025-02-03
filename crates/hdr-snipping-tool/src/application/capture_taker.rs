@@ -301,7 +301,9 @@ impl InnerCaptureTaker {
                 }
             };
 
-            let is_hdr = maximum <= monitor.sdr_white;
+            debug!("Found maximum: {}", maximum);
+
+            let is_hdr = maximum > monitor.sdr_white;
 
             if !is_hdr {
                 debug!("Selected SDR whitepoint: {}", monitor.sdr_white);
@@ -335,7 +337,7 @@ impl InnerCaptureTaker {
                 // }
 
                 let whitepoint = {
-                    let threshold: f64 = 0.99;
+                    let threshold: f64 = 0.9975;
 
                     let total = windows_capture.size[0] * windows_capture.size[1] * 3;
 

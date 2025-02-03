@@ -257,6 +257,7 @@ static const VpFeatureDesc featureDesc = {
                 case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR: {
                     VkPhysicalDeviceFeatures2KHR* s = static_cast<VkPhysicalDeviceFeatures2KHR*>(static_cast<void*>(p));
                     s->features.fillModeNonSolid = VK_TRUE;
+                    s->features.shaderFloat64 = VK_TRUE;
                     s->features.wideLines = VK_TRUE;
                 } break;
                 default: break;
@@ -276,6 +277,7 @@ static const VpFeatureDesc featureDesc = {
                 case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR: {
                     VkPhysicalDeviceFeatures2KHR* s = static_cast<VkPhysicalDeviceFeatures2KHR*>(static_cast<void*>(p));
                     ret = ret && (s->features.fillModeNonSolid == VK_TRUE);
+                    ret = ret && (s->features.shaderFloat64 == VK_TRUE);
                     ret = ret && (s->features.wideLines == VK_TRUE);
                 } break;
                 default: break;
@@ -344,6 +346,7 @@ static const VpFeatureDesc featureDesc = {
                 case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR: {
                     VkPhysicalDeviceFeatures2KHR* s = static_cast<VkPhysicalDeviceFeatures2KHR*>(static_cast<void*>(p));
                     s->features.fillModeNonSolid = VK_TRUE;
+                    s->features.shaderFloat64 = VK_TRUE;
                     s->features.wideLines = VK_TRUE;
                 } break;
                 default: break;
@@ -363,6 +366,7 @@ static const VpFeatureDesc featureDesc = {
                 case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR: {
                     VkPhysicalDeviceFeatures2KHR* s = static_cast<VkPhysicalDeviceFeatures2KHR*>(static_cast<void*>(p));
                     ret = ret && (s->features.fillModeNonSolid == VK_TRUE);
+                    ret = ret && (s->features.shaderFloat64 == VK_TRUE);
                     ret = ret && (s->features.wideLines == VK_TRUE);
                 } break;
                 default: break;

@@ -11,7 +11,8 @@
                 },
                 "VkPhysicalDeviceFeatures": {
                     "fillModeNonSolid": true,
-                    "wideLines": true
+                    "wideLines": true,
+                    "shaderFloat64": true
                 }
             },
             "extensions": {

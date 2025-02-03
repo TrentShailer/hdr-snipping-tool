@@ -14,7 +14,7 @@ struct Descriptor
 ConstantBuffer<PushConstants> push_constants;
 struct PushConstants
 {
-    float bin_width;
+    double bin_width;
 }
 
 static const uint2 OUT_OF_BOUNDS_INDEX = { 0, 0 };
@@ -37,9 +37,9 @@ void main(
 
     float4 colour = descriptor.image[index.xy];
 
-    let r_bin_index = uint(floor(colour.r / push_constants.bin_width));
-    let g_bin_index = uint(floor(colour.g / push_constants.bin_width));
-    let b_bin_index = uint(floor(colour.b / push_constants.bin_width));
+    let r_bin_index = uint(floor(double(colour.r) / push_constants.bin_width));
+    let g_bin_index = uint(floor(double(colour.g) / push_constants.bin_width));
+    let b_bin_index = uint(floor(double(colour.b) / push_constants.bin_width));
 
     descriptor.histogram.InterlockedAdd(r_bin_index * 4, value);
     descriptor.histogram.InterlockedAdd(g_bin_index * 4, value);
