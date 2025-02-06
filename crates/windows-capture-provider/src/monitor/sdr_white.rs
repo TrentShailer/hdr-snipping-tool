@@ -60,7 +60,7 @@ impl Monitor {
 
             let matching_path_index = match maybe_matching_path_index {
                 Some(index) => index,
-                None => return Err(Error::MonitorsChanged),
+                None => return Err(Error::MonitorsMismatch),
             };
 
             paths[matching_path_index]

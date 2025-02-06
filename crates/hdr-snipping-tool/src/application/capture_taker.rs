@@ -167,7 +167,14 @@ impl InnerCaptureTaker {
         };
 
         if let Err(e) = self.cache.cache_active(&self.direct_x) {
-            error!("Could not cache the active monitors:\n{e}");
+            match e {
+                MonitorError::WinError(win_error) => {
+                    error!("Could not cache the active monitors:\n{win_error}")
+                }
+                MonitorError::MonitorsMismatch => {
+                    debug!("Could not cache the active monitors:\n{e}");
+                }
+            };
         };
     }
 

@@ -136,7 +136,7 @@ pub enum Error {
     /// A Windows API call failed.
     WinError(#[from] WinError),
 
-    #[error("The monitors changed while loading their config.")]
+    #[error("The DXGI Outputs and monitor config do not match.")]
     /// The monitor had no matching config path.
-    MonitorsChanged,
+    MonitorsMismatch,
 }
