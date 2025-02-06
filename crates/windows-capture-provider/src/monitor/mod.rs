@@ -3,6 +3,7 @@ mod sdr_white;
 use core::fmt::Debug;
 
 use thiserror::Error;
+use tracing::debug;
 use windows::{
     Graphics::Capture::GraphicsCaptureItem,
     Win32::{
@@ -30,7 +31,13 @@ pub struct Monitor {
     /// The monitor's GDI device name.
     pub device_name: [u16; 32],
 
-    /// The monitor's SDR White
+    /// The monitor's maximum luminance.
+    pub min_brightness: f32,
+
+    /// The monitor's minimum luminance.
+    pub max_brightness: f32,
+
+    /// The monitor's SDR White luminance.
     pub sdr_white: f32,
 }
 
@@ -43,6 +50,8 @@ impl Monitor {
             handle: SendHMONITOR(descriptor.Monitor),
             desktop_coordinates: descriptor.DesktopCoordinates,
             device_name: descriptor.DeviceName,
+            max_brightness: descriptor.MaxLuminance / 80.0,
+            min_brightness: descriptor.MinLuminance / 80.0,
             sdr_white,
         })
     }
@@ -123,8 +132,8 @@ impl core::fmt::Display for Monitor {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "Monitor {{ handle: {:?}, rect: {:?}, sdr_white: {} }}",
-            self.handle.0, self.desktop_coordinates, self.sdr_white
+            "Monitor {{ handle: {:?}, rect: {:?}, sdr_white: {}, min_brightness: {}, max_brightness: {} }}",
+            self.handle.0, self.desktop_coordinates, self.sdr_white, self.min_brightness, self.max_brightness
         )
     }
 }

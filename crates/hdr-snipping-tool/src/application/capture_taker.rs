@@ -163,7 +163,14 @@ impl InnerCaptureTaker {
 
     pub fn refresh_cache(&mut self) {
         if let Err(e) = self.cache.prune(&self.direct_x) {
-            error!("Could not prune the cache:\n{e}");
+            match e {
+                MonitorError::WinError(win_error) => {
+                    error!("Could not prune the cache:\n{win_error}")
+                }
+                MonitorError::MonitorsMismatch => {
+                    debug!("Could not prune the cache:\n{e}");
+                }
+            };
         };
 
         if let Err(e) = self.cache.cache_active(&self.direct_x) {
@@ -191,7 +198,7 @@ impl InnerCaptureTaker {
                         return;
                     }
 
-                    MonitorError::MonitorsChanged => {
+                    MonitorError::MonitorsMismatch => {
                         report(e, "Could not take the screenshot.\nThe monitor config changed during loading");
                         let _ = proxy
                             .send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
@@ -343,8 +350,8 @@ impl InnerCaptureTaker {
                 //     debug!("{message}");
                 // }
 
-                let whitepoint = {
-                    let threshold: f64 = 0.9975;
+                let histogram_whitepoint = {
+                    let threshold: f64 = 0.99;
 
                     let total = windows_capture.size[0] * windows_capture.size[1] * 3;
 
@@ -361,16 +368,11 @@ impl InnerCaptureTaker {
                         }
                     }
 
-                    (maximum / BIN_COUNT as f32) * selected_bin_index as f32
+                    (maximum / BIN_COUNT as f32) * (selected_bin_index + 1) as f32
                 };
 
-                let whitepoint = if whitepoint <= monitor.sdr_white {
-                    debug!("Selected HDR Whitepoint (SDR) {}", monitor.sdr_white);
-                    monitor.sdr_white
-                } else {
-                    debug!("Selected HDR Whitepoint (HDR) {}", whitepoint);
-                    whitepoint
-                };
+                let whitepoint = histogram_whitepoint.max(monitor.max_brightness);
+                debug!("Selected HDR Whitepoint {}", whitepoint);
 
                 proxy
                     .send_event(WindowMessage::CaptureProgress(
