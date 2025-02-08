@@ -160,12 +160,9 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
             return;
         }
 
-        let Some(application) = self.application.as_mut() else {
+        if self.application.is_none() {
             return;
-        };
-
-        // Request render
-        application.window.request_redraw();
+        }
 
         // Handle tray events
         'tray: {
@@ -229,6 +226,7 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                     event_loop.exit();
                     warn!("Exiting: Renderer::resize returned Err");
                 }
+                application.window.request_redraw();
             }
 
             WindowEvent::KeyboardInput {
@@ -282,6 +280,8 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                     capture.selection.update_selection(self.mouse_position);
                     application.renderer.set_selection(capture.selection);
                 }
+
+                application.window.request_redraw();
             }
 
             WindowEvent::MouseInput {
@@ -302,6 +302,7 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                     ElementState::Pressed => {
                         capture.selection.start_selection(self.mouse_position);
                         application.renderer.set_selection(capture.selection);
+                        application.window.request_redraw();
                     }
 
                     // Save
