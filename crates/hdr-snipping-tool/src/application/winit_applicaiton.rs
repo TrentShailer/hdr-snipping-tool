@@ -82,7 +82,11 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
 
                 match message {
                     CaptureProgress::FoundMonitor(monitor) => {
-                        let capture = Capture::new(application.vulkan.clone(), monitor);
+                        let capture = Capture::new(
+                            application.vulkan.clone(),
+                            application.capture_taker.clone(),
+                            monitor,
+                        );
 
                         // Update window
                         {
@@ -161,11 +165,7 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
         };
 
         // Request render
-        if application.renderer.render().is_err() {
-            event_loop.exit();
-            warn!("Exiting: Renderer::render returned Err");
-            return;
-        }
+        application.window.request_redraw();
 
         // Handle tray events
         'tray: {

@@ -13,6 +13,7 @@ use std::{
 
 use tracing::{debug, error, info_span};
 use vulkan::{HdrImage, HdrScanner, HistogramGenerator, Vulkan, BIN_COUNT};
+use windows::Win32::Foundation::CloseHandle;
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, MonitorError, WindowsCapture};
 use winit::event_loop::EventLoopProxy;
 
@@ -46,6 +47,7 @@ impl Display for CaptureProgress {
 
 enum Message {
     TakeCapture(EventLoopProxy<WindowMessage>),
+    CloseHandle(WindowsCapture),
     RefreshCache,
     Shutdown,
 }
@@ -75,6 +77,7 @@ impl CaptureTaker {
                         Message::Shutdown => break,
                         Message::RefreshCache => inner.refresh_cache(),
                         Message::TakeCapture(proxy) => inner.take_capture(proxy),
+                        Message::CloseHandle(capture) => inner.close_handle(capture),
                     }
                 }
 
@@ -110,6 +113,15 @@ impl CaptureTaker {
 
     pub fn take_capture(&self, proxy: EventLoopProxy<WindowMessage>) -> Result<(), ()> {
         if let Err(e) = self.sender.send(Message::TakeCapture(proxy)) {
+            error!("Failed to send message to capture taker:\n{e}");
+            return Err(());
+        }
+
+        Ok(())
+    }
+
+    pub fn close_handle(&self, capture: WindowsCapture) -> Result<(), ()> {
+        if let Err(e) = self.sender.send(Message::CloseHandle(capture)) {
             error!("Failed to send message to capture taker:\n{e}");
             return Err(());
         }
@@ -386,6 +398,18 @@ impl InnerCaptureTaker {
         {
             if let Err(e) = windows_capture_resources.destroy(&self.direct_x) {
                 error!("Failed to destroy Windows Capture Resources:\n{e}");
+            }
+        }
+    }
+
+    pub fn close_handle(&self, capture: WindowsCapture) {
+        if capture.handle.0.is_invalid() {
+            return;
+        }
+
+        unsafe {
+            if let Err(e) = CloseHandle(capture.handle.0) {
+                error!("Failed to close handle to Windows capture:\n{e}");
             }
         }
     }

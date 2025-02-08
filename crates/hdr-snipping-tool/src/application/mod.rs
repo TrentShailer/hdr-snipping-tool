@@ -43,14 +43,14 @@ pub struct Application {
 
     vulkan: Arc<Vulkan>,
     renderer: Renderer,
-    capture_taker: CaptureTaker,
+    capture_taker: Arc<CaptureTaker>,
     capture_saver: CaptureSaver,
 
     capture: Option<Capture>,
 }
 
 impl Application {
-    pub fn new(event_loop: &ActiveEventLoop, config: Config) -> Self {
+    pub fn new(event_loop: &ActiveEventLoop, _config: Config) -> Self {
         // Create the window
         let window = {
             let focused_window = get_foreground_window();
@@ -131,7 +131,7 @@ impl Application {
         };
 
         let renderer = Renderer::new(vulkan.clone(), &window);
-        let capture_taker = CaptureTaker::new(vulkan.clone());
+        let capture_taker = Arc::new(CaptureTaker::new(vulkan.clone()));
         let capture_saver = CaptureSaver::new(vulkan.clone());
 
         Self {

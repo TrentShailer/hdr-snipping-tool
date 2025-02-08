@@ -1,3 +1,4 @@
+use tracing::error;
 use windows::{
     Graphics::DirectX::Direct3D11::IDirect3DDevice,
     Win32::{
@@ -96,6 +97,14 @@ impl DirectX {
     }
 }
 
+impl Drop for DirectX {
+    fn drop(&mut self) {
+        if let Err(e) = self.d3d_device.Close() {
+            error!("Failed to close D3D device:\n{e}");
+        }
+    }
+}
+
 fn d3d11_device_with_type(
     driver_type: D3D_DRIVER_TYPE,
     flags: D3D11_CREATE_DEVICE_FLAG,
@@ -105,7 +114,7 @@ fn d3d11_device_with_type(
         D3D11CreateDevice(
             None,
             driver_type,
-            HMODULE(core::ptr::null_mut() as _),
+            HMODULE::default(),
             flags,
             None,
             D3D11_SDK_VERSION,
