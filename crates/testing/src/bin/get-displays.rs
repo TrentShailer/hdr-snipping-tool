@@ -1,7 +1,5 @@
-use std::time::Instant;
-
 use testing::setup_logger;
-use tracing::info;
+use tracing::info_span;
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor};
 
 fn main() {
@@ -18,28 +16,14 @@ fn main() {
     println!("Hovered: {hovered}");
 
     let _capture_item = {
-        let start = Instant::now();
+        let _span = info_span!("Get item 1").entered();
 
-        let item = cache.get_capture_item(hovered).unwrap();
-
-        info!(
-            "Getting capture item took {}ms",
-            start.elapsed().as_millis()
-        );
-
-        item
+        cache.get_capture_item(hovered).unwrap()
     };
 
     let _capture_item = {
-        let start = Instant::now();
+        let _span = info_span!("Get item 2").entered();
 
-        let item = cache.get_capture_item(hovered).unwrap();
-
-        info!(
-            "Getting capture item took {}ms",
-            start.elapsed().as_millis()
-        );
-
-        item
+        cache.get_capture_item(hovered).unwrap()
     };
 }

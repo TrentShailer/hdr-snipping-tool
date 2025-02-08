@@ -8,13 +8,15 @@ use std::{
 use tracing::debug;
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCapture};
 
-use ash_helper::VulkanContext;
 use parking_lot::Mutex;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use testing::setup_logger;
 use vulkan::{HdrImage, Renderer, RendererState, Vulkan};
 use winit::{
-    application::ApplicationHandler, dpi::PhysicalPosition, event_loop::EventLoop, window::Window,
+    application::ApplicationHandler,
+    dpi::PhysicalPosition,
+    event_loop::{ActiveEventLoop, EventLoop},
+    window::Window,
 };
 
 fn main() {
@@ -29,29 +31,20 @@ fn main() {
 }
 
 struct App {
-    vulkan: Option<Arc<Vulkan>>,
+    app: Option<ActiveApp>,
+}
+
+struct ActiveApp {
+    vulkan: Arc<Vulkan>,
     render_thread: Option<JoinHandle<()>>,
-    render_sender: Option<Sender<RenderMessage>>,
-    render_state: Option<Arc<Mutex<RendererState>>>,
-    window: Option<Window>,
-    capture: Option<HdrImage>,
+    render_sender: Sender<RenderMessage>,
+    render_state: Arc<Mutex<RendererState>>,
+    window: Window,
+    capture: HdrImage,
 }
 
-impl App {
-    pub fn new() -> Self {
-        Self {
-            vulkan: None,
-            render_sender: None,
-            render_thread: None,
-            window: None,
-            render_state: None,
-            capture: None,
-        }
-    }
-}
-
-impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+impl ActiveApp {
+    pub fn new(event_loop: &ActiveEventLoop) -> Self {
         let window_attributes = Window::default_attributes()
             .with_title("Renderer Testing")
             .with_active(false)
@@ -62,21 +55,11 @@ impl ApplicationHandler for App {
         let vulkan = unsafe {
             Arc::new(Vulkan::new(true, Some(window.display_handle().unwrap().as_raw())).unwrap())
         };
-        let direct_x = DirectX::new().unwrap();
-        let mut cache = CaptureItemCache::new();
-
-        let renderer = unsafe {
-            Renderer::new(
-                vulkan.clone(),
-                window.display_handle().unwrap().as_raw(),
-                window.window_handle().unwrap().as_raw(),
-            )
-            .unwrap()
-        };
-
-        self.render_state = Some(renderer.state.clone());
 
         let (windows_capture, capture) = {
+            let direct_x = DirectX::new().unwrap();
+            let mut cache = CaptureItemCache::new();
+
             let monitor = Monitor::get_hovered_monitor(&direct_x).unwrap().unwrap();
             let capture_item = cache.get_capture_item(monitor).unwrap();
 
@@ -99,21 +82,64 @@ impl ApplicationHandler for App {
             (capture, hdr_capture)
         };
 
+        let renderer = unsafe {
+            Renderer::new(
+                vulkan.clone(),
+                window.display_handle().unwrap().as_raw(),
+                window.window_handle().unwrap().as_raw(),
+            )
+            .unwrap()
+        };
+
+        let render_state = renderer.state.clone();
+
         let (render_sender, render_thread) = render_thread(renderer);
 
-        let mut render_state = self.render_state.as_ref().unwrap().lock();
-        render_state.capture = Some(capture);
-        render_state.whitepoint = windows_capture.monitor.sdr_white;
-        drop(render_state);
+        {
+            let mut render_state = render_state.lock();
+            render_state.capture = Some(capture);
+            render_state.whitepoint = windows_capture.monitor.sdr_white;
+            drop(render_state);
+        }
 
         window.set_visible(true);
 
-        self.capture = Some(capture);
+        Self {
+            vulkan,
+            render_thread: Some(render_thread),
+            render_sender,
+            render_state,
+            window,
+            capture,
+        }
+    }
+}
 
-        self.window = Some(window);
-        self.vulkan = Some(vulkan);
-        self.render_sender = Some(render_sender);
-        self.render_thread = Some(render_thread);
+impl Drop for ActiveApp {
+    fn drop(&mut self) {
+        unsafe {
+            self.capture.destroy(&self.vulkan);
+            self.render_sender.send(RenderMessage::Shutdown).unwrap();
+            self.render_thread.take().unwrap().join().unwrap();
+        }
+    }
+}
+
+impl App {
+    pub fn new() -> Self {
+        Self { app: None }
+    }
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let app = ActiveApp::new(event_loop);
+
+        self.app = Some(app);
+    }
+
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+        self.app.take();
     }
 
     fn window_event(
@@ -122,57 +148,23 @@ impl ApplicationHandler for App {
         window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
-        if self.window.is_none() {
+        let Some(app) = self.app.as_mut() else {
             return;
         };
 
-        if event == winit::event::WindowEvent::Destroyed
-            && self.window.as_ref().unwrap().id() == window_id
-        {
-            self.render_sender
-                .as_ref()
-                .unwrap()
-                .send(RenderMessage::Shutdown)
-                .unwrap();
-
-            self.render_thread.take().unwrap().join().unwrap();
-
-            let capture = self.capture.take().unwrap();
-            let vulkan = self.vulkan.take().unwrap();
-            unsafe {
-                vulkan.device().device_wait_idle().unwrap();
-                capture.destroy(&vulkan);
-            }
-
+        if event == winit::event::WindowEvent::Destroyed && app.window.id() == window_id {
             event_loop.exit();
             return;
         }
 
         match event {
-            winit::event::WindowEvent::CloseRequested => {
-                self.render_sender
-                    .as_ref()
-                    .unwrap()
-                    .send(RenderMessage::Shutdown)
-                    .unwrap();
-
-                self.render_thread.take().unwrap().join().unwrap();
-
-                let capture = self.capture.take().unwrap();
-                let vulkan = self.vulkan.take().unwrap();
-                unsafe {
-                    vulkan.device().device_wait_idle().unwrap();
-                    capture.destroy(&vulkan);
-                }
-
-                event_loop.exit();
-            }
+            winit::event::WindowEvent::CloseRequested => event_loop.exit(),
 
             winit::event::WindowEvent::Resized(size) => {
                 let width = size.width as f64;
                 let height = size.height as f64;
 
-                let mut state = self.render_state.as_ref().unwrap().lock();
+                let mut state = app.render_state.lock();
                 state.selection = [
                     PhysicalPosition::new(width / 2.0, height / 2.0).into(),
                     PhysicalPosition::new(width / 2.0 - width / 4.0, height / 2.0 - height / 4.0)
@@ -180,26 +172,20 @@ impl ApplicationHandler for App {
                 ];
                 drop(state);
 
-                self.render_sender
-                    .as_ref()
-                    .unwrap()
+                app.render_sender
                     .send(RenderMessage::RequestResize)
                     .unwrap();
             }
 
             winit::event::WindowEvent::RedrawRequested => {
-                self.render_sender
-                    .as_ref()
-                    .unwrap()
-                    .send(RenderMessage::Render)
-                    .unwrap();
+                app.render_sender.send(RenderMessage::Render).unwrap();
             }
 
             winit::event::WindowEvent::CursorMoved {
                 device_id: _,
                 position,
             } => {
-                let mut state = self.render_state.as_ref().unwrap().lock();
+                let mut state = app.render_state.lock();
                 state.mouse_position = position.into();
                 drop(state);
             }
@@ -209,10 +195,10 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
-        if self.window.is_none() {
+        let Some(app) = self.app.as_mut() else {
             return;
         };
-        self.window.as_ref().unwrap().request_redraw();
+        app.window.request_redraw();
     }
 }
 

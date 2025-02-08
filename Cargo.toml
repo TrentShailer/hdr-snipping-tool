@@ -52,6 +52,8 @@ windows-capture-provider = { path = "crates/windows-capture-provider" }
 # Random data
 rand = "0.9"
 
+# Allocator
+mimalloc = { version = "0.1" }
 
 [workspace.lints.clippy]
 "alloc_instead_of_core" = "warn"

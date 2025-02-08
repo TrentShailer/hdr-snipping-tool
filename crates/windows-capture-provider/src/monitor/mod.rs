@@ -3,7 +3,6 @@ mod sdr_white;
 use core::fmt::Debug;
 
 use thiserror::Error;
-use tracing::debug;
 use windows::{
     Graphics::Capture::GraphicsCaptureItem,
     Win32::{

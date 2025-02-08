@@ -3,7 +3,16 @@
 //!
 
 #![warn(missing_docs)]
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+// hide console window on Windows in release
+#![cfg_attr(
+    all(not(debug_assertions), not(feature = "mimalloc_debug")),
+    windows_subsystem = "windows"
+)]
+
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 pub use utilities::directories::{config_dir, screenshot_dir};
 

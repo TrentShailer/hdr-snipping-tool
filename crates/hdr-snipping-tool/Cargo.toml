@@ -43,5 +43,11 @@ tray-icon = { version = "0.19", default-features = false }
 # Windows API
 windows = { workspace = true, features = ["Win32_System_Threading"] }
 
+# Allocator
+mimalloc = { workspace = true }
+
+[features]
+mimalloc_debug = ["mimalloc/debug"]
+
 [build-dependencies]
 embed-resource = "3.0"
