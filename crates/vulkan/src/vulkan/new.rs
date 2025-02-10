@@ -36,7 +36,7 @@ impl Vulkan {
         let core_profile = vp::ProfileProperties::default()
             .profile_name(c"VP_HDR_SNIPPING_TOOL_requirements")
             .unwrap()
-            .spec_version(1);
+            .spec_version(2);
         let debug_profile = vp::ProfileProperties::default()
             .profile_name(c"VP_HDR_SNIPPING_TOOL_requirements_debug")
             .unwrap()
