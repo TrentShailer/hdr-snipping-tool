@@ -339,9 +339,17 @@ impl InnerCaptureTaker {
                         CaptureProgress::FoundWhitepoint(monitor.sdr_white),
                     ))
                     .report_and_panic("Eventloop exited");
-            } else {
-                // TODO should a preliminary value be sent first incase the user's GPU does not match mine in atomic speed?
+            }
+            /*  else if maximum <= monitor.max_brightness {
+                debug!("Selected HDR Whitepoint {}", monitor.max_brightness);
 
+                proxy
+                    .send_event(WindowMessage::CaptureProgress(
+                        CaptureProgress::FoundWhitepoint(monitor.max_brightness),
+                    ))
+                    .report_and_panic("Eventloop exited");
+            }  */
+            else {
                 let histogram = match unsafe {
                     self.histogram_generator.generate(hdr_capture, maximum)
                 } {
@@ -363,7 +371,7 @@ impl InnerCaptureTaker {
                 // }
 
                 let histogram_whitepoint = {
-                    let threshold: f64 = 0.99;
+                    let threshold: f64 = 0.9999;
 
                     let total = windows_capture.size[0] * windows_capture.size[1] * 3;
 
@@ -383,12 +391,11 @@ impl InnerCaptureTaker {
                     (maximum / BIN_COUNT as f32) * (selected_bin_index + 1) as f32
                 };
 
-                let whitepoint = histogram_whitepoint.max(monitor.max_brightness);
-                debug!("Selected HDR Whitepoint {}", whitepoint);
+                debug!("Selected HDR Whitepoint {}", histogram_whitepoint);
 
                 proxy
                     .send_event(WindowMessage::CaptureProgress(
-                        CaptureProgress::FoundWhitepoint(whitepoint),
+                        CaptureProgress::FoundWhitepoint(histogram_whitepoint),
                     ))
                     .report_and_panic("Eventloop exited");
             }
