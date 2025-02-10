@@ -92,7 +92,7 @@ impl Renderer {
 
     pub fn resize(&self) -> Result<(), ()> {
         if let Err(e) = self.sender.send(Message::Resize) {
-            error!("Failed to send message to renderer:\n{e}");
+            error!("Failed to send message to renderer: {e}");
             return Err(());
         }
 
@@ -101,7 +101,7 @@ impl Renderer {
 
     pub fn render(&self) -> Result<(), ()> {
         if let Err(e) = self.sender.send(Message::Render) {
-            error!("Failed to send message to renderer:\n{e}");
+            error!("Failed to send message to renderer: {e}");
             return Err(());
         }
 

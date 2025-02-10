@@ -43,7 +43,7 @@ impl Drop for Capture {
         unsafe {
             let queue = self.vulkan.queue(vulkan::QueuePurpose::Graphics).lock();
             if let Err(e) = self.vulkan.device().queue_wait_idle(*queue) {
-                error!("Could not wait for queue idle:\n{e}");
+                error!("Could not wait for queue idle: {e}");
             };
             drop(queue);
 

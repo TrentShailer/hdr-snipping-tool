@@ -96,7 +96,7 @@ fn main() {
                     }
 
                     value => report_and_panic(
-                        format!("Message box returned an unexpected response:\n{:?}", value),
+                        format!("Message box returned an unexpected response: {:?}", value),
                         "Message box returned an unexpected response",
                     ),
                 }

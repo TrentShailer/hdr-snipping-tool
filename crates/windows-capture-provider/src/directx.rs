@@ -100,7 +100,7 @@ impl DirectX {
 impl Drop for DirectX {
     fn drop(&mut self) {
         if let Err(e) = self.d3d_device.Close() {
-            error!("Failed to close D3D device:\n{e}");
+            error!("Failed to close D3D device: {e}");
         }
     }
 }

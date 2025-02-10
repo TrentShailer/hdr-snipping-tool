@@ -71,6 +71,6 @@ impl WinError {
 
 impl Display for WinError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Windows {} call failed:\n{}", self.call, self.source)
+        write!(f, "Windows {} call failed: {}", self.call, self.source)
     }
 }

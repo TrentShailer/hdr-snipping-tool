@@ -71,7 +71,7 @@ impl WindowsCapture {
                         move |_, _| {
                             match frame_arrived_sender.send(()) {
                                 Ok(_) => {}
-                                Err(e) => error!("Failed to send frame arrived event:\n{e}"),
+                                Err(e) => error!("Failed to send frame arrived event: {e}"),
                             };
 
                             Ok(())

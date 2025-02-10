@@ -65,7 +65,7 @@ impl CaptureSaver {
 
     pub fn save(&self, capture: Capture) -> Result<(), ()> {
         if let Err(e) = self.sender.send(Message::Save(capture)) {
-            error!("Failed to send message to capture saver:\n{e}");
+            error!("Failed to send message to capture saver: {e}");
             return Err(());
         }
 
@@ -159,7 +159,7 @@ impl InnerCaptureSaver {
             let mut clipboard = match Clipboard::new() {
                 Ok(clipboard) => clipboard,
                 Err(e) => {
-                    warn!("Platform does not support clipboard:\n{e}");
+                    warn!("Platform does not support clipboard: {e}");
                     return;
                 }
             };

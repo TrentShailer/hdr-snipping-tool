@@ -74,7 +74,7 @@ impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
             if let Err(e) = self.vulkan.device().device_wait_idle() {
-                error!("Failed to wait for device idle:\n{e}")
+                error!("Failed to wait for device idle: {e}")
             }
 
             self.vulkan

@@ -6,22 +6,22 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use crate::utilities::windows_helpers::display_message;
 
 pub fn log_and_panic<Err: core::fmt::Display>(error: Err, message: &str) -> ! {
-    error!("{message}:\n{error}");
+    error!("{message}: {error}");
 
-    panic!("{message}:\n{error}");
+    panic!("{message}: {error}");
 }
 
 pub fn report_and_panic<Err: core::fmt::Display>(error: Err, message: &str) -> ! {
-    error!("{message}:\n{error}");
+    error!("{message}: {error}");
 
     let user_message = format!("ERROR:\n{message}.\nSee the logs for more details.");
     display_message(&user_message, MB_ICONERROR | MB_OK | MB_SETFOREGROUND);
 
-    panic!("{message}:\n{error}");
+    panic!("{message}: {error}");
 }
 
 pub fn report<Err: core::fmt::Display>(error: Err, message: &str) {
-    error!("{message}:\n{error}");
+    error!("{message}: {error}");
 
     let user_message = format!("{message}.\nSee the logs for more details.");
     display_message(&user_message, MB_ICONWARNING | MB_OK | MB_SETFOREGROUND);

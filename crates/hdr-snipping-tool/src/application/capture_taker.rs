@@ -113,7 +113,7 @@ impl CaptureTaker {
 
     pub fn take_capture(&self, proxy: EventLoopProxy<WindowMessage>) -> Result<(), ()> {
         if let Err(e) = self.sender.send(Message::TakeCapture(proxy)) {
-            error!("Failed to send message to capture taker:\n{e}");
+            error!("Failed to send message to capture taker: {e}");
             return Err(());
         }
 
@@ -122,7 +122,7 @@ impl CaptureTaker {
 
     pub fn close_handle(&self, capture: WindowsCapture) -> Result<(), ()> {
         if let Err(e) = self.sender.send(Message::CloseHandle(capture)) {
-            error!("Failed to send message to capture taker:\n{e}");
+            error!("Failed to send message to capture taker: {e}");
             return Err(());
         }
 
@@ -177,10 +177,10 @@ impl InnerCaptureTaker {
         if let Err(e) = self.cache.prune(&self.direct_x) {
             match e {
                 MonitorError::WinError(win_error) => {
-                    error!("Could not prune the cache:\n{win_error}")
+                    error!("Could not prune the cache: {win_error}")
                 }
                 MonitorError::MonitorsMismatch => {
-                    debug!("Could not prune the cache:\n{e}");
+                    debug!("Could not prune the cache: {e}");
                 }
             };
         };
@@ -188,10 +188,10 @@ impl InnerCaptureTaker {
         if let Err(e) = self.cache.cache_active(&self.direct_x) {
             match e {
                 MonitorError::WinError(win_error) => {
-                    error!("Could not cache the active monitors:\n{win_error}")
+                    error!("Could not cache the active monitors: {win_error}")
                 }
                 MonitorError::MonitorsMismatch => {
-                    debug!("Could not cache the active monitors:\n{e}");
+                    debug!("Could not cache the active monitors: {e}");
                 }
             };
         };
@@ -397,7 +397,7 @@ impl InnerCaptureTaker {
         // Clean up
         {
             if let Err(e) = windows_capture_resources.destroy(&self.direct_x) {
-                error!("Failed to destroy Windows Capture Resources:\n{e}");
+                error!("Failed to destroy Windows Capture Resources: {e}");
             }
         }
     }
@@ -409,7 +409,7 @@ impl InnerCaptureTaker {
 
         unsafe {
             if let Err(e) = CloseHandle(capture.handle.0) {
-                error!("Failed to close handle to Windows capture:\n{e}");
+                error!("Failed to close handle to Windows capture: {e}");
             }
         }
     }
