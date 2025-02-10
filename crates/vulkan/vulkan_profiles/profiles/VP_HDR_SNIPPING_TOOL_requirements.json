@@ -11,8 +11,7 @@
                 },
                 "VkPhysicalDeviceFeatures": {
                     "fillModeNonSolid": true,
-                    "wideLines": true,
-                    "shaderFloat64": true
+                    "wideLines": true
                 }
             },
             "extensions": {
@@ -101,7 +100,7 @@
     },
     "profiles": {
         "VP_HDR_SNIPPING_TOOL_requirements": {
-            "version": 1,
+            "version": 2,
             "api-version": "1.2.198",
             "label": "HDR Snipping Tool Requirements",
             "description": "Profile ecapsulating the requirements to run HDR Snipping Tool.",
@@ -119,6 +118,12 @@
                     "date": "2025-01-13",
                     "author": "Trent Shailer",
                     "comment": "Initial revision"
+                },
+                {
+                    "revision": 1,
+                    "date": "2025-02-11",
+                    "author": "Trent Shailer",
+                    "comment": "Added queue family properties, relaxed requirements to match current state."
                 }
             ]
         },

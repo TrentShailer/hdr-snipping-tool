@@ -16,7 +16,7 @@ impl HistogramGenerator {
     /// Generates a histogram for an HDR Image.
     pub unsafe fn generate(&mut self, image: HdrImage, maximum: f32) -> LabelledVkResult<Vec<u32>> {
         // Floating point precision issues hate this one simple trick
-        let bin_width = maximum as f64 / BIN_COUNT as f64 + f64::EPSILON;
+        let bin_width = maximum / BIN_COUNT as f32 + f32::EPSILON;
 
         let image_descriptor = vk::DescriptorImageInfo::default()
             .image_layout(vk::ImageLayout::GENERAL)
