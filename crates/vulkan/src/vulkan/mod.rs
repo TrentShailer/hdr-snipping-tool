@@ -1,3 +1,5 @@
+use core::fmt::Debug;
+
 use alloc::sync::Arc;
 
 pub use new::Error;
@@ -32,6 +34,34 @@ pub struct Vulkan {
 
     /// A command pool with the Transient Flag, used for any component to run onetime commands.
     transient_pool: Arc<Mutex<vk::CommandPool>>,
+}
+
+impl Debug for Vulkan {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let properties = unsafe {
+            self.instance
+                .get_physical_device_properties(self.physical_device)
+        };
+
+        let api_version = {
+            let major = vk::api_version_major(properties.api_version);
+            let minor = vk::api_version_minor(properties.api_version);
+            let patch = vk::api_version_patch(properties.api_version);
+
+            format!("{}.{}.{}", major, minor, patch)
+        };
+
+        let device_name = properties.device_name_as_c_str().unwrap_or(c"Invalid name");
+
+        f.debug_struct("Vulkan")
+            .field("device_name", &device_name)
+            .field("device_type", &properties.device_type)
+            .field("api_version", &api_version)
+            .field("queue_family_index", &self.queue_family_index)
+            .field("queue_count", &self.queues.len())
+            .field("debug", &self.debug_utils.is_some())
+            .finish()
+    }
 }
 
 /// The purpose of a created queue.

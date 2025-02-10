@@ -68,6 +68,10 @@ typedef struct VpBlockProperties {
     char blockName[VP_MAX_PROFILE_NAME_SIZE];
 } VpBlockProperties;
 
+typedef struct VpVideoProfileProperties {
+    char name[VP_MAX_PROFILE_NAME_SIZE];
+} VpVideoProfileProperties;
+
 typedef enum VpInstanceCreateFlagBits {
     VP_INSTANCE_CREATE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
 } VpInstanceCreateFlagBits;
@@ -309,6 +313,26 @@ VPAPI_ATTR VkResult vpGetProfilePropertyStructureTypes(
     uint32_t*                                   pStructureTypeCount,
     VkStructureType*                            pStructureTypes);
 
+// Fill the queue family property structures with the requirements of a profile
+VPAPI_ATTR VkResult vpGetProfileQueueFamilyProperties(
+#ifdef VP_USE_OBJECT
+    VpCapabilities                              capabilities,
+#endif//VP_USE_OBJECT
+    const VpProfileProperties*                  pProfile,
+    const char*                                 pBlockName,
+    uint32_t*                                   pPropertyCount,
+    VkQueueFamilyProperties2KHR*                pProperties);
+
+// Query the list of queue family property structure types specified by the profile
+VPAPI_ATTR VkResult vpGetProfileQueueFamilyStructureTypes(
+#ifdef VP_USE_OBJECT
+    VpCapabilities                              capabilities,
+#endif//VP_USE_OBJECT
+    const VpProfileProperties*                  pProfile,
+    const char*                                 pBlockName,
+    uint32_t*                                   pStructureTypeCount,
+    VkStructureType*                            pStructureTypes);
+
 // Query the list of formats with specified requirements by a profile
 VPAPI_ATTR VkResult vpGetProfileFormats(
 #ifdef VP_USE_OBJECT
@@ -338,6 +362,82 @@ VPAPI_ATTR VkResult vpGetProfileFormatStructureTypes(
     const char*                                 pBlockName,
     uint32_t*                                   pStructureTypeCount,
     VkStructureType*                            pStructureTypes);
+
+#ifdef VK_KHR_video_queue
+// Query the list of video profiles specified by the profile
+VPAPI_ATTR VkResult vpGetProfileVideoProfiles(
+#ifdef VP_USE_OBJECT
+    VpCapabilities                              capabilities,
+#endif//VP_USE_OBJECT
+    const VpProfileProperties*                  pProfile,
+    const char*                                 pBlockName,
+    uint32_t*                                   pVideoProfileCount,
+    VpVideoProfileProperties*                   pVideoProfiles);
+
+// Query the video profile info structures for a video profile defined by a profile
+VPAPI_ATTR VkResult vpGetProfileVideoProfileInfo(
+#ifdef VP_USE_OBJECT
+    VpCapabilities                              capabilities,
+#endif//VP_USE_OBJECT
+    const VpProfileProperties*                  pProfile,
+    const char*                                 pBlockName,
+    uint32_t                                    videoProfileIndex,
+    VkVideoProfileInfoKHR*                      pVideoProfileInfo);
+
+// Query the list of video profile info structure types specified by the profile for a video profile
+VPAPI_ATTR VkResult vpGetProfileVideoProfileInfoStructureTypes(
+#ifdef VP_USE_OBJECT
+    VpCapabilities                              capabilities,
+#endif//VP_USE_OBJECT
+    const VpProfileProperties*                  pProfile,
+    const char*                                 pBlockName,
+    uint32_t                                    videoProfileIndex,
+    uint32_t*                                   pStructureTypeCount,
+    VkStructureType*                            pStructureTypes);
+
+// Query the video capabilities requirements for a video profile defined by a profile
+VPAPI_ATTR VkResult vpGetProfileVideoCapabilities(
+#ifdef VP_USE_OBJECT
+    VpCapabilities                              capabilities,
+#endif//VP_USE_OBJECT
+    const VpProfileProperties*                  pProfile,
+    const char*                                 pBlockName,
+    uint32_t                                    videoProfileIndex,
+    void*                                       pNext);
+
+// Query the list of video capability structure types specified by the profile for a video profile
+VPAPI_ATTR VkResult vpGetProfileVideoCapabilityStructureTypes(
+#ifdef VP_USE_OBJECT
+    VpCapabilities                              capabilities,
+#endif//VP_USE_OBJECT
+    const VpProfileProperties*                  pProfile,
+    const char*                                 pBlockName,
+    uint32_t                                    videoProfileIndex,
+    uint32_t*                                   pStructureTypeCount,
+    VkStructureType*                            pStructureTypes);
+
+// Query the video format property requirements for a video profile defined by a profile
+VPAPI_ATTR VkResult vpGetProfileVideoFormatProperties(
+#ifdef VP_USE_OBJECT
+    VpCapabilities                              capabilities,
+#endif//VP_USE_OBJECT
+    const VpProfileProperties*                  pProfile,
+    const char*                                 pBlockName,
+    uint32_t                                    videoProfileIndex,
+    uint32_t*                                   pPropertyCount,
+    VkVideoFormatPropertiesKHR*                 pProperties);
+
+// Query the list of video format property structure types specified by the profile for a video profile
+VPAPI_ATTR VkResult vpGetProfileVideoFormatStructureTypes(
+#ifdef VP_USE_OBJECT
+    VpCapabilities                              capabilities,
+#endif//VP_USE_OBJECT
+    const VpProfileProperties*                  pProfile,
+    const char*                                 pBlockName,
+    uint32_t                                    videoProfileIndex,
+    uint32_t*                                   pStructureTypeCount,
+    VkStructureType*                            pStructureTypes);
+#endif  // VK_KHR_video_queue
 
 #ifdef __cplusplus
 }

@@ -18,9 +18,8 @@ parking_lot = { workspace = true }
 # Vulkan
 ash = { workspace = true, features = ["linked"] }
 ash-helper = { workspace = true }
-vp-ash = { git = "https://github.com/trentshailer/vulkan-profiles-ash", rev = "5e9bef4", features = [
+vp-ash = { git = "https://github.com/trentshailer/vulkan-profiles-ash", branch = "vulkan-sdk-1.4.304", features = [
     "debug",
-    "std",
     "VK_USE_PLATFORM_WIN32_KHR",
 ] }
 

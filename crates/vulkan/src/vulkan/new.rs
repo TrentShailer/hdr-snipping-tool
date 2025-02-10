@@ -1,3 +1,5 @@
+use core::slice;
+
 use alloc::sync::Arc;
 
 use ash::{khr, vk};
@@ -5,6 +7,7 @@ use ash_helper::{try_name, vulkan_debug_callback, DebugUtils, VkError};
 use parking_lot::Mutex;
 use raw_window_handle::RawDisplayHandle;
 use thiserror::Error;
+use tracing::info;
 use vp_ash::vp;
 
 use super::{QueuePurpose, Vulkan};
@@ -112,29 +115,11 @@ impl Vulkan {
                 .map_err(|e| VkError::new(e, "vkEnumeratePhysicalDevices"))?
                 .into_iter()
                 .filter_map(|device| unsafe {
-                    let supported = {
-                        let support_result = capabilities
-                            .get_physical_device_profile_support(&instance, device, &core_profile)
-                            .map_err(|e| VkError::new(e, "vpGetPhysicalDeviceProfileSupport"));
-
-                        match support_result {
-                            Ok(supported) => supported,
-                            Err(e) => return Some(Err(e)),
-                        }
-                    };
-
-                    let queue_supported = {
-                        let queue_properties =
-                            instance.get_physical_device_queue_family_properties(device);
-
-                        queue_properties.iter().any(valid_queue_family)
-                    };
-
-                    if !supported || !queue_supported {
-                        return None;
-                    }
-
-                    Some(Ok(device))
+                    capabilities
+                        .get_physical_device_profile_support(&instance, device, &core_profile)
+                        .map(|supported| if supported { Some(device) } else { None })
+                        .map_err(|e| VkError::new(e, "vpGetPhysicalDeviceProfileSupport"))
+                        .transpose()
                 })
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
@@ -155,13 +140,33 @@ impl Vulkan {
 
         // Get the queue family index and queue count.
         let (queue_family_index, queue_count) = {
+            let requirements = {
+                let mut count = 1;
+                let mut requirements = vk::QueueFamilyProperties2KHR::default();
+                unsafe {
+                    capabilities
+                        .get_profile_queue_family_properties(
+                            &core_profile,
+                            None,
+                            &mut count,
+                            Some(slice::from_mut(&mut requirements)),
+                        )
+                        .map_err(|e| VkError::new(e, "vpGetProfileQueueFamilyProperties"))?
+                }
+
+                requirements.queue_family_properties
+            };
+
             let queue_properties =
                 unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
 
             let (index, properties) = queue_properties
                 .into_iter()
                 .enumerate()
-                .find(|(_, properties)| valid_queue_family(properties))
+                .find(|(_, properties)| {
+                    properties.queue_count >= requirements.queue_count
+                        && properties.queue_flags.contains(requirements.queue_flags)
+                })
                 .map(|(index, properties)| (index as u32, properties))
                 .unwrap();
 
@@ -249,6 +254,8 @@ impl Vulkan {
             transient_pool,
         };
 
+        info!("Created Vulkan Context: {:?}", vulkan);
+
         // Name objects
         unsafe {
             if queue_count == 1 {
@@ -281,19 +288,6 @@ impl Vulkan {
 
         Ok(vulkan)
     }
-}
-
-/// Validates if a queue family meets the requirements.
-///
-/// This is needed because:
-/// * The Vulkan Profiles Library was not compiling with queue family
-///   requirements.
-/// * The index of the valid queue family needs to be extracted.
-fn valid_queue_family(properties: &vk::QueueFamilyProperties) -> bool {
-    properties.queue_count >= 1
-        && properties
-            .queue_flags
-            .contains(vk::QueueFlags::COMPUTE | vk::QueueFlags::GRAPHICS)
 }
 
 /// Error variants from trying to create the Vulkan Context.

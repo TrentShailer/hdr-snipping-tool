@@ -80,7 +80,18 @@
                         ]
                     }
                 }
-            }
+            },
+            "queueFamiliesProperties": [
+                {
+                    "VkQueueFamilyProperties": {
+                        "queueCount": 1,
+                        "queueFlags": [
+                            "VK_QUEUE_COMPUTE_BIT",
+                            "VK_QUEUE_GRAPHICS_BIT"
+                        ]
+                    }
+                }
+            ]
         },
         "debug": {
             "extensions": {
