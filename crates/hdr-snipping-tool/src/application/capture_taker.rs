@@ -14,7 +14,7 @@ use std::{
 use tracing::{debug, error, info_span};
 use vulkan::{HdrImage, HdrScanner, HistogramGenerator, Vulkan, BIN_COUNT};
 use windows::Win32::Foundation::CloseHandle;
-use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, MonitorError, WindowsCapture};
+use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCapture};
 use winit::event_loop::EventLoopProxy;
 
 use crate::utilities::failure::{report, Failure};
@@ -175,48 +175,26 @@ impl InnerCaptureTaker {
 
     pub fn refresh_cache(&mut self) {
         if let Err(e) = self.cache.prune(&self.direct_x) {
-            match e {
-                MonitorError::WinError(win_error) => {
-                    error!("Could not prune the cache: {win_error}")
-                }
-                MonitorError::MonitorsMismatch => {
-                    debug!("Could not prune the cache: {e}");
-                }
-            };
+            error!("Could not prune the cache: {e}");
         };
 
         if let Err(e) = self.cache.cache_active(&self.direct_x) {
-            match e {
-                MonitorError::WinError(win_error) => {
-                    error!("Could not cache the active monitors: {win_error}")
-                }
-                MonitorError::MonitorsMismatch => {
-                    debug!("Could not cache the active monitors: {e}");
-                }
-            };
+            error!("Could not cache the active monitors: {e}");
         };
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     pub fn take_capture(&mut self, proxy: EventLoopProxy<WindowMessage>) {
         // Get the monitor
         let monitor = {
             let maybe_monitor = match Monitor::get_hovered_monitor(&self.direct_x) {
                 Ok(maybe_monitor) => maybe_monitor,
-                Err(e) => match e {
-                    MonitorError::WinError(win_error) => {
-                        report(win_error, "Could not take the screenshot.\nAn error was encountered while finding the hovered monitor");
-                        let _ = proxy
-                            .send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
-                        return;
-                    }
-
-                    MonitorError::MonitorsMismatch => {
-                        report(e, "Could not take the screenshot.\nThe monitor config changed during loading");
-                        let _ = proxy
-                            .send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
-                        return;
-                    }
-                },
+                Err(e) => {
+                    report(e, "Could not take the screenshot.\nAn error was encountered while finding the hovered monitor");
+                    let _ =
+                        proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
+                    return;
+                }
             };
 
             let monitor = match maybe_monitor {
@@ -244,7 +222,7 @@ impl InnerCaptureTaker {
         let (windows_capture, windows_capture_resources) = {
             let start = Instant::now();
 
-            let capture_item = match self.cache.get_capture_item(monitor) {
+            let capture_item = match self.cache.get_capture_item(monitor.handle.0) {
                 Ok(capture_item) => capture_item,
                 Err(e) => {
                     report(
@@ -262,7 +240,6 @@ impl InnerCaptureTaker {
 
             let (capture, resources) = match WindowsCapture::take_capture(
                 &self.direct_x,
-                monitor,
                 &capture_item,
             ) {
                 Ok(capture) => capture,

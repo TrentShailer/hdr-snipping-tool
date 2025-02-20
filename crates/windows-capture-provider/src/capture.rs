@@ -17,7 +17,7 @@ use windows::{
 };
 use windows_core::{IInspectable, Interface};
 
-use crate::{monitor::Monitor, DirectX, LabelledWinResult, SendHANDLE, WinError};
+use crate::{DirectX, LabelledWinResult, SendHANDLE, WinError};
 
 /// A capture from Windows in R16G16B16A16_Float format
 #[derive(Debug, Clone, Copy)]
@@ -28,9 +28,6 @@ pub struct WindowsCapture {
 
     /// The size of the capture.
     pub size: [u32; 2],
-
-    /// The monitor the capture is of.
-    pub monitor: Monitor,
 }
 
 /// The resources leftover from taking a Windows capture.
@@ -40,10 +37,9 @@ pub struct WindowsCaptureResources {
 }
 
 impl WindowsCapture {
-    /// Take and retrieve a WindowsCapture from a monitor and its capture item.
+    /// Take and retrieve a WindowsCapture from a capture item.
     pub fn take_capture(
         direct_x: &DirectX,
-        monitor: Monitor,
         capture_item: &GraphicsCaptureItem,
     ) -> LabelledWinResult<(Self, WindowsCaptureResources)> {
         // Get the capture size
@@ -144,6 +140,7 @@ impl WindowsCapture {
             }
         };
 
+        // Clean up
         {
             session
                 .Close()
@@ -157,7 +154,6 @@ impl WindowsCapture {
                     capture_size.Width.unsigned_abs(),
                     capture_size.Height.unsigned_abs(),
                 ],
-                monitor,
             },
             WindowsCaptureResources { frame, framepool },
         ))
@@ -175,7 +171,7 @@ impl WindowsCaptureResources {
             .Close()
             .map_err(|e| WinError::new(e, "Direct3D11CaptureFramePool::Close"))?;
 
-        unsafe { direct_x.d3d11_context.ClearState() };
+        unsafe { direct_x.d3d11_context.ClearState() }
         direct_x
             .d3d_device
             .Trim()

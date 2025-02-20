@@ -2,8 +2,8 @@ use windows::Win32::{
     Devices::Display::{
         DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes, QueryDisplayConfig,
         DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL, DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
-        DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_SDR_WHITE_LEVEL, DISPLAYCONFIG_SOURCE_DEVICE_NAME,
-        QDC_ONLY_ACTIVE_PATHS,
+        DISPLAYCONFIG_MODE_INFO, DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_SDR_WHITE_LEVEL,
+        DISPLAYCONFIG_SOURCE_DEVICE_NAME, QDC_ONLY_ACTIVE_PATHS,
     },
     Graphics::Dxgi::DXGI_OUTPUT_DESC1,
 };
@@ -11,10 +11,10 @@ use windows_core::HRESULT;
 
 use crate::{LabelledWinResult, WinError};
 
-use super::{Error, Monitor};
+use super::Monitor;
 
 impl Monitor {
-    pub(super) fn get_sdr_white(descriptor: DXGI_OUTPUT_DESC1) -> Result<f32, Error> {
+    pub(super) fn get_sdr_white(descriptor: DXGI_OUTPUT_DESC1) -> Result<Option<f32>, WinError> {
         let mut path_elements = 0;
         let mut mode_info_elements = 0;
         unsafe {
@@ -25,12 +25,12 @@ impl Monitor {
             );
 
             if result.is_err() {
-                return Err(WinError::from_win32(result, "GetDisplayConfigBufferSizes").into());
+                return Err(WinError::from_win32(result, "GetDisplayConfigBufferSizes"));
             }
-        };
+        }
 
-        let mut paths = vec![Default::default(); path_elements as usize];
-        let mut mode_infos = vec![Default::default(); mode_info_elements as usize];
+        let mut paths = vec![DISPLAYCONFIG_PATH_INFO::default(); path_elements as usize];
+        let mut mode_infos = vec![DISPLAYCONFIG_MODE_INFO::default(); mode_info_elements as usize];
         unsafe {
             let result = QueryDisplayConfig(
                 QDC_ONLY_ACTIVE_PATHS,
@@ -42,9 +42,9 @@ impl Monitor {
             );
 
             if result.is_err() {
-                return Err(WinError::from_win32(result, "QueryDisplayConfig").into());
+                return Err(WinError::from_win32(result, "QueryDisplayConfig"));
             }
-        };
+        }
 
         let matching_path = {
             let names = paths
@@ -58,9 +58,10 @@ impl Monitor {
             let maybe_matching_path_index =
                 names.iter().position(|name| *name == descriptor.DeviceName);
 
+            // If the output does not have a matching path, then return None.
             let matching_path_index = match maybe_matching_path_index {
                 Some(index) => index,
-                None => return Err(Error::MonitorsMismatch),
+                None => return Ok(None),
             };
 
             paths[matching_path_index]
@@ -68,18 +69,19 @@ impl Monitor {
 
         let sdr_white = get_sdr_white(&matching_path)?;
 
-        Ok(sdr_white)
+        Ok(Some(sdr_white))
     }
 }
 
 /// Get device name, matches the descriptor DeviceName
 fn get_device_name(path_info: &DISPLAYCONFIG_PATH_INFO) -> LabelledWinResult<[u16; 32]> {
-    let mut config = DISPLAYCONFIG_SOURCE_DEVICE_NAME::default();
+    let header_size = size_of::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>() as u32;
 
+    let mut config = DISPLAYCONFIG_SOURCE_DEVICE_NAME::default();
     config.header.adapterId = path_info.sourceInfo.adapterId;
     config.header.id = path_info.sourceInfo.id;
     config.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
-    config.header.size = core::mem::size_of_val(&config) as u32;
+    config.header.size = header_size;
 
     unsafe {
         let result = DisplayConfigGetDeviceInfo(&mut config.header);
@@ -91,18 +93,19 @@ fn get_device_name(path_info: &DISPLAYCONFIG_PATH_INFO) -> LabelledWinResult<[u1
                 "DisplayConfigGetDeviceInfo",
             ));
         }
-    };
+    }
 
     Ok(config.viewGdiDeviceName)
 }
 
 fn get_sdr_white(path_info: &DISPLAYCONFIG_PATH_INFO) -> LabelledWinResult<f32> {
-    let mut config = DISPLAYCONFIG_SDR_WHITE_LEVEL::default();
+    let header_size = size_of::<DISPLAYCONFIG_SDR_WHITE_LEVEL>() as u32;
 
+    let mut config = DISPLAYCONFIG_SDR_WHITE_LEVEL::default();
     config.header.adapterId = path_info.targetInfo.adapterId;
     config.header.id = path_info.targetInfo.id;
     config.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL;
-    config.header.size = core::mem::size_of_val(&config) as u32;
+    config.header.size = header_size;
 
     unsafe {
         let result = DisplayConfigGetDeviceInfo(&mut config.header);
@@ -114,7 +117,7 @@ fn get_sdr_white(path_info: &DISPLAYCONFIG_PATH_INFO) -> LabelledWinResult<f32> 
                 "DisplayConfigGetDeviceInfo",
             ));
         }
-    };
+    }
 
     let sdr_white = config.SDRWhiteLevel as f32 / 1000.0;
 

@@ -9,7 +9,10 @@ use windows::{
                 D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext,
                 D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_FLAG, D3D11_SDK_VERSION,
             },
-            Dxgi::{IDXGIAdapter1, IDXGIDevice, DXGI_ERROR_UNSUPPORTED},
+            Dxgi::{
+                IDXGIAdapter1, IDXGIDevice, IDXGIOutput, IDXGIOutput6, DXGI_ERROR_NOT_FOUND,
+                DXGI_ERROR_UNSUPPORTED, DXGI_OUTPUT_DESC1,
+            },
         },
         System::WinRT::Direct3D11::CreateDirect3D11DeviceFromDXGIDevice,
     },
@@ -56,7 +59,10 @@ impl DirectX {
             }
             result.map_err(|e| WinError::new(e, "D3D11CreateDevice"))?;
 
-            device.expect("d3d11_device was none")
+            match device {
+                Some(device) => device,
+                None => unreachable!("D3D11 Device should be Some if no errors were returned"),
+            }
         };
 
         // Get the d3d11 context.
@@ -94,6 +100,49 @@ impl DirectX {
             d3d11_device,
             d3d11_context,
         })
+    }
+
+    /// Enumerate the DXGI outputs using `IDXGIAdapter1::EnumOutputs` until `DXGI_ERROR_NOT_FOUND`.
+    pub unsafe fn dxgi_outputs(&self) -> Result<Vec<IDXGIOutput>, windows_result::Error> {
+        let mut outputs = Vec::new();
+
+        let mut index = 0;
+        loop {
+            let result = unsafe { self.dxgi_adapter.EnumOutputs(index) };
+
+            // break on `DXGI_ERROR_NOT_FOUND`, propegate other errors.
+            let dxgi_output = match result {
+                Ok(output) => output,
+                Err(e) => {
+                    if e.code() == DXGI_ERROR_NOT_FOUND {
+                        break;
+                    } else {
+                        return Err(e);
+                    }
+                }
+            };
+
+            outputs.push(dxgi_output);
+
+            index += 1;
+        }
+
+        Ok(outputs)
+    }
+
+    /// Returns the DXGI_OUTPUT_DESC1 for each IDXGIOutput.
+    pub fn dxgi_output_descriptors(&self) -> Result<Vec<DXGI_OUTPUT_DESC1>, WinError> {
+        unsafe { self.dxgi_outputs() }
+            .map_err(|e| WinError::new(e, "IDXGIAdapter1::EnumOutputs"))?
+            .into_iter()
+            .map(|output| unsafe {
+                output
+                    .cast::<IDXGIOutput6>()
+                    .map_err(|e| WinError::new(e, "IDXGIOutput::cast"))?
+                    .GetDesc1()
+                    .map_err(|e| WinError::new(e, "IDXGIOutput6::GetDesc1"))
+            })
+            .collect::<Result<_, _>>()
     }
 }
 

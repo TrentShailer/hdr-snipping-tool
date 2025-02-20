@@ -1,11 +1,16 @@
-use windows::Graphics::Capture::GraphicsCaptureItem;
+use windows::{
+    Graphics::Capture::GraphicsCaptureItem,
+    Win32::{
+        Graphics::Gdi::HMONITOR, System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop,
+    },
+};
 
-use crate::{send::SendHMONITOR, DirectX, LabelledWinResult, Monitor, MonitorError};
+use crate::{DirectX, LabelledWinResult, WinError};
 
-/// A cache for the connected displays and their capture items.
+/// A cache for monitors and their capture items.
 pub struct CaptureItemCache {
     /// A map between HMONITOR handles and their capture item.
-    capture_items: Vec<(SendHMONITOR, GraphicsCaptureItem)>,
+    capture_items: Vec<(HMONITOR, GraphicsCaptureItem)>,
 }
 
 impl CaptureItemCache {
@@ -13,57 +18,72 @@ impl CaptureItemCache {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
-            capture_items: vec![],
+            capture_items: Vec::new(),
         }
     }
 
     /// Gets the graphics capture item from the cache or creates and caches it if it doesn't exist.
-    pub fn get_capture_item(&mut self, monitor: Monitor) -> LabelledWinResult<GraphicsCaptureItem> {
+    pub fn get_capture_item(&mut self, handle: HMONITOR) -> LabelledWinResult<GraphicsCaptureItem> {
         let maybe_capture_item = self
             .capture_items
             .iter()
-            .find(|(handle, _)| handle.0 == monitor.handle.0);
+            .find(|(cache_handle, _)| *cache_handle == handle);
 
         if let Some((_, capture_item)) = maybe_capture_item {
             return Ok(capture_item.clone());
         }
 
-        let capture_item = monitor.create_capture_item()?;
-        self.capture_items
-            .push((monitor.handle, capture_item.clone()));
+        let capture_item = Self::create_capture_item(handle)?;
+        self.capture_items.push((handle, capture_item.clone()));
 
         Ok(capture_item)
     }
 
     /// Prunes the monitors in the cache that are no longer connected.
-    pub fn prune(&mut self, direct_x: &DirectX) -> Result<(), MonitorError> {
-        let monitors = Monitor::get_monitors(direct_x)?;
+    pub fn prune(&mut self, direct_x: &DirectX) -> Result<(), WinError> {
+        let output_descriptors = direct_x.dxgi_output_descriptors()?;
 
-        self.capture_items
-            .retain(|(handle, _)| monitors.iter().any(|monitor| monitor.handle.0 == handle.0));
+        self.capture_items.retain(|(cache_handle, _)| {
+            output_descriptors
+                .iter()
+                .any(|descriptor| descriptor.Monitor == *cache_handle)
+        });
 
         Ok(())
     }
 
     /// Caches any active monitors that aren't in the cache.
-    pub fn cache_active(&mut self, direct_x: &DirectX) -> Result<(), MonitorError> {
-        let monitors = Monitor::get_monitors(direct_x)?;
+    pub fn cache_active(&mut self, direct_x: &DirectX) -> Result<(), WinError> {
+        let output_descriptors = direct_x.dxgi_output_descriptors()?;
 
         // If a monitor does not exist in the cache, add it.
-        for monitor in monitors {
+        for descriptor in output_descriptors {
             let exists_in_cache = self
                 .capture_items
                 .iter()
-                .any(|(handle, _)| handle.0 == monitor.handle.0);
+                .any(|(cache_handle, _)| *cache_handle == descriptor.Monitor);
 
             if exists_in_cache {
                 continue;
             }
 
-            self.capture_items
-                .push((monitor.handle, monitor.create_capture_item()?));
+            self.capture_items.push((
+                descriptor.Monitor,
+                Self::create_capture_item(descriptor.Monitor)?,
+            ));
         }
 
         Ok(())
+    }
+
+    /// Creates a graphics capture item for a monitor.
+    pub fn create_capture_item(handle: HMONITOR) -> Result<GraphicsCaptureItem, WinError> {
+        let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()
+            .map_err(|e| WinError::new(e, "factory::GraphicsCaptureItem"))?;
+
+        let capture_item: GraphicsCaptureItem = unsafe { interop.CreateForMonitor(handle) }
+            .map_err(|e| WinError::new(e, "GraphicsCaptureItem::CreateForMonitor"))?;
+
+        Ok(capture_item)
     }
 }

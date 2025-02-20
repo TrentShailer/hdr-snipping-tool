@@ -17,6 +17,7 @@ pub struct WinError {
 
 /// Possible sources for a WinError.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum WinErrorSource {
     /// A [windows_result::Error].
     #[error(transparent)]

@@ -1,23 +1,13 @@
+mod get_monitors;
 mod sdr_white;
 
-use core::fmt::Debug;
+use windows::Win32::{Foundation::RECT, Graphics::Dxgi::DXGI_OUTPUT_DESC1};
+use windows_core::PCWSTR;
 
-use thiserror::Error;
-use windows::{
-    Graphics::Capture::GraphicsCaptureItem,
-    Win32::{
-        Foundation::{POINT, RECT},
-        Graphics::Dxgi::{IDXGIOutput6, DXGI_OUTPUT_DESC1},
-        System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop,
-        UI::WindowsAndMessaging::GetCursorPos,
-    },
-};
-use windows_core::Interface;
-
-use crate::{send::SendHMONITOR, DirectX, LabelledWinResult, WinError};
+use crate::{send::SendHMONITOR, WinError};
 
 /// A monitor and related data
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[non_exhaustive]
 pub struct Monitor {
     /// The monitor's `HMONITOR` handle.
@@ -41,72 +31,21 @@ pub struct Monitor {
 }
 
 impl Monitor {
-    /// Create a new monitor.
-    pub(crate) fn new(descriptor: DXGI_OUTPUT_DESC1) -> Result<Self, Error> {
-        let sdr_white = Self::get_sdr_white(descriptor)?;
+    /// Create a new monitor, returns `Ok(None)` if the monitor is inactive.
+    pub(crate) fn new(descriptor: DXGI_OUTPUT_DESC1) -> Result<Option<Self>, WinError> {
+        let sdr_white = match Self::get_sdr_white(descriptor)? {
+            Some(sdr_white) => sdr_white,
+            None => return Ok(None),
+        };
 
-        Ok(Self {
+        Ok(Some(Self {
             handle: SendHMONITOR(descriptor.Monitor),
             desktop_coordinates: descriptor.DesktopCoordinates,
             device_name: descriptor.DeviceName,
             max_brightness: descriptor.MaxLuminance / 80.0,
             min_brightness: descriptor.MinLuminance / 80.0,
             sdr_white,
-        })
-    }
-
-    /// Returns the DXGI device's current outputs.
-    pub fn get_monitors(direct_x: &DirectX) -> Result<Vec<Self>, Error> {
-        let mut monitors = vec![];
-
-        let mut output_index = 0;
-        while let Ok(output) = unsafe { direct_x.dxgi_adapter.EnumOutputs(output_index) } {
-            let output_6: IDXGIOutput6 = output
-                .cast()
-                .map_err(|e| WinError::new(e, "IDXGIOutput::cast"))?;
-
-            let output_desc_1 = unsafe { output_6.GetDesc1() }
-                .map_err(|e| WinError::new(e, "IDXGIOutput6::GetDesc1"))?;
-
-            monitors.push(Self::new(output_desc_1)?);
-
-            output_index += 1;
-        }
-
-        Ok(monitors)
-    }
-
-    /// Returns the monitor that is currently hovered by the mouse.
-    pub fn get_hovered_monitor(direct_x: &DirectX) -> Result<Option<Self>, Error> {
-        let monitors = Self::get_monitors(direct_x)?;
-
-        let mut mouse_point: POINT = Default::default();
-        unsafe { GetCursorPos(&mut mouse_point) }.map_err(|e| WinError::new(e, "GetCursorPos"))?;
-
-        let monitor = monitors.into_iter().find(|monitor| {
-            let left = monitor.desktop_coordinates.left;
-            let right = monitor.desktop_coordinates.right;
-            let top = monitor.desktop_coordinates.top;
-            let bottom = monitor.desktop_coordinates.bottom;
-
-            mouse_point.x >= left
-                && mouse_point.x <= right
-                && mouse_point.y >= top
-                && mouse_point.y <= bottom
-        });
-
-        Ok(monitor)
-    }
-
-    /// Creates a graphics capture item for this monitor.
-    pub fn create_capture_item(&self) -> LabelledWinResult<GraphicsCaptureItem> {
-        let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()
-            .map_err(|e| WinError::new(e, "factory::GraphicsCaptureItem"))?;
-
-        let capture_item: GraphicsCaptureItem = unsafe { interop.CreateForMonitor(self.handle.0) }
-            .map_err(|e| WinError::new(e, "GraphicsCaptureItem::CreateForMonitor"))?;
-
-        Ok(capture_item)
+        }))
     }
 
     /// Calculates the monitor's width and height from it's Desktop Coordinates.
@@ -127,24 +66,18 @@ impl PartialEq for Monitor {
     }
 }
 
-impl core::fmt::Display for Monitor {
+impl core::fmt::Debug for Monitor {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            "Monitor {{ handle: {:?}, rect: {:?}, sdr_white: {}, min_brightness: {}, max_brightness: {} }}",
-            self.handle.0, self.desktop_coordinates, self.sdr_white, self.min_brightness, self.max_brightness
-        )
+        let name = unsafe { PCWSTR::from_raw(self.device_name.as_ptr()).to_string() }
+            .unwrap_or("Invalid Name".to_string());
+
+        f.debug_struct("Monitor")
+            .field("handle", &self.handle)
+            .field("desktop_coordinates", &self.desktop_coordinates)
+            .field("device_name", &name)
+            .field("min_brightness", &self.min_brightness)
+            .field("max_brightness", &self.max_brightness)
+            .field("sdr_white", &self.sdr_white)
+            .finish()
     }
-}
-
-#[derive(Debug, Error)]
-/// Error variants from creating a monitor.
-pub enum Error {
-    #[error(transparent)]
-    /// A Windows API call failed.
-    WinError(#[from] WinError),
-
-    #[error("The DXGI Outputs and monitor config do not match.")]
-    /// The monitor had no matching config path.
-    MonitorsMismatch,
 }
