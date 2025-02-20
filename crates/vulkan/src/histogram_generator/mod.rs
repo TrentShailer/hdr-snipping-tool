@@ -26,10 +26,14 @@ pub struct HistogramGenerator {
     command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
 
+    // STORAGE_BUFFER, TRANSFER_SRC, TRANSFER_DST
     buffer: vk::Buffer,
+    // DEVICE_LOCAL, BIN_COUNT * 4 B
     memory: vk::DeviceMemory,
 
+    // TRANSFER_DST
     staging_buffer: vk::Buffer,
+    // HOST_COHERENT, HOST_VISIBLE, BIN_COUNT * 4 B
     staging_memory: vk::DeviceMemory,
 }
 
@@ -66,7 +70,7 @@ impl Drop for HistogramGenerator {
 /// Error variants from creating the histogram generator.
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum Error {
+pub enum HistogramError {
     /// A Vulkan allocation failed.
     #[error(transparent)]
     AllocationError(#[from] AllocationError),

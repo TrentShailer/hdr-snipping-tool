@@ -9,7 +9,7 @@ use bytemuck::bytes_of;
 
 use crate::{HdrImage, QueuePurpose, SdrImage};
 
-use super::{Error, HdrToSdrTonemapper, PushConstants};
+use super::{TonemapperError, HdrToSdrTonemapper, PushConstants};
 
 impl HdrToSdrTonemapper {
     /// Runs the HDR to SDR tonemapper over an input image.
@@ -27,7 +27,7 @@ impl HdrToSdrTonemapper {
     /// * `format: R8G8B8A8_UNORM`
     /// * `layout: GENERAL`
     /// * `usage: STORAGE, TRANSFER_SRC`
-    pub unsafe fn tonemap(&self, hdr_image: HdrImage, whitepoint: f32) -> Result<SdrImage, Error> {
+    pub unsafe fn tonemap(&self, hdr_image: HdrImage, whitepoint: f32) -> Result<SdrImage, TonemapperError> {
         // Create the output image
         let (sdr_image, sdr_memory) = {
             let queue_family = self.vulkan.queue_family_index();
@@ -171,8 +171,8 @@ impl HdrToSdrTonemapper {
         unsafe {
             self.vulkan
                 .device()
-                .destroy_image_view(output_image_view, None)
-        };
+                .destroy_image_view(output_image_view, None);
+        }
 
         Ok(SdrImage {
             image: sdr_image,

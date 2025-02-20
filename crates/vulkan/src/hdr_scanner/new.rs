@@ -8,11 +8,11 @@ use ash_helper::{
 
 use crate::Vulkan;
 
-use super::{Error, HdrScanner};
+use super::{HdrScannerError, HdrScanner};
 
 impl HdrScanner {
     /// Creates a new HDR Scanner.
-    pub unsafe fn new(vulkan: Arc<Vulkan>) -> Result<Self, Error> {
+    pub unsafe fn new(vulkan: Arc<Vulkan>) -> Result<Self, HdrScannerError> {
         // Create descriptor layout
         let descriptor_layout = {
             let bindings = [

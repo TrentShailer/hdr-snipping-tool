@@ -78,7 +78,7 @@ impl Drop for CaptureSaver {
         let _ = self.sender.send(Message::Shutdown);
         if let Some(thread) = self.thread.take() {
             if thread.join().is_err() {
-                error!("Joining Capture Saver thread returned an error.")
+                error!("Joining Capture Saver thread returned an error.");
             };
         }
     }
@@ -91,7 +91,7 @@ pub struct InnerCaptureSaver {
 
 impl InnerCaptureSaver {
     pub fn new(vulkan: Arc<Vulkan>) -> Self {
-        let tonemapper = unsafe { HdrToSdrTonemapper::new(vulkan.clone()) }
+        let tonemapper = unsafe { HdrToSdrTonemapper::new(Arc::clone(&vulkan)) }
             .report_and_panic("Could not create the tonemapper");
 
         Self { vulkan, tonemapper }
@@ -179,5 +179,6 @@ impl InnerCaptureSaver {
         }
 
         info!("Saved screenshot");
+        drop(capture);
     }
 }

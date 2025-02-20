@@ -35,7 +35,7 @@ impl Config {
         file.read_to_string(&mut contents)
             .report_and_panic("Could not read the existing configuration file");
 
-        let config: Config = toml::from_str(&contents)?;
+        let config: Self = toml::from_str(&contents)?;
 
         Ok(Some(config))
     }

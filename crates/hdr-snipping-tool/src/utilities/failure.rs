@@ -68,7 +68,7 @@ impl<T> Failure<T> for Option<T> {
         }
     }
 
-    fn report(self, message: &str) -> Option<T> {
+    fn report(self, message: &str) -> Self {
         match self {
             Some(value) => Some(value),
             None => {

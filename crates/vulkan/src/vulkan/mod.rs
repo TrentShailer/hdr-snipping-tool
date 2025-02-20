@@ -2,7 +2,7 @@ use core::fmt::Debug;
 
 use alloc::sync::Arc;
 
-pub use new::Error;
+pub use new::VulkanCreationError;
 
 use ash::{khr, vk};
 use ash_helper::{DebugUtils, VulkanContext};
@@ -48,7 +48,7 @@ impl Debug for Vulkan {
             let minor = vk::api_version_minor(properties.api_version);
             let patch = vk::api_version_patch(properties.api_version);
 
-            format!("{}.{}.{}", major, minor, patch)
+            format!("{major}.{minor}.{patch}")
         };
 
         let device_name = properties.device_name_as_c_str().unwrap_or(c"Invalid name");
@@ -60,11 +60,13 @@ impl Debug for Vulkan {
             .field("queue_family_index", &self.queue_family_index)
             .field("queue_count", &self.queues.len())
             .field("debug", &self.debug_utils.is_some())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
 /// The purpose of a created queue.
+#[derive(Clone, Copy)]
+#[allow(clippy::exhaustive_enums)]
 pub enum QueuePurpose {
     /// The Queue is reserved for graphics (Renderer).
     Graphics,
@@ -90,7 +92,7 @@ impl Vulkan {
     /// The transient pool is a command pool with the Transient Flag, used for any component to run
     /// onetime commands.
     pub unsafe fn clone_transient_pool(&self) -> Arc<Mutex<vk::CommandPool>> {
-        self.transient_pool.clone()
+        Arc::clone(&self.transient_pool)
     }
 
     /// Returns the queue that was allocated for the given purpose

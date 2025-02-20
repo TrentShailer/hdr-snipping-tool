@@ -45,6 +45,3 @@ flate2 = "1.0"
 
 # Allocator
 mimalloc = { workspace = true, features = ["debug"] }
-
-[lints]
-workspace = true

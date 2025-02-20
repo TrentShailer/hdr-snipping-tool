@@ -87,7 +87,11 @@ impl Application {
                 .report_and_panic("Could not create tray icon");
             let icon = tray_icon::Icon::from_resource(1, Some((24, 24)))
                 .report_and_panic("Could not create tray icon");
-            let tooltip = format!("HDR Snipping Tool v{}", VERSION);
+            let tooltip = if should_debug() {
+                format!("HDR Snipping Tool v{VERSION} (debug)")
+            } else {
+                format!("HDR Snipping Tool v{VERSION}")
+            };
 
             TrayIconBuilder::new()
                 .with_menu(Box::new(tray_menu))
@@ -126,13 +130,15 @@ impl Application {
                             "Your GPU does not meet the requirements to run this application",
                         );
                     }
+
+                    error => report_and_panic(error, "Could not initialise Vulkan"),
                 },
             }
         };
 
-        let renderer = Renderer::new(vulkan.clone(), &window);
-        let capture_taker = Arc::new(CaptureTaker::new(vulkan.clone()));
-        let capture_saver = CaptureSaver::new(vulkan.clone());
+        let renderer = Renderer::new(Arc::clone(&vulkan), &window);
+        let capture_taker = Arc::new(CaptureTaker::new(Arc::clone(&vulkan)));
+        let capture_saver = CaptureSaver::new(Arc::clone(&vulkan));
 
         Self {
             window,

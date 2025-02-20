@@ -23,7 +23,7 @@ pub struct SdrImage {
 
 impl SdrImage {
     /// Copy the image to a slice in CPU memory.
-    pub unsafe fn copy_to_cpu(&self, vulkan: &Vulkan) -> Result<Vec<u8>, Error> {
+    pub unsafe fn copy_to_cpu(&self, vulkan: &Vulkan) -> Result<Vec<u8>, SdrImageError> {
         // Create staging
         let (staging_buffer, staging_memory) = {
             let queue_family = vulkan.queue_family_index();
@@ -31,7 +31,7 @@ impl SdrImage {
             let buffer_info = vk::BufferCreateInfo::default()
                 .queue_family_indices(slice::from_ref(&queue_family))
                 .usage(vk::BufferUsageFlags::TRANSFER_DST)
-                .size(self.extent.width as u64 * self.extent.height as u64 * 4);
+                .size(u64::from(self.extent.width) * u64::from(self.extent.height) * 4);
 
             let (buffer, memory, _) = unsafe {
                 allocate_buffer(
@@ -52,6 +52,7 @@ impl SdrImage {
                 vulkan.transient_pool(),
                 vulkan.queue(QueuePurpose::Compute),
                 |vk, command_buffer| {
+                    #[allow(clippy::missing_panics_doc)]
                     cmd_transition_image(
                         vk,
                         command_buffer,
@@ -94,7 +95,7 @@ impl SdrImage {
                 .map_memory(
                     staging_memory,
                     0,
-                    self.extent.width as u64 * self.extent.height as u64 * 4,
+                    u64::from(self.extent.width) * u64::from(self.extent.height) * 4,
                     vk::MemoryMapFlags::empty(),
                 )
                 .map_err(|e| VkError::new(e, "vkMapMemory"))?;
@@ -129,7 +130,7 @@ impl SdrImage {
 /// SDR Image error variants.
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum Error {
+pub enum SdrImageError {
     /// An allocation failed.
     #[error(transparent)]
     AllocationError(#[from] AllocationError),

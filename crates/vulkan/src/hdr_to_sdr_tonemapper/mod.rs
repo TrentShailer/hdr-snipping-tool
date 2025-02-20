@@ -49,7 +49,7 @@ impl Drop for HdrToSdrTonemapper {
 /// Tonemapper error variants.
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum Error {
+pub enum TonemapperError {
     /// An allocation failed, likely from the output image.
     #[error(transparent)]
     AllocationError(#[from] AllocationError),

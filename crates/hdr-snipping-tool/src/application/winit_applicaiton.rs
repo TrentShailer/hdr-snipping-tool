@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{process::Command, sync::Arc};
 
 use tracing::{debug, info, warn};
 use tray_icon::menu::MenuEvent;
@@ -6,8 +6,9 @@ use winit::{
     application::ApplicationHandler,
     dpi::{PhysicalPosition, PhysicalSize},
     event::{ElementState, KeyEvent, MouseButton, WindowEvent},
-    event_loop::EventLoopProxy,
+    event_loop::{ActiveEventLoop, EventLoopProxy},
     keyboard::{KeyCode, PhysicalKey},
+    window::WindowId,
 };
 
 use crate::{
@@ -46,16 +47,12 @@ impl WinitApp {
 }
 
 impl ApplicationHandler<WindowMessage> for WinitApp {
-    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let application = Application::new(event_loop, self.config);
         self.application = Some(application);
     }
 
-    fn user_event(
-        &mut self,
-        event_loop: &winit::event_loop::ActiveEventLoop,
-        event: WindowMessage,
-    ) {
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: WindowMessage) {
         if event_loop.exiting() {
             return;
         }
@@ -83,8 +80,8 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                 match message {
                     CaptureProgress::FoundMonitor(monitor) => {
                         let capture = Capture::new(
-                            application.vulkan.clone(),
-                            application.capture_taker.clone(),
+                            Arc::clone(&application.vulkan),
+                            Arc::clone(&application.capture_taker),
                             monitor,
                         );
 
@@ -151,11 +148,11 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
         }
     }
 
-    fn exiting(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
         self.application.take();
     }
 
-    fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         if event_loop.exiting() {
             return;
         }
@@ -200,9 +197,9 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
 
     fn window_event(
         &mut self,
-        event_loop: &winit::event_loop::ActiveEventLoop,
-        window_id: winit::window::WindowId,
-        event: winit::event::WindowEvent,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
     ) {
         if event_loop.exiting() {
             return;
@@ -212,7 +209,7 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
             return;
         };
 
-        if event == winit::event::WindowEvent::Destroyed && application.window.id() == window_id {
+        if event == WindowEvent::Destroyed && application.window.id() == window_id {
             event_loop.exit();
             return;
         }
@@ -308,7 +305,7 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                     // Save
                     ElementState::Released => match capture.selection.state {
                         SelectionState::Clicked(_) => {
-                            capture.selection.state = SelectionState::None
+                            capture.selection.state = SelectionState::None;
                         }
 
                         SelectionState::Selecting => {

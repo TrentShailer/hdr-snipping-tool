@@ -7,12 +7,12 @@
 extern crate alloc;
 
 pub use hdr_image::HdrImage;
-pub use hdr_scanner::{Error as HdrScannerError, HdrScanner};
-pub use hdr_to_sdr_tonemapper::{Error as TonemapperError, HdrToSdrTonemapper};
-pub use histogram_generator::{Error as HistogramError, HistogramGenerator, BIN_COUNT};
+pub use hdr_scanner::{HdrScanner, HdrScannerError};
+pub use hdr_to_sdr_tonemapper::{HdrToSdrTonemapper, TonemapperError};
+pub use histogram_generator::{HistogramError, HistogramGenerator, BIN_COUNT};
 pub use renderer::{CreationError as RendererCreationError, Renderer, State as RendererState};
-pub use sdr_image::SdrImage;
-pub use vulkan::{Error as VulkanCreationError, QueuePurpose, Vulkan};
+pub use sdr_image::{SdrImage, SdrImageError};
+pub use vulkan::{QueuePurpose, Vulkan, VulkanCreationError};
 
 mod hdr_image;
 mod hdr_scanner;

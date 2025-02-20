@@ -55,18 +55,23 @@ rand = "0.9"
 # Allocator
 mimalloc = { version = "0.1" }
 
+[workspace.lints.rust]
+"missing_docs" = "warn"
+"unused_qualifications" = "warn"
+"rust_2018_idioms" = "warn"
+"deprecated_in_future" = "warn"
+
 [workspace.lints.clippy]
 "alloc_instead_of_core" = "warn"
 "std_instead_of_alloc" = "warn"
 "std_instead_of_core" = "warn"
 
-"missing_docs" = "warn"
-
-"trivial_numeric_casts" = "warn"
-"unused_qualifications" = "warn"
-"deprecated_in_future" = "warn"
-"rust_2018_idioms" = "warn"
-"trivial_casts" = "warn"
 "use_self" = "warn"
+"cast_lossless" = "warn"
+"unnecessary_self_imports" = "warn"
+"inconsistent_struct_constructor" = "warn"
+
+"default_trait_access" = "warn"
+"clone_on_ref_ptr" = "warn"
 
 "missing_safety_doc" = "allow"

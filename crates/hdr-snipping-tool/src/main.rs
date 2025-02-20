@@ -2,7 +2,7 @@
 //! Main application logic for HDR Snipping Tool.
 //!
 
-#![warn(missing_docs)]
+#![allow(clippy::std_instead_of_alloc)]
 // hide console window on Windows in release
 #![cfg_attr(
     all(not(debug_assertions), not(feature = "mimalloc_debug")),
@@ -96,7 +96,7 @@ fn main() {
                     }
 
                     value => report_and_panic(
-                        format!("Message box returned an unexpected response: {:?}", value),
+                        format!("Message box returned an unexpected response: {value:?}"),
                         "Message box returned an unexpected response",
                     ),
                 }

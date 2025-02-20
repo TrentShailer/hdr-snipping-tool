@@ -6,11 +6,11 @@ use ash_helper::{create_shader_module_from_spv, try_name, VkError, VulkanContext
 
 use crate::Vulkan;
 
-use super::{Error, HdrToSdrTonemapper, PushConstants};
+use super::{HdrToSdrTonemapper, PushConstants, TonemapperError};
 
 impl HdrToSdrTonemapper {
     /// Creates a new instance of an HDR to SDR Tonemapper.
-    pub unsafe fn new(vulkan: Arc<Vulkan>) -> Result<Self, Error> {
+    pub unsafe fn new(vulkan: Arc<Vulkan>) -> Result<Self, TonemapperError> {
         // Create descriptor layout
         let descriptor_layout = {
             let bindings = [
@@ -44,8 +44,8 @@ impl HdrToSdrTonemapper {
                     vulkan.as_ref(),
                     layout,
                     "HDR to SDR Tonemapper Descriptor Layout",
-                )
-            };
+                );
+            }
 
             layout
         };

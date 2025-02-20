@@ -18,7 +18,7 @@ impl Vulkan {
     pub unsafe fn new(
         try_debug: bool,
         display_handle: Option<RawDisplayHandle>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, VulkanCreationError> {
         // Setup objects.
         let entry = ash::Entry::linked();
         let vp_entry = vp_ash::Entry::linked();
@@ -63,7 +63,7 @@ impl Vulkan {
             unsafe { capabilities.get_instance_profile_support(None, &core_profile) }
                 .map_err(|e| VkError::new(e, "vpGetInstanceProfileSupport"))?;
         if !supports_instance {
-            return Err(Error::UnsupportedInstance);
+            return Err(VulkanCreationError::UnsupportedInstance);
         }
 
         // If the instance supports debug and debug is wanted, then we should debug.
@@ -135,7 +135,7 @@ impl Vulkan {
                         _ => 5,
                     }
                 })
-                .ok_or(Error::UnsupportedDevice)?
+                .ok_or(VulkanCreationError::UnsupportedDevice)?
         };
 
         // Get the queue family index and queue count.
@@ -151,7 +151,7 @@ impl Vulkan {
                             &mut count,
                             Some(slice::from_mut(&mut requirements)),
                         )
-                        .map_err(|e| VkError::new(e, "vpGetProfileQueueFamilyProperties"))?
+                        .map_err(|e| VkError::new(e, "vpGetProfileQueueFamilyProperties"))?;
                 }
 
                 requirements.queue_family_properties
@@ -292,7 +292,8 @@ impl Vulkan {
 
 /// Error variants from trying to create the Vulkan Context.
 #[derive(Debug, Error)]
-pub enum Error {
+#[non_exhaustive]
+pub enum VulkanCreationError {
     /// A Vulkan call returned an error.
     #[allow(clippy::enum_variant_names)]
     #[error(transparent)]

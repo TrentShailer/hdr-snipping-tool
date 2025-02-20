@@ -8,11 +8,11 @@ use ash_helper::{
 
 use crate::Vulkan;
 
-use super::{Error, HistogramGenerator, BIN_COUNT};
+use super::{HistogramError, HistogramGenerator, BIN_COUNT};
 
 impl HistogramGenerator {
     /// Creates a new Histogram Generator.
-    pub unsafe fn new(vulkan: Arc<Vulkan>) -> Result<Self, Error> {
+    pub unsafe fn new(vulkan: Arc<Vulkan>) -> Result<Self, HistogramError> {
         // Create descriptor layout
         let descriptor_layout = {
             let bindings = [
@@ -50,7 +50,7 @@ impl HistogramGenerator {
         let layout = {
             let push_constant_range = vk::PushConstantRange::default()
                 .offset(0)
-                .size(8)
+                .size(4)
                 .stage_flags(vk::ShaderStageFlags::COMPUTE);
 
             let layout_info = vk::PipelineLayoutCreateInfo::default()

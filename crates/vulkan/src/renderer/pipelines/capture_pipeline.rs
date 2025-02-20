@@ -111,8 +111,8 @@ impl CapturePipeline {
             pipeline,
             layout,
             shader,
-            sampler,
             set_layout,
+            sampler,
         })
     }
 

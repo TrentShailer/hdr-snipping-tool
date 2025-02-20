@@ -1,3 +1,7 @@
+//! # Testing
+//! Library for resources used in the test binaries.
+//!
+
 use mimalloc::MiMalloc;
 
 #[global_allocator]

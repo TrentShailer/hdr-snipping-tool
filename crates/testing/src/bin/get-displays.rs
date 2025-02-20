@@ -1,5 +1,5 @@
 use testing::setup_logger;
-use tracing::info_span;
+use tracing::{info, info_span};
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor};
 
 fn main() {
@@ -7,23 +7,21 @@ fn main() {
     let direct_x = DirectX::new().unwrap();
     let mut cache = CaptureItemCache::new();
 
-    let monitors = Monitor::get_monitors(&direct_x).unwrap();
-    for monitor in monitors {
-        println!("{monitor}");
-    }
+    let monitors = Monitor::get_active_monitors(&direct_x).unwrap();
+    info!("Monitors {monitors:#?}");
 
     let hovered = Monitor::get_hovered_monitor(&direct_x).unwrap().unwrap();
-    println!("Hovered: {hovered}");
+    info!("Hovered {hovered:?}");
 
     let _capture_item = {
         let _span = info_span!("Get item 1").entered();
 
-        cache.get_capture_item(hovered).unwrap()
+        cache.get_capture_item(hovered.handle.0).unwrap()
     };
 
     let _capture_item = {
         let _span = info_span!("Get item 2").entered();
 
-        cache.get_capture_item(hovered).unwrap()
+        cache.get_capture_item(hovered.handle.0).unwrap()
     };
 }

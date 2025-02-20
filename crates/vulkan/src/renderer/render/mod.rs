@@ -101,8 +101,8 @@ impl Renderer {
                 self.vulkan
                     .device()
                     .reset_command_pool(command_pool, vk::CommandPoolResetFlags::empty())
-                    .map_err(|e| VkError::new(e, "vkResetCommandPool"))?
-            };
+                    .map_err(|e| VkError::new(e, "vkResetCommandPool"))?;
+            }
 
             // Start recording
             {
@@ -151,8 +151,8 @@ impl Renderer {
                 unsafe {
                     self.surface
                         .rendering_device()
-                        .cmd_begin_rendering(command_buffer, &rendering_info)
-                };
+                        .cmd_begin_rendering(command_buffer, &rendering_info);
+                }
             }
 
             // Set viewport & Scissor
@@ -187,8 +187,8 @@ impl Renderer {
                 unsafe {
                     self.surface
                         .rendering_device()
-                        .cmd_end_rendering(command_buffer)
-                };
+                        .cmd_end_rendering(command_buffer);
+                }
 
                 // Transition swapchain image from present to colour attachment
                 cmd_transition_image(

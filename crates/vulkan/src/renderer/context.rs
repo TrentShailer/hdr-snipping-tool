@@ -63,17 +63,17 @@ impl Surface {
 
 impl SurfaceContext for Surface {
     #[inline]
-    unsafe fn surface_instance(&self) -> &ash::khr::surface::Instance {
+    unsafe fn surface_instance(&self) -> &khr::surface::Instance {
         &self.surface_instance
     }
 
     #[inline]
-    unsafe fn swapchain_device(&self) -> &ash::khr::swapchain::Device {
+    unsafe fn swapchain_device(&self) -> &khr::swapchain::Device {
         &self.swapchain_device
     }
 
     #[inline]
-    unsafe fn surface(&self) -> ash::vk::SurfaceKHR {
+    unsafe fn surface(&self) -> vk::SurfaceKHR {
         self.surface
     }
 }

@@ -1,6 +1,6 @@
-use std::env;
+//! Embeds icon rc, and links the Windows manifest file
 
-extern crate embed_resource;
+use std::env;
 
 fn main() {
     // Embed icon

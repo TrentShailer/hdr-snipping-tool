@@ -17,8 +17,8 @@ fn main() {
 
     // Get capture
     let monitor = Monitor::get_hovered_monitor(&dx).unwrap().unwrap();
-    let capture_item = { cache.get_capture_item(monitor).unwrap() };
-    let capture = { WindowsCapture::take_capture(&dx, monitor, &capture_item).unwrap() };
+    let capture_item = { cache.get_capture_item(monitor.handle.0).unwrap() };
+    let capture = { WindowsCapture::take_capture(&dx, &capture_item).unwrap() };
 
     // Import capture
     let hdr_image = unsafe {
@@ -32,10 +32,7 @@ fn main() {
 
     let maximum = unsafe { hdr_scanner.scan(hdr_image).unwrap() };
 
-    info!(
-        "Maximum: {} | SDR White: {:.3}",
-        maximum, capture.0.monitor.sdr_white
-    );
+    info!("Maximum: {} | SDR White: {:.3}", maximum, monitor.sdr_white);
 
     unsafe {
         hdr_image.destroy(&vulkan);

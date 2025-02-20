@@ -44,7 +44,7 @@ impl Renderer {
             .report_and_panic("Could not create the renderer")
         };
 
-        let state = renderer.state.clone();
+        let state = Arc::clone(&renderer.state);
 
         // Start the thread to handle taking the capture
         let thread = thread::Builder::new()
@@ -70,12 +70,12 @@ impl Renderer {
                     }
 
                     if messages.contains(&Message::Resize) {
-                        renderer.request_resize()
+                        renderer.request_resize();
                     }
 
                     if messages.contains(&Message::Render) {
                         unsafe { renderer.render() }
-                            .report_and_panic("Encountered an error while rendering")
+                            .report_and_panic("Encountered an error while rendering");
                     }
                 }
 
@@ -134,7 +134,7 @@ impl Drop for Renderer {
         let _ = self.sender.send(Message::Shutdown);
         if let Some(thread) = self.thread.take() {
             if thread.join().is_err() {
-                error!("Joining Render thread returned an error.")
+                error!("Joining Render thread returned an error.");
             };
         }
     }

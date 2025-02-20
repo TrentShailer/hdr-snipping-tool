@@ -49,6 +49,23 @@ impl HdrScanner {
                 self.vulkan
                     .device()
                     .cmd_fill_buffer(self.command_buffer, self.buffer, 0, 4, 0);
+
+                let buffer_barrier = vk::BufferMemoryBarrier::default()
+                    .buffer(self.buffer)
+                    .dst_access_mask(vk::AccessFlags::SHADER_READ)
+                    .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                    .offset(0)
+                    .size(4);
+
+                self.vulkan.device().cmd_pipeline_barrier(
+                    self.command_buffer,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::PipelineStageFlags::COMPUTE_SHADER,
+                    vk::DependencyFlags::BY_REGION,
+                    &[],
+                    slice::from_ref(&buffer_barrier),
+                    &[],
+                );
             }
 
             {
@@ -266,8 +283,8 @@ impl HdrScanner {
                 let pool = self.vulkan.transient_pool().lock();
                 self.vulkan
                     .device()
-                    .free_command_buffers(*pool, slice::from_ref(&command_buffer))
-            };
+                    .free_command_buffers(*pool, slice::from_ref(&command_buffer));
+            }
 
             maximum
         };

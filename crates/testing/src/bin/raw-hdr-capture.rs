@@ -19,19 +19,18 @@ fn main() {
 
     let vulkan = Arc::new(unsafe { Vulkan::new(true, None) }.unwrap());
 
-    let capture = {
+    let (monitor, capture) = {
         let dx = DirectX::new().unwrap();
         let mut cache = CaptureItemCache::new();
 
         // Get capture
         let monitor = Monitor::get_hovered_monitor(&dx).unwrap().unwrap();
-        let capture_item = { cache.get_capture_item(monitor).unwrap() };
-        let (capture, resources) =
-            { WindowsCapture::take_capture(&dx, monitor, &capture_item).unwrap() };
+        let capture_item = { cache.get_capture_item(monitor.handle.0).unwrap() };
+        let (capture, resources) = { WindowsCapture::take_capture(&dx, &capture_item).unwrap() };
 
         resources.destroy(&dx).unwrap();
 
-        capture
+        (monitor, capture)
     };
 
     let hdr_capture = unsafe {
@@ -135,7 +134,7 @@ fn main() {
     let metadata = Metadata {
         width: capture.size[0],
         height: capture.size[1],
-        sdr_white: capture.monitor.sdr_white,
+        sdr_white: monitor.sdr_white,
     };
     let toml = toml::to_string_pretty(&metadata).unwrap();
     let mut file = File::create("crates/testing/src/assets/metadata.toml").unwrap();

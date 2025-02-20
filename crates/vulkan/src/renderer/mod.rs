@@ -60,6 +60,7 @@ impl Renderer {
 
 /// Error variants from renderer creation.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum CreationError {
     /// An allocation failed.
     #[error(transparent)]
@@ -74,7 +75,7 @@ impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
             if let Err(e) = self.vulkan.device().device_wait_idle() {
-                error!("Failed to wait for device idle: {e}")
+                error!("Failed to wait for device idle: {e}");
             }
 
             self.vulkan

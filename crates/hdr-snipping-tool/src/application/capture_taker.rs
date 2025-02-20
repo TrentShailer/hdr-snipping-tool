@@ -29,7 +29,7 @@ pub enum CaptureProgress {
     Failed,
 }
 impl Debug for CaptureProgress {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::FoundMonitor(_) => write!(f, "FoundMonitor"),
             Self::CaptureTaken(_) => write!(f, "CaptureTaken"),
@@ -40,8 +40,8 @@ impl Debug for CaptureProgress {
     }
 }
 impl Display for CaptureProgress {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(&self, f)
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        Debug::fmt(&self, f)
     }
 }
 
@@ -135,7 +135,7 @@ impl Drop for CaptureTaker {
         let _ = self.sender.send(Message::Shutdown);
         if let Some(thread) = self.thread.take() {
             if thread.join().is_err() {
-                error!("Joining Capture Taker thread returned an error.")
+                error!("Joining Capture Taker thread returned an error.");
             };
         }
     }
@@ -156,10 +156,10 @@ impl InnerCaptureTaker {
         let direct_x = DirectX::new().report_and_panic("Could not create DirectX devices");
         let cache = CaptureItemCache::new();
 
-        let hdr_scanner = unsafe { HdrScanner::new(vulkan.clone()) }
+        let hdr_scanner = unsafe { HdrScanner::new(Arc::clone(&vulkan)) }
             .report_and_panic("Could not create the HDR Scanner");
 
-        let histogram_generator = unsafe { HistogramGenerator::new(vulkan.clone()) }
+        let histogram_generator = unsafe { HistogramGenerator::new(Arc::clone(&vulkan)) }
             .report_and_panic("Could not create the Histogram Generator");
 
         Self {
@@ -229,7 +229,7 @@ impl InnerCaptureTaker {
                 }
             };
 
-            debug!("Found monitor: {monitor}");
+            debug!("Hovered {monitor:?}");
 
             proxy
                 .send_event(WindowMessage::CaptureProgress(
@@ -381,7 +381,7 @@ impl InnerCaptureTaker {
                     for (index, count) in histogram.iter().enumerate() {
                         running_total += count;
 
-                        if running_total as f64 / total as f64 >= threshold {
+                        if f64::from(running_total) / f64::from(total) >= threshold {
                             debug!("Selected bin: {index}");
                             selected_bin_index = index;
                             break;

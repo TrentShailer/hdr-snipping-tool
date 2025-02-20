@@ -56,15 +56,15 @@ impl ActiveApp {
             Arc::new(Vulkan::new(true, Some(window.display_handle().unwrap().as_raw())).unwrap())
         };
 
-        let (windows_capture, capture) = {
+        let (capture, monitor) = {
             let direct_x = DirectX::new().unwrap();
             let mut cache = CaptureItemCache::new();
 
             let monitor = Monitor::get_hovered_monitor(&direct_x).unwrap().unwrap();
-            let capture_item = cache.get_capture_item(monitor).unwrap();
+            let capture_item = cache.get_capture_item(monitor.handle.0).unwrap();
 
             let (capture, resources) =
-                WindowsCapture::take_capture(&direct_x, monitor, &capture_item).unwrap();
+                WindowsCapture::take_capture(&direct_x, &capture_item).unwrap();
 
             debug!("Capture Size: {:?}", capture.size);
 
@@ -79,7 +79,7 @@ impl ActiveApp {
 
             resources.destroy(&direct_x).unwrap();
 
-            (capture, hdr_capture)
+            (hdr_capture, monitor)
         };
 
         let renderer = unsafe {
@@ -98,7 +98,7 @@ impl ActiveApp {
         {
             let mut render_state = render_state.lock();
             render_state.capture = Some(capture);
-            render_state.whitepoint = windows_capture.monitor.sdr_white;
+            render_state.whitepoint = monitor.sdr_white;
             drop(render_state);
         }
 
