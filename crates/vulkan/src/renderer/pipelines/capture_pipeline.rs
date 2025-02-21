@@ -4,6 +4,7 @@ use ash::vk;
 use ash_helper::{
     LabelledVkResult, VkError, VulkanContext, create_shader_module_from_spv, try_name,
 };
+use bytemuck::{Pod, Zeroable};
 
 use crate::Vulkan;
 
@@ -12,6 +13,13 @@ use crate::Vulkan;
 pub struct Vertex {
     pub position: [f32; 2],
     pub uv: [f32; 2],
+}
+
+#[repr(C)]
+#[derive(Default, Zeroable, Pod, Clone, Copy)]
+pub struct PushConstants {
+    pub whitepoint: f32,
+    pub max_brightness: f32,
 }
 
 #[derive(Clone)]
@@ -98,7 +106,7 @@ impl CapturePipeline {
         let layout = {
             let push_constant_range = vk::PushConstantRange::default()
                 .offset(0)
-                .size(size_of::<f32>() as u32)
+                .size(size_of::<PushConstants>() as u32)
                 .stage_flags(vk::ShaderStageFlags::FRAGMENT | vk::ShaderStageFlags::VERTEX);
 
             let create_info = vk::PipelineLayoutCreateInfo::default()

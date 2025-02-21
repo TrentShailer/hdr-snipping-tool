@@ -2,8 +2,12 @@ use core::slice;
 
 use ash::vk;
 use ash_helper::VulkanContext;
+use bytemuck::bytes_of;
 
-use crate::{Renderer, RendererState, renderer::pipelines::CapturePipeline};
+use crate::{
+    Renderer, RendererState,
+    renderer::pipelines::{CapturePipeline, capture_pipeline::PushConstants},
+};
 
 impl Renderer {
     pub(super) unsafe fn cmd_draw_capture(
@@ -55,12 +59,17 @@ impl Renderer {
         }
 
         unsafe {
+            let push_constants = PushConstants {
+                max_brightness: state.max_brightness,
+                whitepoint: state.whitepoint,
+            };
+
             self.vulkan.device().cmd_push_constants(
                 command_buffer,
                 self.capture_pipeline.layout,
                 vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 0,
-                &state.whitepoint.to_ne_bytes(),
+                bytes_of(&push_constants),
             );
         }
 

@@ -1,7 +1,7 @@
 use std::{
     sync::{
-        mpsc::{channel, Sender},
         Arc,
+        mpsc::{Sender, channel},
     },
     thread::{self, JoinHandle},
 };
@@ -126,6 +126,11 @@ impl Renderer {
     pub fn set_whitepoint(&mut self, whitepoint: f32) {
         let mut state = self.state.lock();
         state.whitepoint = whitepoint;
+    }
+
+    pub fn set_max_brightness(&mut self, max_brightness: f32) {
+        let mut state = self.state.lock();
+        state.max_brightness = max_brightness;
     }
 }
 

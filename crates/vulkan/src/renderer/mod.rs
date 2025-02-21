@@ -21,6 +21,9 @@ pub struct State {
     /// The whitepoint for previewing the tonemap.
     pub whitepoint: f32,
 
+    /// The monitors max brightness.
+    pub max_brightness: f32,
+
     /// The HDR Capture.
     pub capture: Option<HdrImage>,
 

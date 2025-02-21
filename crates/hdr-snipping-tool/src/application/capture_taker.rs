@@ -12,23 +12,25 @@ use std::{
 };
 
 use tracing::{debug, error, info_span};
-use vulkan::{BIN_COUNT, HdrImage, HdrScanner, HistogramGenerator, Vulkan};
+use vulkan::{HdrImage, HdrScanner, Vulkan};
 use windows::Win32::Foundation::CloseHandle;
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCapture};
 use winit::event_loop::EventLoopProxy;
 
-use crate::{
-    should_debug,
-    utilities::failure::{Failure, report},
-};
+use crate::utilities::failure::{Failure, report};
 
 use super::WindowMessage;
+
+pub enum Whitepoint {
+    Sdr(f32),
+    Hdr(f32),
+}
 
 pub enum CaptureProgress {
     FoundMonitor(Monitor),
     CaptureTaken(WindowsCapture),
     Imported(HdrImage),
-    FoundWhitepoint(f32),
+    FoundWhitepoint(Whitepoint),
     Failed,
 }
 impl Debug for CaptureProgress {
@@ -151,7 +153,6 @@ struct InnerCaptureTaker {
     vulkan: Arc<Vulkan>,
 
     hdr_scanner: HdrScanner,
-    histogram_generator: HistogramGenerator,
 }
 
 impl InnerCaptureTaker {
@@ -162,15 +163,11 @@ impl InnerCaptureTaker {
         let hdr_scanner = unsafe { HdrScanner::new(Arc::clone(&vulkan)) }
             .report_and_panic("Could not create the HDR Scanner");
 
-        let histogram_generator = unsafe { HistogramGenerator::new(Arc::clone(&vulkan)) }
-            .report_and_panic("Could not create the Histogram Generator");
-
         Self {
             direct_x,
             cache,
             vulkan,
             hdr_scanner,
-            histogram_generator,
         }
     }
 
@@ -325,66 +322,15 @@ impl InnerCaptureTaker {
 
                 proxy
                     .send_event(WindowMessage::CaptureProgress(
-                        CaptureProgress::FoundWhitepoint(monitor.sdr_white),
+                        CaptureProgress::FoundWhitepoint(Whitepoint::Sdr(monitor.sdr_white)),
                     ))
                     .report_and_panic("Eventloop exited");
-            }
-            /*  else if maximum <= monitor.max_brightness {
-                debug!("Selected HDR Whitepoint {}", monitor.max_brightness);
+            } else {
+                debug!("Selected HDR whitepoint: {}", monitor.max_brightness);
 
                 proxy
                     .send_event(WindowMessage::CaptureProgress(
-                        CaptureProgress::FoundWhitepoint(monitor.max_brightness),
-                    ))
-                    .report_and_panic("Eventloop exited");
-            }  */
-            else {
-                let histogram = match unsafe {
-                    self.histogram_generator.generate(hdr_capture, maximum)
-                } {
-                    Ok(histogram) => histogram,
-                    Err(e) => {
-                        report(e, "Encountered an error while analysing the screenshot");
-                        let _ = proxy
-                            .send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
-                        return;
-                    }
-                };
-
-                // if should_debug() {
-                //     let mut message = String::from("Histogram:");
-                //     for (index, count) in histogram.iter().enumerate() {
-                //         message += &format!("\n[{:3}] {count}", index);
-                //     }
-                //     debug!("{message}");
-                // }
-
-                let histogram_whitepoint = {
-                    let threshold: f64 = 0.9999;
-
-                    let total = windows_capture.size[0] * windows_capture.size[1] * 3;
-
-                    let mut running_total = 0;
-                    let mut selected_bin_index = BIN_COUNT as usize;
-
-                    for (index, count) in histogram.iter().enumerate() {
-                        running_total += count;
-
-                        if f64::from(running_total) / f64::from(total) >= threshold {
-                            debug!("Selected bin: {index}");
-                            selected_bin_index = index;
-                            break;
-                        }
-                    }
-
-                    (maximum / BIN_COUNT as f32) * (selected_bin_index + 1) as f32
-                };
-
-                debug!("Selected HDR Whitepoint {}", histogram_whitepoint);
-
-                proxy
-                    .send_event(WindowMessage::CaptureProgress(
-                        CaptureProgress::FoundWhitepoint(histogram_whitepoint),
+                        CaptureProgress::FoundWhitepoint(Whitepoint::Hdr(monitor.max_brightness)),
                     ))
                     .report_and_panic("Eventloop exited");
             }

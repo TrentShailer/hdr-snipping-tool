@@ -12,6 +12,7 @@ use winit::{
 };
 
 use crate::{
+    application::capture_taker::Whitepoint,
     config::Config,
     config_dir, screenshot_dir,
     selection::SelectionState,
@@ -102,6 +103,11 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                         {
                             application.renderer.set_mouse_position(self.mouse_position);
                             application.renderer.set_selection(capture.selection);
+
+                            // Set preliminary max brightness
+                            // application
+                            //     .renderer
+                            //     .set_max_brightness(monitor.max_brightness);
                         }
 
                         // Request redraw
@@ -131,6 +137,32 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
 
                     CaptureProgress::FoundWhitepoint(whitepoint) => {
                         if let Some(capture) = application.capture.as_mut() {
+                            // Set the max brightness based on if the content is SDR or HDR
+                            let whitepoint = match whitepoint {
+                                Whitepoint::Sdr(whitepoint) => {
+                                    application
+                                        .renderer
+                                        .set_max_brightness(capture.monitor.sdr_white);
+
+                                    debug!("Preview max brightness: {}", capture.monitor.sdr_white);
+
+                                    whitepoint
+                                }
+                                Whitepoint::Hdr(whitepoint) => {
+                                    application
+                                        .renderer
+                                        .set_max_brightness(capture.monitor.max_brightness);
+
+                                    debug!(
+                                        "Preview max brightness: {}",
+                                        capture.monitor.max_brightness
+                                    );
+
+                                    whitepoint
+                                }
+                            };
+
+                            // Set the whitepoint
                             capture.whitepoint = whitepoint;
                             application.renderer.set_whitepoint(capture.whitepoint);
                         }

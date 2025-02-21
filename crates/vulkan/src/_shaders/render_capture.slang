@@ -14,8 +14,14 @@ struct FSInput
     float2 uv : UV;
 };
 
+struct PushConstants
+{
+    float whitepoint;
+    float max_brightness;
+}
+
 [vk::push_constant]
-ConstantBuffer<float> whitepoint;
+ConstantBuffer<PushConstants> push_constants;
 
 [vk_binding(0, 0)]
 ParameterBlock<Descriptor> descriptor;
@@ -43,23 +49,26 @@ FSInput vertexMain(VSInput input)
 float4 fragmentMain(FSInput input)
     : SV_Target
 {
+    let max_brightness = push_constants.max_brightness;
+    let whitepoint = push_constants.whitepoint;
+
     let colour = descriptor.sampler.Sample(input.uv);
 
     if (present_srgb == 1)
     {
         return {
-            tonemap(colour.r, whitepoint),
-            tonemap(colour.g, whitepoint),
-            tonemap(colour.b, whitepoint),
+            tonemap(colour.r, push_constants.whitepoint),
+            tonemap(colour.g, push_constants.whitepoint),
+            tonemap(colour.b, push_constants.whitepoint),
             colour.a
         };
     }
     else
     {
         return {
-            clamp(colour.r, 0.0, whitepoint),
-            clamp(colour.g, 0.0, whitepoint),
-            clamp(colour.b, 0.0, whitepoint),
+            (clamp(colour.r, 0.0, whitepoint) / whitepoint) * max_brightness,
+            (clamp(colour.g, 0.0, whitepoint) / whitepoint) * max_brightness,
+            (clamp(colour.b, 0.0, whitepoint) / whitepoint) * max_brightness,
             colour.a
         };
     }
