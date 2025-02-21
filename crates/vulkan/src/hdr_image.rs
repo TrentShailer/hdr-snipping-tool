@@ -2,8 +2,8 @@ use std::time::Instant;
 
 use ash::vk;
 use ash_helper::{
-    cmd_transition_image, find_memorytype_index, onetime_command, AllocationError, VkError,
-    VulkanContext,
+    AllocationError, VkError, VulkanContext, cmd_transition_image, find_memorytype_index,
+    onetime_command,
 };
 use tracing::debug;
 
@@ -160,8 +160,10 @@ impl HdrImage {
 
     /// Destroy the image.
     pub unsafe fn destroy(self, vulkan: &Vulkan) {
-        vulkan.device().destroy_image_view(self.view, None);
-        vulkan.device().destroy_image(self.image, None);
-        vulkan.device().free_memory(self.memory, None);
+        unsafe {
+            vulkan.device().destroy_image_view(self.view, None);
+            vulkan.device().destroy_image(self.image, None);
+            vulkan.device().free_memory(self.memory, None);
+        }
     }
 }

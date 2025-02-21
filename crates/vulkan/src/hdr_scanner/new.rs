@@ -3,12 +3,12 @@ use core::slice;
 use alloc::sync::Arc;
 use ash::vk;
 use ash_helper::{
-    allocate_buffer, create_shader_module_from_spv, try_name, VkError, VulkanContext,
+    VkError, VulkanContext, allocate_buffer, create_shader_module_from_spv, try_name,
 };
 
 use crate::Vulkan;
 
-use super::{HdrScannerError, HdrScanner};
+use super::{HdrScanner, HdrScannerError};
 
 impl HdrScanner {
     /// Creates a new HDR Scanner.
@@ -61,10 +61,12 @@ impl HdrScanner {
 
         // Create shader module
         let shader = {
-            let shader = create_shader_module_from_spv(
-                vulkan.as_ref(),
-                include_bytes!("../_shaders/spv/maximum_reduction.spv"),
-            )?;
+            let shader = unsafe {
+                create_shader_module_from_spv(
+                    vulkan.as_ref(),
+                    include_bytes!("../_shaders/spv/maximum_reduction.spv"),
+                )?
+            };
 
             unsafe { try_name(vulkan.as_ref(), shader, "HDR Scanner Shader") };
 
@@ -108,12 +110,14 @@ impl HdrScanner {
                         | vk::BufferUsageFlags::TRANSFER_DST,
                 );
 
-            allocate_buffer(
-                vulkan.as_ref(),
-                &create_info,
-                vk::MemoryPropertyFlags::DEVICE_LOCAL,
-                "HDR Scanner",
-            )?
+            unsafe {
+                allocate_buffer(
+                    vulkan.as_ref(),
+                    &create_info,
+                    vk::MemoryPropertyFlags::DEVICE_LOCAL,
+                    "HDR Scanner",
+                )?
+            }
         };
 
         let (staging_buffer, staging_memory, _) = {
@@ -122,12 +126,14 @@ impl HdrScanner {
                 .size(4)
                 .usage(vk::BufferUsageFlags::TRANSFER_DST);
 
-            allocate_buffer(
-                vulkan.as_ref(),
-                &create_info,
-                vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
-                "HDR Scanner Staging",
-            )?
+            unsafe {
+                allocate_buffer(
+                    vulkan.as_ref(),
+                    &create_info,
+                    vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
+                    "HDR Scanner Staging",
+                )?
+            }
         };
 
         let (command_pool, command_buffer, semaphore) = {
@@ -159,9 +165,7 @@ impl HdrScanner {
                     .semaphore_type(vk::SemaphoreType::TIMELINE);
                 let create_info = vk::SemaphoreCreateInfo::default().push_next(&mut type_info);
 
-                vulkan
-                    .device()
-                    .create_semaphore(&create_info, None)
+                unsafe { vulkan.device().create_semaphore(&create_info, None) }
                     .map_err(|e| VkError::new(e, "vkCreateSemaphore"))?
             };
 

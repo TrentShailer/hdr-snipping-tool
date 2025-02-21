@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use core::slice;
 
 use ash::vk;
-use ash_helper::{create_shader_module_from_spv, try_name, VkError, VulkanContext};
+use ash_helper::{VkError, VulkanContext, create_shader_module_from_spv, try_name};
 
 use crate::Vulkan;
 
@@ -71,10 +71,12 @@ impl HdrToSdrTonemapper {
 
         // Create shader module
         let shader = {
-            let shader = create_shader_module_from_spv(
-                vulkan.as_ref(),
-                include_bytes!("../_shaders/spv/tonemap_hdr_to_sdr.spv"),
-            )?;
+            let shader = unsafe {
+                create_shader_module_from_spv(
+                    vulkan.as_ref(),
+                    include_bytes!("../_shaders/spv/tonemap_hdr_to_sdr.spv"),
+                )?
+            };
 
             unsafe { try_name(vulkan.as_ref(), shader, "HDR to SDR Tonemapper Shader") };
 

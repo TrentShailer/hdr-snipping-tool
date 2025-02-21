@@ -2,19 +2,18 @@ use core::slice;
 
 use ash::{util::Align, vk};
 use ash_helper::{
-    allocate_buffer, onetime_command, BufferAlignment, BufferUsageFlags, VkError, VulkanContext,
+    BufferAlignment, BufferUsageFlags, VkError, VulkanContext, allocate_buffer, onetime_command,
 };
 
 use crate::{QueuePurpose, Vulkan};
 
 use super::{
+    CreationError,
     pipelines::{
-        capture_pipeline,
+        CapturePipeline, capture_pipeline,
         line_pipeline::{self, LinePipeline},
         selection_pipeline::{self, SelectionPipeline},
-        CapturePipeline,
     },
-    CreationError,
 };
 
 /// A Wrapper around the buffer containing all fo the verticies, indicies, and instance data.
@@ -88,12 +87,14 @@ impl RenderBuffer {
                         | vk::BufferUsageFlags::TRANSFER_DST,
                 );
 
-            allocate_buffer(
-                vulkan,
-                &buffer_create_info,
-                vk::MemoryPropertyFlags::DEVICE_LOCAL,
-                "Render",
-            )?
+            unsafe {
+                allocate_buffer(
+                    vulkan,
+                    &buffer_create_info,
+                    vk::MemoryPropertyFlags::DEVICE_LOCAL,
+                    "Render",
+                )?
+            }
         };
 
         // Create staging buffer
@@ -105,88 +106,102 @@ impl RenderBuffer {
                 .size(buffer_size)
                 .usage(vk::BufferUsageFlags::TRANSFER_SRC);
 
-            allocate_buffer(
-                vulkan,
-                &buffer_create_info,
-                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-                "Render Staging",
-            )?
+            unsafe {
+                allocate_buffer(
+                    vulkan,
+                    &buffer_create_info,
+                    vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+                    "Render Staging",
+                )?
+            }
         };
 
         // Write data to staging
         {
             // Write line verticies
             {
-                let pointer = vulkan
-                    .device()
-                    .map_memory(
-                        staging_memory,
-                        line_offset,
-                        line_end - line_offset,
-                        vk::MemoryMapFlags::empty(),
-                    )
-                    .map_err(|e| VkError::new(e, "vkMapMemory"))?;
+                let pointer = unsafe {
+                    vulkan
+                        .device()
+                        .map_memory(
+                            staging_memory,
+                            line_offset,
+                            line_end - line_offset,
+                            vk::MemoryMapFlags::empty(),
+                        )
+                        .map_err(|e| VkError::new(e, "vkMapMemory"))?
+                };
 
-                let mut align = Align::new(
-                    pointer,
-                    align_of::<line_pipeline::Vertex>() as u64,
-                    line_end - line_offset,
-                );
+                let mut align = unsafe {
+                    Align::new(
+                        pointer,
+                        align_of::<line_pipeline::Vertex>() as u64,
+                        line_end - line_offset,
+                    )
+                };
 
                 align.copy_from_slice(&LinePipeline::VERTICIES);
 
-                vulkan.device().unmap_memory(staging_memory);
+                unsafe { vulkan.device().unmap_memory(staging_memory) };
             }
 
             // Write selection verticies
             {
-                let pointer = vulkan
-                    .device()
-                    .map_memory(
-                        staging_memory,
-                        selection_offset,
-                        selection_end - selection_offset,
-                        vk::MemoryMapFlags::empty(),
-                    )
-                    .map_err(|e| VkError::new(e, "vkMapMemory"))?;
+                let pointer = unsafe {
+                    vulkan
+                        .device()
+                        .map_memory(
+                            staging_memory,
+                            selection_offset,
+                            selection_end - selection_offset,
+                            vk::MemoryMapFlags::empty(),
+                        )
+                        .map_err(|e| VkError::new(e, "vkMapMemory"))?
+                };
 
-                let mut align = Align::new(
-                    pointer,
-                    align_of::<selection_pipeline::Vertex>() as u64,
-                    selection_end - selection_offset,
-                );
+                let mut align = unsafe {
+                    Align::new(
+                        pointer,
+                        align_of::<selection_pipeline::Vertex>() as u64,
+                        selection_end - selection_offset,
+                    )
+                };
 
                 align.copy_from_slice(&SelectionPipeline::VERTICIES);
 
-                vulkan.device().unmap_memory(staging_memory);
+                unsafe { vulkan.device().unmap_memory(staging_memory) };
             }
 
             // Write capture verticies
             {
-                let pointer = vulkan
-                    .device()
-                    .map_memory(
-                        staging_memory,
-                        capture_offset,
-                        capture_end - capture_offset,
-                        vk::MemoryMapFlags::empty(),
-                    )
-                    .map_err(|e| VkError::new(e, "vkMapMemory"))?;
+                let pointer = unsafe {
+                    vulkan
+                        .device()
+                        .map_memory(
+                            staging_memory,
+                            capture_offset,
+                            capture_end - capture_offset,
+                            vk::MemoryMapFlags::empty(),
+                        )
+                        .map_err(|e| VkError::new(e, "vkMapMemory"))?
+                };
 
-                let mut align = Align::new(
-                    pointer,
-                    align_of::<capture_pipeline::Vertex>() as u64,
-                    capture_end - capture_offset,
-                );
+                let mut align = unsafe {
+                    Align::new(
+                        pointer,
+                        align_of::<capture_pipeline::Vertex>() as u64,
+                        capture_end - capture_offset,
+                    )
+                };
 
                 align.copy_from_slice(&CapturePipeline::VERTICIES);
 
-                vulkan.device().unmap_memory(staging_memory);
+                unsafe { vulkan.device().unmap_memory(staging_memory) };
             }
         }
 
         // Copy data to GPU
-        {
+        unsafe {
             onetime_command(
                 vulkan,
                 vulkan.transient_pool(),

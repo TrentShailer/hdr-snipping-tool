@@ -2,7 +2,7 @@ use core::{mem::offset_of, slice};
 
 use ash::vk;
 use ash_helper::{
-    create_shader_module_from_spv, try_name, LabelledVkResult, VkError, VulkanContext,
+    LabelledVkResult, VkError, VulkanContext, create_shader_module_from_spv, try_name,
 };
 
 use crate::Vulkan;
@@ -59,12 +59,10 @@ impl CapturePipeline {
         let sampler = {
             let create_info = vk::SamplerCreateInfo::default();
 
-            let sampler = vulkan
-                .device()
-                .create_sampler(&create_info, None)
+            let sampler = unsafe { vulkan.device().create_sampler(&create_info, None) }
                 .map_err(|e| VkError::new(e, "vkCreateSampler"))?;
 
-            try_name(vulkan, sampler, "Capture Sampler");
+            unsafe { try_name(vulkan, sampler, "Capture Sampler") };
 
             sampler
         };
@@ -81,12 +79,18 @@ impl CapturePipeline {
                 .bindings(slice::from_ref(&bindings))
                 .flags(vk::DescriptorSetLayoutCreateFlags::PUSH_DESCRIPTOR_KHR);
 
-            let layout = vulkan
-                .device()
-                .create_descriptor_set_layout(&create_info, None)
-                .map_err(|e| VkError::new(e, "vkCreateDescriptorSetLayout"))?;
+            let layout = unsafe {
+                {
+                    vulkan
+                        .device()
+                        .create_descriptor_set_layout(&create_info, None)
+                }
+                .map_err(|e| VkError::new(e, "vkCreateDescriptorSetLayout"))?
+            };
 
-            try_name(vulkan, layout, "Capture Set Layout");
+            unsafe {
+                try_name(vulkan, layout, "Capture Set Layout");
+            }
 
             layout
         };
@@ -264,12 +268,14 @@ impl CapturePipeline {
 
     /// Destroy the Vulkan resources.
     pub unsafe fn destroy(&self, vulkan: &Vulkan) {
-        vulkan.device().destroy_pipeline(self.pipeline, None);
-        vulkan.device().destroy_pipeline_layout(self.layout, None);
-        vulkan.device().destroy_shader_module(self.shader, None);
-        vulkan
-            .device()
-            .destroy_descriptor_set_layout(self.set_layout, None);
-        vulkan.device().destroy_sampler(self.sampler, None);
+        unsafe {
+            vulkan.device().destroy_pipeline(self.pipeline, None);
+            vulkan.device().destroy_pipeline_layout(self.layout, None);
+            vulkan.device().destroy_shader_module(self.shader, None);
+            vulkan
+                .device()
+                .destroy_descriptor_set_layout(self.set_layout, None);
+            vulkan.device().destroy_sampler(self.sampler, None);
+        }
     }
 }

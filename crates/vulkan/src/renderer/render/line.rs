@@ -5,8 +5,8 @@ use ash_helper::VulkanContext;
 use bytemuck::bytes_of;
 
 use crate::{
-    renderer::pipelines::{Line, LinePipeline},
     Renderer, RendererState,
+    renderer::pipelines::{Line, LinePipeline},
 };
 
 impl Renderer {
@@ -15,20 +15,25 @@ impl Renderer {
         command_buffer: vk::CommandBuffer,
         state: RendererState,
     ) {
-        self.vulkan.device().cmd_bind_pipeline(
-            command_buffer,
-            vk::PipelineBindPoint::GRAPHICS,
-            self.line_pipeline.pipeline,
-        );
-        self.vulkan.device().cmd_bind_vertex_buffers(
-            command_buffer,
-            0,
-            slice::from_ref(&self.render_buffer.buffer),
-            slice::from_ref(&self.render_buffer.line_offset),
-        );
+        unsafe {
+            self.vulkan.device().cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.line_pipeline.pipeline,
+            );
+        }
 
-        self.cmd_draw_border(command_buffer, state);
-        self.cmd_draw_guides(command_buffer, state);
+        unsafe {
+            self.vulkan.device().cmd_bind_vertex_buffers(
+                command_buffer,
+                0,
+                slice::from_ref(&self.render_buffer.buffer),
+                slice::from_ref(&self.render_buffer.line_offset),
+            );
+        }
+
+        unsafe { self.cmd_draw_border(command_buffer, state) };
+        unsafe { self.cmd_draw_guides(command_buffer, state) };
     }
 
     unsafe fn cmd_draw_border(&self, command_buffer: vk::CommandBuffer, state: RendererState) {
@@ -64,11 +69,13 @@ impl Renderer {
             .end(self.swapchain.screen_space([right, bottom_capped]))
             .colour(border_colour);
 
-        self.cmd_draw_lines(
-            command_buffer,
-            border_width,
-            &[top_line, left_line, bottom_line, right_line],
-        );
+        unsafe {
+            self.cmd_draw_lines(
+                command_buffer,
+                border_width,
+                &[top_line, left_line, bottom_line, right_line],
+            );
+        }
     }
 
     unsafe fn cmd_draw_guides(&self, command_buffer: vk::CommandBuffer, state: RendererState) {
@@ -85,7 +92,7 @@ impl Renderer {
             .end([1.0, mouse[1]])
             .colour(guide_colour);
 
-        self.cmd_draw_lines(command_buffer, 1.0, &[horizontal, vertical]);
+        unsafe { self.cmd_draw_lines(command_buffer, 1.0, &[horizontal, vertical]) };
     }
 
     unsafe fn cmd_draw_lines(
@@ -94,26 +101,32 @@ impl Renderer {
         line_width: f32,
         lines: &[Line],
     ) {
-        self.vulkan
-            .device()
-            .cmd_set_line_width(command_buffer, line_width);
+        unsafe {
+            self.vulkan
+                .device()
+                .cmd_set_line_width(command_buffer, line_width);
+        }
 
         for line in lines {
-            self.vulkan.device().cmd_push_constants(
-                command_buffer,
-                self.line_pipeline.layout,
-                vk::ShaderStageFlags::VERTEX,
-                0,
-                bytes_of(line),
-            );
+            unsafe {
+                self.vulkan.device().cmd_push_constants(
+                    command_buffer,
+                    self.line_pipeline.layout,
+                    vk::ShaderStageFlags::VERTEX,
+                    0,
+                    bytes_of(line),
+                );
+            }
 
-            self.vulkan.device().cmd_draw(
-                command_buffer,
-                LinePipeline::VERTICIES.len() as u32,
-                1,
-                0,
-                0,
-            );
+            unsafe {
+                self.vulkan.device().cmd_draw(
+                    command_buffer,
+                    LinePipeline::VERTICIES.len() as u32,
+                    1,
+                    0,
+                    0,
+                );
+            }
         }
     }
 }

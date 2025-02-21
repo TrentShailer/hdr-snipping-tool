@@ -4,20 +4,23 @@ use core::{
 };
 use std::{
     sync::{
-        mpsc::{channel, Sender},
         Arc,
+        mpsc::{Sender, channel},
     },
     thread::{self, JoinHandle},
     time::Instant,
 };
 
 use tracing::{debug, error, info_span};
-use vulkan::{HdrImage, HdrScanner, HistogramGenerator, Vulkan, BIN_COUNT};
+use vulkan::{BIN_COUNT, HdrImage, HdrScanner, HistogramGenerator, Vulkan};
 use windows::Win32::Foundation::CloseHandle;
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCapture};
 use winit::event_loop::EventLoopProxy;
 
-use crate::utilities::failure::{report, Failure};
+use crate::{
+    should_debug,
+    utilities::failure::{Failure, report},
+};
 
 use super::WindowMessage;
 
@@ -190,7 +193,10 @@ impl InnerCaptureTaker {
             let maybe_monitor = match Monitor::get_hovered_monitor(&self.direct_x) {
                 Ok(maybe_monitor) => maybe_monitor,
                 Err(e) => {
-                    report(e, "Could not take the screenshot.\nAn error was encountered while finding the hovered monitor");
+                    report(
+                        e,
+                        "Could not take the screenshot.\nAn error was encountered while finding the hovered monitor",
+                    );
                     let _ =
                         proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
                     return;
@@ -200,7 +206,10 @@ impl InnerCaptureTaker {
             let monitor = match maybe_monitor {
                 Some(monitor) => monitor,
                 None => {
-                    report("Monitor::get_hovered_monitor was None", "Could not take the screenshot.\nCould not find the monitor that the cursor is on");
+                    report(
+                        "Monitor::get_hovered_monitor was None",
+                        "Could not take the screenshot.\nCould not find the monitor that the cursor is on",
+                    );
                     let _ =
                         proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
                     return;
@@ -244,7 +253,10 @@ impl InnerCaptureTaker {
             ) {
                 Ok(capture) => capture,
                 Err(e) => {
-                    report(e, "Could not take the screenshot.\nEncountered an error while taking the screenshot");
+                    report(
+                        e,
+                        "Could not take the screenshot.\nEncountered an error while taking the screenshot",
+                    );
                     let _ =
                         proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
                     return;
@@ -267,7 +279,7 @@ impl InnerCaptureTaker {
             let capture = match HdrImage::import_windows_capture(
                 &self.vulkan,
                 windows_capture.size,
-                windows_capture.handle.0 .0 as isize,
+                windows_capture.handle.0.0 as isize,
             ) {
                 Ok(capture) => capture,
                 Err(e) => {

@@ -3,14 +3,14 @@ use std::time::Instant;
 
 use ash::vk;
 use ash_helper::{
-    cmd_try_begin_label, cmd_try_end_label, queue_try_begin_label, queue_try_end_label, try_name,
-    LabelledVkResult, VkError, VulkanContext,
+    LabelledVkResult, VkError, VulkanContext, cmd_try_begin_label, cmd_try_end_label,
+    queue_try_begin_label, queue_try_end_label, try_name,
 };
 use tracing::debug;
 
 use crate::{HdrImage, QueuePurpose};
 
-use super::{HistogramGenerator, BIN_COUNT};
+use super::{BIN_COUNT, HistogramGenerator};
 
 impl HistogramGenerator {
     /// Generates a histogram for an HDR Image.
@@ -163,7 +163,7 @@ impl HistogramGenerator {
 
         // Get the result
         let histogram = {
-            let pool = self.vulkan.transient_pool().lock();
+            let pool = unsafe { self.vulkan.transient_pool().lock() };
 
             // Allocate command buffer
             let command_buffer = {
@@ -179,11 +179,13 @@ impl HistogramGenerator {
                 }
                 .map_err(|e| VkError::new(e, "vkAllocateCommandBuffers"))?[0];
 
-                try_name(
-                    self.vulkan.as_ref(),
-                    buffer,
-                    "Histogram Result Command Buffer",
-                );
+                unsafe {
+                    try_name(
+                        self.vulkan.as_ref(),
+                        buffer,
+                        "Histogram Result Command Buffer",
+                    );
+                }
 
                 buffer
             };
@@ -287,7 +289,7 @@ impl HistogramGenerator {
                 .map_err(|e| VkError::new(e, "vkMapMemory"))?;
 
                 let histogram: Vec<u32> =
-                    slice::from_raw_parts(pointer.cast(), BIN_COUNT as usize).to_vec();
+                    unsafe { slice::from_raw_parts(pointer.cast(), BIN_COUNT as usize).to_vec() };
 
                 unsafe { self.vulkan.device().unmap_memory(self.staging_memory) };
 

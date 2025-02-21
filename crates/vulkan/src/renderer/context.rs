@@ -1,5 +1,5 @@
 use ash::{khr, vk};
-use ash_helper::{try_name, LabelledVkResult, SurfaceContext, VkError, VulkanContext};
+use ash_helper::{LabelledVkResult, SurfaceContext, VkError, VulkanContext, try_name};
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 
 use crate::Vulkan;
@@ -30,10 +30,12 @@ impl Surface {
             .map_err(|e| VkError::new(e, "createSurface"))?
         };
 
-        let surface_instance = khr::surface::Instance::new(vulkan.entry(), vulkan.instance());
-        let swapchain_device = khr::swapchain::Device::new(vulkan.instance(), vulkan.device());
+        let surface_instance =
+            unsafe { khr::surface::Instance::new(vulkan.entry(), vulkan.instance()) };
+        let swapchain_device =
+            unsafe { khr::swapchain::Device::new(vulkan.instance(), vulkan.device()) };
         let rendering_device =
-            khr::dynamic_rendering::Device::new(vulkan.instance(), vulkan.device());
+            unsafe { khr::dynamic_rendering::Device::new(vulkan.instance(), vulkan.device()) };
 
         // Name the objects
         unsafe {

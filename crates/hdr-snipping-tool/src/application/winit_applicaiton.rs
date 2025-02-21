@@ -19,8 +19,8 @@ use crate::{
 };
 
 use super::{
-    capture::Capture, capture_taker::CaptureProgress, Application, TRAY_CONFIG_ID, TRAY_QUIT_ID,
-    TRAY_SCREENSHOT_ID,
+    Application, TRAY_CONFIG_ID, TRAY_QUIT_ID, TRAY_SCREENSHOT_ID, capture::Capture,
+    capture_taker::CaptureProgress,
 };
 
 pub enum WindowMessage {
@@ -87,15 +87,15 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
 
                         // Update window
                         {
-                            application.window.set_outer_position(PhysicalPosition::new(
-                                monitor.desktop_coordinates.left,
-                                monitor.desktop_coordinates.top,
-                            ));
-
                             let size = monitor.size();
                             let _ = application
                                 .window
                                 .request_inner_size(PhysicalSize::new(size[0], size[1]));
+
+                            application.window.set_outer_position(PhysicalPosition::new(
+                                monitor.desktop_coordinates.left,
+                                monitor.desktop_coordinates.top,
+                            ));
                         }
 
                         // Update renderer
@@ -275,6 +275,7 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                 // Update selection
                 if let Some(capture) = application.capture.as_mut() {
                     capture.selection.update_selection(self.mouse_position);
+                    application.renderer.set_selection(capture.selection);
                     application.renderer.set_selection(capture.selection);
                 }
 

@@ -2,8 +2,8 @@ use core::slice;
 
 use ash::vk;
 use ash_helper::{
-    cmd_transition_image, cmd_try_begin_label, cmd_try_end_label, FrameResources, LabelledVkResult,
-    SurfaceContext, Swapchain, VkError, VulkanContext,
+    FrameResources, LabelledVkResult, SurfaceContext, Swapchain, VkError, VulkanContext,
+    cmd_transition_image, cmd_try_begin_label, cmd_try_end_label,
 };
 
 use crate::QueuePurpose;
@@ -19,15 +19,19 @@ impl Renderer {
     pub unsafe fn render(&mut self) -> LabelledVkResult<()> {
         // Recreate the swapchain if it needs recreating
         if self.swapchain.needs_to_rebuild {
-            let swapchain = Swapchain::new(
-                self.vulkan.as_ref(),
-                &self.surface,
-                self.vulkan.transient_pool(),
-                self.vulkan.queue(QueuePurpose::Graphics),
-                Some(self.swapchain.swapchain),
-                &self.swapchain_preferences,
-            )?;
-            self.swapchain.destroy(self.vulkan.as_ref(), &self.surface);
+            let swapchain = unsafe {
+                Swapchain::new(
+                    self.vulkan.as_ref(),
+                    &self.surface,
+                    self.vulkan.transient_pool(),
+                    self.vulkan.queue(QueuePurpose::Graphics),
+                    Some(self.swapchain.swapchain),
+                    &self.swapchain_preferences,
+                )?
+            };
+
+            unsafe { self.swapchain.destroy(self.vulkan.as_ref(), &self.surface) };
+
             self.swapchain = swapchain;
 
             unsafe {
@@ -116,20 +120,22 @@ impl Renderer {
                         .map_err(|e| VkError::new(e, "vkBeginCommandBuffer"))?;
                 }
 
-                cmd_try_begin_label(self.vulkan.as_ref(), command_buffer, "Render");
+                unsafe { cmd_try_begin_label(self.vulkan.as_ref(), command_buffer, "Render") };
             }
 
             // Start rendering
             {
                 // Transition swapchain image from present to colour attachment
-                cmd_transition_image(
-                    self.vulkan.as_ref(),
-                    command_buffer,
-                    image,
-                    vk::ImageLayout::PRESENT_SRC_KHR,
-                    vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                )
-                .unwrap();
+                unsafe {
+                    cmd_transition_image(
+                        self.vulkan.as_ref(),
+                        command_buffer,
+                        image,
+                        vk::ImageLayout::PRESENT_SRC_KHR,
+                        vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    )
+                    .unwrap();
+                }
 
                 // Start rendering
                 let colour_attachment = vk::RenderingAttachmentInfoKHR::default()
@@ -162,24 +168,30 @@ impl Renderer {
                     .height(self.swapchain.extent.height as f32)
                     .min_depth(0.0)
                     .max_depth(1.0);
-                self.vulkan.device().cmd_set_viewport(
-                    command_buffer,
-                    0,
-                    slice::from_ref(&viewport),
-                );
+                unsafe {
+                    self.vulkan.device().cmd_set_viewport(
+                        command_buffer,
+                        0,
+                        slice::from_ref(&viewport),
+                    );
+                }
 
                 let scissor = vk::Rect2D::default().extent(self.swapchain.extent);
-                self.vulkan
-                    .device()
-                    .cmd_set_scissor(command_buffer, 0, slice::from_ref(&scissor));
+                unsafe {
+                    self.vulkan.device().cmd_set_scissor(
+                        command_buffer,
+                        0,
+                        slice::from_ref(&scissor),
+                    );
+                }
             }
 
             // Draw
             {
                 let state = *self.state.lock();
-                self.cmd_draw_capture(command_buffer, state);
-                self.cmd_draw_selection(command_buffer, state);
-                self.cmd_draw_all_lines(command_buffer, state);
+                unsafe { self.cmd_draw_capture(command_buffer, state) };
+                unsafe { self.cmd_draw_selection(command_buffer, state) };
+                unsafe { self.cmd_draw_all_lines(command_buffer, state) };
             }
 
             // End rendering
@@ -191,14 +203,16 @@ impl Renderer {
                 }
 
                 // Transition swapchain image from present to colour attachment
-                cmd_transition_image(
-                    self.vulkan.as_ref(),
-                    command_buffer,
-                    image,
-                    vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                    vk::ImageLayout::PRESENT_SRC_KHR,
-                )
-                .unwrap();
+                unsafe {
+                    cmd_transition_image(
+                        self.vulkan.as_ref(),
+                        command_buffer,
+                        image,
+                        vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                        vk::ImageLayout::PRESENT_SRC_KHR,
+                    )
+                    .unwrap();
+                }
             }
 
             // End recording
@@ -222,11 +236,13 @@ impl Renderer {
                 .wait_semaphores(slice::from_ref(&image_available_semaphore))
                 .signal_semaphores(slice::from_ref(&render_finished_semaphore));
 
-            let queue = self.vulkan.queue(QueuePurpose::Graphics).lock();
-            self.vulkan
-                .device()
-                .queue_submit(*queue, slice::from_ref(&submit), in_flight_fence)
-                .map_err(|e| VkError::new(e, "vkQueueSubmit"))?;
+            let queue = unsafe { self.vulkan.queue(QueuePurpose::Graphics).lock() };
+            unsafe {
+                self.vulkan
+                    .device()
+                    .queue_submit(*queue, slice::from_ref(&submit), in_flight_fence)
+                    .map_err(|e| VkError::new(e, "vkQueueSubmit"))?;
+            }
             drop(queue);
         }
 
@@ -237,11 +253,12 @@ impl Renderer {
                 .swapchains(slice::from_ref(&self.swapchain.swapchain))
                 .image_indices(slice::from_ref(&image_index));
 
-            let queue = self.vulkan.queue(QueuePurpose::Graphics).lock();
-            let result = self
-                .surface
-                .swapchain_device()
-                .queue_present(*queue, &present_info);
+            let queue = unsafe { self.vulkan.queue(QueuePurpose::Graphics).lock() };
+            let result = unsafe {
+                self.surface
+                    .swapchain_device()
+                    .queue_present(*queue, &present_info)
+            };
             drop(queue);
 
             let suboptimal = match result {

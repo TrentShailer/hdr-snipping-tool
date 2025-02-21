@@ -3,12 +3,12 @@ use core::slice;
 use alloc::sync::Arc;
 use ash::vk;
 use ash_helper::{
-    allocate_buffer, create_shader_module_from_spv, try_name, VkError, VulkanContext,
+    VkError, VulkanContext, allocate_buffer, create_shader_module_from_spv, try_name,
 };
 
 use crate::Vulkan;
 
-use super::{HistogramError, HistogramGenerator, BIN_COUNT};
+use super::{BIN_COUNT, HistogramError, HistogramGenerator};
 
 impl HistogramGenerator {
     /// Creates a new Histogram Generator.
@@ -67,10 +67,12 @@ impl HistogramGenerator {
 
         // Create shader module
         let shader = {
-            let shader = create_shader_module_from_spv(
-                vulkan.as_ref(),
-                include_bytes!("../_shaders/spv/histogram.spv"),
-            )?;
+            let shader = unsafe {
+                create_shader_module_from_spv(
+                    vulkan.as_ref(),
+                    include_bytes!("../_shaders/spv/histogram.spv"),
+                )?
+            };
 
             unsafe { try_name(vulkan.as_ref(), shader, "Histogram Shader") };
 
@@ -114,12 +116,14 @@ impl HistogramGenerator {
                         | vk::BufferUsageFlags::TRANSFER_DST,
                 );
 
-            allocate_buffer(
-                vulkan.as_ref(),
-                &create_info,
-                vk::MemoryPropertyFlags::DEVICE_LOCAL,
-                "Histogram",
-            )?
+            unsafe {
+                allocate_buffer(
+                    vulkan.as_ref(),
+                    &create_info,
+                    vk::MemoryPropertyFlags::DEVICE_LOCAL,
+                    "Histogram",
+                )?
+            }
         };
 
         let (staging_buffer, staging_memory, _) = {
@@ -128,12 +132,14 @@ impl HistogramGenerator {
                 .size(BIN_COUNT * 4)
                 .usage(vk::BufferUsageFlags::TRANSFER_DST);
 
-            allocate_buffer(
-                vulkan.as_ref(),
-                &create_info,
-                vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
-                "Histogram Staging",
-            )?
+            unsafe {
+                allocate_buffer(
+                    vulkan.as_ref(),
+                    &create_info,
+                    vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
+                    "Histogram Staging",
+                )?
+            }
         };
 
         let (command_pool, command_buffer, semaphore) = {
@@ -165,9 +171,7 @@ impl HistogramGenerator {
                     .semaphore_type(vk::SemaphoreType::TIMELINE);
                 let create_info = vk::SemaphoreCreateInfo::default().push_next(&mut type_info);
 
-                vulkan
-                    .device()
-                    .create_semaphore(&create_info, None)
+                unsafe { vulkan.device().create_semaphore(&create_info, None) }
                     .map_err(|e| VkError::new(e, "vkCreateSemaphore"))?
             };
 

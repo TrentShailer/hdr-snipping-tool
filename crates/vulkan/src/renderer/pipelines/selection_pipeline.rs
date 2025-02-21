@@ -2,7 +2,7 @@ use core::{mem::offset_of, slice};
 
 use ash::vk;
 use ash_helper::{
-    create_shader_module_from_spv, try_name, LabelledVkResult, VkError, VulkanContext,
+    LabelledVkResult, VkError, VulkanContext, create_shader_module_from_spv, try_name,
 };
 use bytemuck::{Pod, Zeroable};
 
@@ -281,8 +281,10 @@ impl SelectionPipeline {
 
     /// Destroy the Vulkan resources.
     pub unsafe fn destroy(&self, vulkan: &Vulkan) {
-        vulkan.device().destroy_pipeline(self.pipeline, None);
-        vulkan.device().destroy_pipeline_layout(self.layout, None);
-        vulkan.device().destroy_shader_module(self.shader, None);
+        unsafe {
+            vulkan.device().destroy_pipeline(self.pipeline, None);
+            vulkan.device().destroy_pipeline_layout(self.layout, None);
+            vulkan.device().destroy_shader_module(self.shader, None);
+        }
     }
 }

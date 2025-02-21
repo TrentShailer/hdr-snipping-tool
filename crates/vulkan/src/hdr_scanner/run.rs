@@ -3,8 +3,8 @@ use std::time::Instant;
 
 use ash::vk;
 use ash_helper::{
-    cmd_try_begin_label, cmd_try_end_label, queue_try_begin_label, queue_try_end_label, try_name,
-    LabelledVkResult, VkError, VulkanContext,
+    LabelledVkResult, VkError, VulkanContext, cmd_try_begin_label, cmd_try_end_label,
+    queue_try_begin_label, queue_try_end_label, try_name,
 };
 use tracing::debug;
 
@@ -148,7 +148,7 @@ impl HdrScanner {
 
         // Get the result
         let maximum = {
-            let pool = self.vulkan.transient_pool().lock();
+            let pool = unsafe { self.vulkan.transient_pool().lock() };
 
             // Allocate command buffer
             let command_buffer = {
@@ -164,11 +164,13 @@ impl HdrScanner {
                 }
                 .map_err(|e| VkError::new(e, "vkAllocateCommandBuffers"))?[0];
 
-                try_name(
-                    self.vulkan.as_ref(),
-                    buffer,
-                    "HDR Scanner Result Command Buffer",
-                );
+                unsafe {
+                    try_name(
+                        self.vulkan.as_ref(),
+                        buffer,
+                        "HDR Scanner Result Command Buffer",
+                    );
+                }
 
                 buffer
             };
@@ -271,7 +273,7 @@ impl HdrScanner {
                 }
                 .map_err(|e| VkError::new(e, "vkMapMemory"))?;
 
-                let maximum: f32 = slice::from_raw_parts(pointer.cast(), 1)[0];
+                let maximum: f32 = unsafe { slice::from_raw_parts(pointer.cast(), 1)[0] };
 
                 unsafe { self.vulkan.device().unmap_memory(self.staging_memory) };
 

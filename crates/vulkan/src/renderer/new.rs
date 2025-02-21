@@ -8,12 +8,12 @@ use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use crate::{QueuePurpose, Vulkan};
 
 use super::{
+    CreationError, Renderer, State,
     buffer::RenderBuffer,
     context::Surface,
     pipelines::{
-        line_pipeline::LinePipeline, selection_pipeline::SelectionPipeline, CapturePipeline,
+        CapturePipeline, line_pipeline::LinePipeline, selection_pipeline::SelectionPipeline,
     },
-    CreationError, Renderer, State,
 };
 
 impl Renderer {
@@ -24,7 +24,7 @@ impl Renderer {
         window_handle: RawWindowHandle,
     ) -> Result<Self, CreationError> {
         // Create the surface context
-        let surface = Surface::new(vulkan.as_ref(), display_handle, window_handle)?;
+        let surface = unsafe { Surface::new(vulkan.as_ref(), display_handle, window_handle)? };
 
         // Create the swapchain
         let swapchain_preferences = SwapchainPreferences::default()
@@ -40,22 +40,24 @@ impl Renderer {
                 vk::ColorSpaceKHR::SRGB_NONLINEAR,
             ]);
 
-        let swapchain = Swapchain::new(
-            vulkan.as_ref(),
-            &surface,
-            vulkan.transient_pool(),
-            vulkan.queue(QueuePurpose::Graphics),
-            None,
-            &swapchain_preferences,
-        )?;
+        let swapchain = unsafe {
+            Swapchain::new(
+                vulkan.as_ref(),
+                &surface,
+                vulkan.transient_pool(),
+                vulkan.queue(QueuePurpose::Graphics),
+                None,
+                &swapchain_preferences,
+            )?
+        };
 
         // Create an initialise the render Vertex/Index/Instance buffer.
-        let buffer = RenderBuffer::new(&vulkan)?;
+        let buffer = unsafe { RenderBuffer::new(&vulkan)? };
 
         // Create the pipelines
-        let line_pipeline = LinePipeline::new(&vulkan, swapchain.format)?;
-        let selection_pipeline = SelectionPipeline::new(&vulkan, swapchain.format)?;
-        let capture_pipeline = CapturePipeline::new(&vulkan, swapchain.format)?;
+        let line_pipeline = unsafe { LinePipeline::new(&vulkan, swapchain.format)? };
+        let selection_pipeline = unsafe { SelectionPipeline::new(&vulkan, swapchain.format)? };
+        let capture_pipeline = unsafe { CapturePipeline::new(&vulkan, swapchain.format)? };
 
         Ok(Self {
             vulkan,
