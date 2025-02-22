@@ -23,8 +23,8 @@ bytemuck = { version = "1.21", default-features = false, features = ["derive"] }
 half = { version = "2.4" }
 
 # Windows API
-windows = { version = "0.59" }
-windows-core = { version = "0.59" }
+windows = { version = "0.60" }
+windows-core = { version = "0.60" }
 
 # Windowing
 winit = { version = "0.30", default-features = false, features = ["rwh_06"] }

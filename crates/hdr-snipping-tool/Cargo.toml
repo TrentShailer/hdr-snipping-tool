@@ -1,6 +1,6 @@
 [package]
 name = "hdr-snipping-tool"
-version = "4.1.0"
+version = "4.1.1"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -41,7 +41,7 @@ dirs = "6.0"
 
 # Windowing
 winit = { workspace = true }
-tray-icon = { version = "0.19", default-features = false }
+tray-icon = { version = "0.20", default-features = false }
 
 # Windows API
 windows = { workspace = true, features = ["Win32_System_Threading"] }
