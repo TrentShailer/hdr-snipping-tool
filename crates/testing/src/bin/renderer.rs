@@ -2,7 +2,7 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 use std::{
-    sync::mpsc::{channel, Sender},
+    sync::mpsc::{Sender, channel},
     thread::{self, JoinHandle},
 };
 use tracing::debug;
@@ -11,10 +11,11 @@ use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCaptur
 use parking_lot::Mutex;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use testing::setup_logger;
-use vulkan::{HdrImage, Renderer, RendererState, Vulkan};
+use vulkan::{HdrImage, HdrScanner, Renderer, RendererState, Vulkan};
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalPosition,
+    event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop},
     window::Window,
 };
@@ -45,18 +46,7 @@ struct ActiveApp {
 
 impl ActiveApp {
     pub fn new(event_loop: &ActiveEventLoop) -> Self {
-        let window_attributes = Window::default_attributes()
-            .with_title("Renderer Testing")
-            .with_active(false)
-            .with_visible(false);
-
-        let window = event_loop.create_window(window_attributes).unwrap();
-
-        let vulkan = unsafe {
-            Arc::new(Vulkan::new(true, Some(window.display_handle().unwrap().as_raw())).unwrap())
-        };
-
-        let (capture, monitor) = {
+        let (windows_capture, monitor) = {
             let direct_x = DirectX::new().unwrap();
             let mut cache = CaptureItemCache::new();
 
@@ -68,41 +58,66 @@ impl ActiveApp {
 
             debug!("Capture Size: {:?}", capture.size);
 
-            let hdr_capture = unsafe {
-                HdrImage::import_windows_capture(
-                    &vulkan,
-                    capture.size,
-                    capture.handle.0 .0 as isize,
+            unsafe { resources.destroy(&direct_x).unwrap() };
+
+            (capture, monitor)
+        };
+
+        let window = {
+            let window_attributes = Window::default_attributes()
+                .with_title("Renderer Testing")
+                .with_active(false)
+                .with_visible(false);
+
+            event_loop.create_window(window_attributes).unwrap()
+        };
+
+        let vulkan =
+            Arc::new(Vulkan::new(true, Some(window.display_handle().unwrap().as_raw())).unwrap());
+
+        let (render_state, render_sender, render_thread) = {
+            let renderer = unsafe {
+                Renderer::new(
+                    vulkan.clone(),
+                    window.display_handle().unwrap().as_raw(),
+                    window.window_handle().unwrap().as_raw(),
                 )
                 .unwrap()
             };
+            let render_state = renderer.state.clone();
+            let (render_sender, render_thread) = render_thread(renderer);
 
-            resources.destroy(&direct_x).unwrap();
-
-            (hdr_capture, monitor)
+            (render_state, render_sender, render_thread)
         };
 
-        let renderer = unsafe {
-            Renderer::new(
-                vulkan.clone(),
-                window.display_handle().unwrap().as_raw(),
-                window.window_handle().unwrap().as_raw(),
+        let capture = unsafe {
+            HdrImage::import_windows_capture(
+                &vulkan,
+                windows_capture.size,
+                windows_capture.handle.0.0 as isize,
             )
             .unwrap()
         };
 
-        let render_state = renderer.state.clone();
-
-        let (render_sender, render_thread) = render_thread(renderer);
-
+        // Update state using the capture
         {
+            let mut hdr_scanner = HdrScanner::new(Arc::clone(&vulkan)).unwrap();
+            let maximum = unsafe { hdr_scanner.scan(capture).unwrap() };
+
             let mut render_state = render_state.lock();
             render_state.capture = Some(capture);
             render_state.whitepoint = monitor.sdr_white;
+            render_state.max_brightness = if maximum <= monitor.sdr_white {
+                monitor.sdr_white
+            } else {
+                monitor.max_brightness
+            };
+
             drop(render_state);
         }
 
         window.set_visible(true);
+        window.set_maximized(true);
 
         Self {
             vulkan,
@@ -146,47 +161,37 @@ impl ApplicationHandler for App {
         &mut self,
         event_loop: &winit::event_loop::ActiveEventLoop,
         window_id: winit::window::WindowId,
-        event: winit::event::WindowEvent,
+        event: WindowEvent,
     ) {
         let Some(app) = self.app.as_mut() else {
             return;
         };
 
-        if event == winit::event::WindowEvent::Destroyed && app.window.id() == window_id {
+        if event == WindowEvent::Destroyed && app.window.id() == window_id {
             event_loop.exit();
             return;
         }
 
         match event {
-            winit::event::WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::CloseRequested => event_loop.exit(),
 
-            winit::event::WindowEvent::Resized(size) => {
-                let width = size.width as f64;
-                let height = size.height as f64;
+            WindowEvent::Resized(_) => app
+                .render_sender
+                .send(RenderMessage::RequestResize)
+                .unwrap(),
 
-                let mut state = app.render_state.lock();
-                state.selection = [
-                    PhysicalPosition::new(width / 2.0, height / 2.0).into(),
-                    PhysicalPosition::new(width / 2.0 - width / 4.0, height / 2.0 - height / 4.0)
-                        .into(),
-                ];
-                drop(state);
+            WindowEvent::RedrawRequested => app.render_sender.send(RenderMessage::Render).unwrap(),
 
-                app.render_sender
-                    .send(RenderMessage::RequestResize)
-                    .unwrap();
-            }
-
-            winit::event::WindowEvent::RedrawRequested => {
-                app.render_sender.send(RenderMessage::Render).unwrap();
-            }
-
-            winit::event::WindowEvent::CursorMoved {
+            WindowEvent::CursorMoved {
                 device_id: _,
                 position,
             } => {
                 let mut state = app.render_state.lock();
                 state.mouse_position = position.into();
+                state.selection = [
+                    PhysicalPosition::new(position.x - 400.0, position.y - 400.0).into(),
+                    PhysicalPosition::new(position.x + 400.0, position.y + 400.0).into(),
+                ];
                 drop(state);
             }
 
@@ -212,26 +217,28 @@ enum RenderMessage {
 fn render_thread(mut renderer: Renderer) -> (Sender<RenderMessage>, JoinHandle<()>) {
     let (sender, receiver) = channel::<RenderMessage>();
 
-    let thread = thread::spawn(move || loop {
-        let mut messages = vec![];
+    let thread = thread::spawn(move || {
+        loop {
+            let mut messages = vec![];
 
-        // Pump all of the messages received while rendering
-        while let Ok(message) = receiver.try_recv() {
-            if !messages.contains(&message) {
-                messages.push(message);
+            // Pump all of the messages received while rendering
+            while let Ok(message) = receiver.try_recv() {
+                if !messages.contains(&message) {
+                    messages.push(message);
+                }
             }
-        }
 
-        if messages.contains(&RenderMessage::Shutdown) {
-            return;
-        }
+            if messages.contains(&RenderMessage::Shutdown) {
+                return;
+            }
 
-        if messages.contains(&RenderMessage::RequestResize) {
-            renderer.request_resize();
-        }
+            if messages.contains(&RenderMessage::RequestResize) {
+                renderer.request_resize();
+            }
 
-        if messages.contains(&RenderMessage::Render) {
-            unsafe { renderer.render().unwrap() };
+            if messages.contains(&RenderMessage::Render) {
+                unsafe { renderer.render().unwrap() };
+            }
         }
     });
 

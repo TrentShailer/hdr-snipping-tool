@@ -98,12 +98,6 @@ impl DirectX {
     pub fn dxgi_outputs(&self) -> Result<Vec<IDXGIOutput>, windows_result::Error> {
         let mut outputs = Vec::new();
 
-        // TODO
-        /* When the EnumOutputs method succeeds and fills the ppOutput parameter with the address of
-        the pointer to the output interface, EnumOutputs increments the output interface's
-        reference count. To avoid a memory leak, when you finish using the output interface, call
-        the Release method to decrement the reference count.  */
-
         let mut index = 0;
         loop {
             let result = unsafe { self.dxgi_adapter.EnumOutputs(index) };

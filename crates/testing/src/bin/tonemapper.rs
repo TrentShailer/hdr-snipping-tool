@@ -2,27 +2,62 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 use core::slice;
+use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCapture};
 
 use ash::vk;
-use ash_helper::{allocate_buffer, cmd_transition_image, onetime_command, VulkanContext};
+use ash_helper::{VulkanContext, allocate_buffer, cmd_transition_image, onetime_command};
 use image::ColorType;
-use testing::{load_hdr_capture, setup_logger};
-use tracing::{info, info_span};
-use vulkan::{HdrToSdrTonemapper, QueuePurpose, Vulkan};
+use testing::setup_logger;
+use tracing::info_span;
+use vulkan::{HdrImage, HdrScanner, HdrToSdrTonemapper, QueuePurpose, Vulkan};
 
 fn main() {
     let _guards = setup_logger().unwrap();
 
-    let vulkan = unsafe { Arc::new(Vulkan::new(true, None).unwrap()) };
-    let tonemapper = unsafe { HdrToSdrTonemapper::new(vulkan.clone()) }.unwrap();
+    let vulkan = Arc::new(Vulkan::new(true, None).unwrap());
+    let tonemapper = HdrToSdrTonemapper::new(vulkan.clone()).unwrap();
 
-    let (metadata, hdr_image) = load_hdr_capture(&vulkan);
-    let extent = vk::Extent2D::default()
-        .width(metadata.width)
-        .height(metadata.height);
+    let (hdr_image, whitepoint) = {
+        let direct_x = DirectX::new().unwrap();
 
-    let sdr_image = unsafe { tonemapper.tonemap(hdr_image, metadata.sdr_white) }.unwrap();
-    info!("Tonemapped Image");
+        let monitor = Monitor::get_hovered_monitor(&direct_x)
+            .unwrap()
+            .expect("Monitor should be some");
+
+        let mut cache = CaptureItemCache::new();
+        let capture_item = cache.get_capture_item(monitor.handle.0).unwrap();
+
+        let (capture, resources) = WindowsCapture::take_capture(&direct_x, &capture_item).unwrap();
+
+        let hdr_image = unsafe {
+            HdrImage::import_windows_capture(&vulkan, capture.size, capture.handle.0.0 as isize)
+                .unwrap()
+        };
+
+        let mut hdr_scanner = HdrScanner::new(Arc::clone(&vulkan)).unwrap();
+
+        let maximum = unsafe {
+            let _span = info_span!("HDR Scanner");
+            hdr_scanner.scan(hdr_image).unwrap()
+        };
+
+        let whitepoint = if maximum <= monitor.sdr_white {
+            monitor.sdr_white
+        } else {
+            monitor.max_brightness
+        };
+
+        unsafe { resources.destroy(&direct_x).unwrap() };
+
+        (hdr_image, whitepoint)
+    };
+
+    let image_values = hdr_image.extent.width as u64 * hdr_image.extent.height as u64 * 4;
+
+    let sdr_image = unsafe {
+        let _span = info_span!("Tonemap");
+        tonemapper.tonemap(hdr_image, whitepoint).unwrap()
+    };
 
     // Create staging
     let (staging_buffer, staging_memory) = {
@@ -31,7 +66,7 @@ fn main() {
         let buffer_info = vk::BufferCreateInfo::default()
             .queue_family_indices(slice::from_ref(&queue_family))
             .usage(vk::BufferUsageFlags::TRANSFER_DST)
-            .size(extent.width as u64 * extent.height as u64 * 4);
+            .size(image_values);
 
         let (buffer, memory, _) = unsafe {
             allocate_buffer(
@@ -65,10 +100,10 @@ fn main() {
                 .unwrap();
 
                 let region = vk::BufferImageCopy::default()
-                    .buffer_image_height(metadata.height)
-                    .buffer_row_length(metadata.width)
+                    .buffer_image_height(hdr_image.extent.height)
+                    .buffer_row_length(hdr_image.extent.width)
                     .buffer_offset(0)
-                    .image_extent(extent.into())
+                    .image_extent(hdr_image.extent.into())
                     .image_offset(vk::Offset3D::default())
                     .image_subresource(
                         vk::ImageSubresourceLayers::default()
@@ -96,18 +131,10 @@ fn main() {
         let _span = info_span!("Copy staging to CPU").entered();
         let pointer = vulkan
             .device()
-            .map_memory(
-                staging_memory,
-                0,
-                metadata.width as u64 * metadata.height as u64 * 4,
-                vk::MemoryMapFlags::empty(),
-            )
+            .map_memory(staging_memory, 0, image_values, vk::MemoryMapFlags::empty())
             .unwrap();
 
-        let slice: &[u8] = slice::from_raw_parts(
-            pointer as _,
-            metadata.width as usize * metadata.height as usize * 4,
-        );
+        let slice: &[u8] = slice::from_raw_parts(pointer as _, image_values as usize);
 
         vulkan.device().unmap_memory(staging_memory);
 
@@ -116,10 +143,10 @@ fn main() {
     {
         let _span = info_span!("Save Image").entered();
         image::save_buffer_with_format(
-            "crates/testing/src/assets/tonemapped.png",
+            "crates/testing/output/tonemapped.png",
             tonemapped_bytes,
-            metadata.width,
-            metadata.height,
+            hdr_image.extent.width,
+            hdr_image.extent.height,
             ColorType::Rgba8,
             image::ImageFormat::Png,
         )

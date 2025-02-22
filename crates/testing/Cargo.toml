@@ -1,6 +1,6 @@
 [package]
 name = "testing"
-version = "0.1.0"
+version = "0.2.0"
 publish = false
 edition.workspace = true
 license.workspace = true
@@ -17,8 +17,6 @@ tracing = { workspace = true }
 tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-# Primitive types
-half = { workspace = true }
 
 # Vulkan
 ash = { workspace = true, features = ["linked"] }
@@ -29,20 +27,8 @@ parking_lot = { workspace = true }
 winit = { workspace = true }
 raw-window-handle = { workspace = true }
 
-# Config
-serde = { workspace = true }
-toml = { workspace = true }
-
 # Image
 image = { workspace = true, features = ["rayon", "png"] }
-
-# Generating Data
-rayon = "1.10"
-rand_distr = "0.5"
-rand = { workspace = true }
-
-# Compressing raw-hdr-capture
-flate2 = "1.0"
 
 # Allocator
 mimalloc = { workspace = true, features = ["debug"] }

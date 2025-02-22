@@ -119,12 +119,6 @@ impl HdrImage {
                 .map_err(|e| VkError::new(e, "vkCreateImageView"))?
         };
 
-        /* TODO
-            The Command after the image bind takes a long time if the GPU is working on other tasks.
-            An empty submission can take ~20-60ms on the Cyberpunk Main Menu (40% utilisation).
-            Without GPU work, on the desktop, this takes ~0-2ms.
-        */
-
         // transition image layout
         unsafe {
             onetime_command(

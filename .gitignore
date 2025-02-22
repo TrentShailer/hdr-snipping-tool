@@ -10,4 +10,4 @@ vulkan_profiles.hpp
 # Assets
 *.afdesign~lock~
 media/details.afdesign
-crates/testing/src/assets
+**/output/

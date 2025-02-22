@@ -22,6 +22,13 @@ impl CaptureItemCache {
         }
     }
 
+    /// Returns if the cache contains a given monitor.
+    pub fn contains(&self, handle: HMONITOR) -> bool {
+        self.capture_items
+            .iter()
+            .any(|(cache_handle, _)| *cache_handle == handle)
+    }
+
     /// Gets the graphics capture item from the cache or creates and caches it if it doesn't exist.
     pub fn get_capture_item(&mut self, handle: HMONITOR) -> LabelledWinResult<GraphicsCaptureItem> {
         let maybe_capture_item = self
@@ -58,12 +65,7 @@ impl CaptureItemCache {
 
         // If a monitor does not exist in the cache, add it.
         for descriptor in output_descriptors {
-            let exists_in_cache = self
-                .capture_items
-                .iter()
-                .any(|(cache_handle, _)| *cache_handle == descriptor.Monitor);
-
-            if exists_in_cache {
+            if self.contains(descriptor.Monitor) {
                 continue;
             }
 
