@@ -12,7 +12,7 @@ use super::{HdrScanner, HdrScannerError};
 
 impl HdrScanner {
     /// Creates a new HDR Scanner.
-    pub unsafe fn new(vulkan: Arc<Vulkan>) -> Result<Self, HdrScannerError> {
+    pub fn new(vulkan: Arc<Vulkan>) -> Result<Self, HdrScannerError> {
         // Create descriptor layout
         let descriptor_layout = {
             let bindings = [

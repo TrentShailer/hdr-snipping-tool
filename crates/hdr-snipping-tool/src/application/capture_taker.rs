@@ -160,7 +160,7 @@ impl InnerCaptureTaker {
         let direct_x = DirectX::new().report_and_panic("Could not create DirectX devices");
         let cache = CaptureItemCache::new();
 
-        let hdr_scanner = unsafe { HdrScanner::new(Arc::clone(&vulkan)) }
+        let hdr_scanner = HdrScanner::new(Arc::clone(&vulkan))
             .report_and_panic("Could not create the HDR Scanner");
 
         Self {
@@ -338,7 +338,7 @@ impl InnerCaptureTaker {
 
         // Clean up
         {
-            if let Err(e) = windows_capture_resources.destroy(&self.direct_x) {
+            if let Err(e) = unsafe { windows_capture_resources.destroy(&self.direct_x) } {
                 error!("Failed to destroy Windows Capture Resources: {e}");
             }
         }

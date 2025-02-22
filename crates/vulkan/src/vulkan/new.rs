@@ -3,7 +3,7 @@ use core::slice;
 use alloc::sync::Arc;
 
 use ash::{khr, vk};
-use ash_helper::{try_name, vulkan_debug_callback, DebugUtils, VkError};
+use ash_helper::{DebugUtils, VkError, try_name, vulkan_debug_callback};
 use parking_lot::Mutex;
 use raw_window_handle::RawDisplayHandle;
 use thiserror::Error;
@@ -15,7 +15,7 @@ use super::{QueuePurpose, Vulkan};
 impl Vulkan {
     /// Creates a new instance of the Vulkan Context using the Vulkan Profiles API. Designed to
     /// support Vulkan 1.2 with the required extensions.
-    pub unsafe fn new(
+    pub fn new(
         try_debug: bool,
         display_handle: Option<RawDisplayHandle>,
     ) -> Result<Self, VulkanCreationError> {

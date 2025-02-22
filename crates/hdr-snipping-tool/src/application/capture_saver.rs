@@ -1,8 +1,8 @@
 use std::{
     borrow::Cow,
     sync::{
-        mpsc::{channel, Sender},
         Arc,
+        mpsc::{Sender, channel},
     },
     thread::{self, JoinHandle},
 };
@@ -15,7 +15,7 @@ use vulkan::{HdrToSdrTonemapper, Vulkan};
 
 use crate::{
     screenshot_dir,
-    utilities::failure::{report, Failure},
+    utilities::failure::{Failure, report},
 };
 
 use super::capture::Capture;
@@ -91,7 +91,7 @@ pub struct InnerCaptureSaver {
 
 impl InnerCaptureSaver {
     pub fn new(vulkan: Arc<Vulkan>) -> Self {
-        let tonemapper = unsafe { HdrToSdrTonemapper::new(Arc::clone(&vulkan)) }
+        let tonemapper = HdrToSdrTonemapper::new(Arc::clone(&vulkan))
             .report_and_panic("Could not create the tonemapper");
 
         Self { vulkan, tonemapper }
@@ -118,7 +118,10 @@ impl InnerCaptureSaver {
         let bytes = match unsafe { sdr_image.copy_to_cpu(&self.vulkan) } {
             Ok(bytes) => bytes,
             Err(e) => {
-                report(e, "Could not save the screenshot.\nEncountered an error while copying the screenshot to CPU Memory");
+                report(
+                    e,
+                    "Could not save the screenshot.\nEncountered an error while copying the screenshot to CPU Memory",
+                );
                 return;
             }
         };

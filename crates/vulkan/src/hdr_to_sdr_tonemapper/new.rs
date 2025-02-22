@@ -10,7 +10,7 @@ use super::{HdrToSdrTonemapper, PushConstants, TonemapperError};
 
 impl HdrToSdrTonemapper {
     /// Creates a new instance of an HDR to SDR Tonemapper.
-    pub unsafe fn new(vulkan: Arc<Vulkan>) -> Result<Self, TonemapperError> {
+    pub fn new(vulkan: Arc<Vulkan>) -> Result<Self, TonemapperError> {
         // Create descriptor layout
         let descriptor_layout = {
             let bindings = [

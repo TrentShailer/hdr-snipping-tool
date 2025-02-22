@@ -10,7 +10,7 @@ use windows::{
     Win32::{
         Graphics::{
             Direct3D11::ID3D11Texture2D,
-            Dxgi::{IDXGIResource1, DXGI_SHARED_RESOURCE_READ, DXGI_SHARED_RESOURCE_WRITE},
+            Dxgi::{DXGI_SHARED_RESOURCE_READ, DXGI_SHARED_RESOURCE_WRITE, IDXGIResource1},
         },
         System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess,
     },
@@ -162,7 +162,7 @@ impl WindowsCapture {
 
 impl WindowsCaptureResources {
     /// Destroy the resources created to retreive the capture.
-    pub fn destroy(&self, direct_x: &DirectX) -> LabelledWinResult<()> {
+    pub unsafe fn destroy(&self, direct_x: &DirectX) -> LabelledWinResult<()> {
         self.frame
             .Close()
             .map_err(|e| WinError::new(e, "Direct3D11CaptureFrame::Close"))?;

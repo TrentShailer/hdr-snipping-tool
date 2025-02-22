@@ -30,7 +30,7 @@ pub struct RenderBuffer {
 
 impl RenderBuffer {
     /// Create and initialise the data in the RenderBuffer.
-    pub unsafe fn new(vulkan: &Vulkan) -> Result<Self, CreationError> {
+    pub fn new(vulkan: &Vulkan) -> Result<Self, CreationError> {
         let alignment = BufferAlignment::new(vulkan);
         let usage = BufferUsageFlags::empty();
         // Plan buffer slices

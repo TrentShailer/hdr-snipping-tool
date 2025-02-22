@@ -7,8 +7,8 @@ use capture_saver::CaptureSaver;
 use capture_taker::CaptureTaker;
 use renderer::Renderer;
 use tray_icon::{
-    menu::{Menu, MenuItem},
     TrayIcon, TrayIconBuilder,
+    menu::{Menu, MenuItem},
 };
 use vulkan::Vulkan;
 use winit::{
@@ -17,13 +17,13 @@ use winit::{
 };
 
 use crate::{
+    VERSION,
     config::Config,
     should_debug,
     utilities::{
-        failure::{report_and_panic, Failure},
+        failure::{Failure, report_and_panic},
         windows_helpers::{get_foreground_window, set_foreground_window},
     },
-    VERSION,
 };
 
 mod capture;
@@ -103,12 +103,10 @@ impl Application {
 
         // Initialise Vulkan
         let vulkan = {
-            let result = unsafe {
-                Vulkan::new(
-                    should_debug(),
-                    Some(window.display_handle().unwrap().as_raw()),
-                )
-            };
+            let result = Vulkan::new(
+                should_debug(),
+                Some(window.display_handle().unwrap().as_raw()),
+            );
 
             match result {
                 Ok(vulkan) => Arc::new(vulkan),

@@ -52,7 +52,7 @@ impl Renderer {
         };
 
         // Create an initialise the render Vertex/Index/Instance buffer.
-        let buffer = unsafe { RenderBuffer::new(&vulkan)? };
+        let buffer = RenderBuffer::new(&vulkan)?;
 
         // Create the pipelines
         let line_pipeline = unsafe { LinePipeline::new(&vulkan, swapchain.format)? };

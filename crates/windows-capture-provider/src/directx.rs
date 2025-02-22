@@ -4,14 +4,14 @@ use windows::{
     Win32::{
         Foundation::HMODULE,
         Graphics::{
-            Direct3D::{D3D_DRIVER_TYPE, D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP},
+            Direct3D::{D3D_DRIVER_TYPE, D3D_DRIVER_TYPE_HARDWARE},
             Direct3D11::{
                 D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_FLAG, D3D11_SDK_VERSION,
                 D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext,
             },
             Dxgi::{
-                DXGI_ERROR_NOT_FOUND, DXGI_ERROR_UNSUPPORTED, DXGI_OUTPUT_DESC1, IDXGIAdapter1,
-                IDXGIDevice, IDXGIOutput, IDXGIOutput6,
+                DXGI_ERROR_NOT_FOUND, DXGI_OUTPUT_DESC1, IDXGIAdapter1, IDXGIDevice1, IDXGIOutput,
+                IDXGIOutput6,
             },
         },
         System::WinRT::Direct3D11::CreateDirect3D11DeviceFromDXGIDevice,
@@ -42,22 +42,14 @@ impl DirectX {
         // Create the d3d11 device
         let d3d11_device = {
             let mut device = None;
-            let mut result = d3d11_device_with_type(
-                D3D_DRIVER_TYPE_HARDWARE,
-                D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-                &mut device,
-            );
-
-            if let Err(error) = &result {
-                if error.code() == DXGI_ERROR_UNSUPPORTED {
-                    result = d3d11_device_with_type(
-                        D3D_DRIVER_TYPE_WARP,
-                        D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-                        &mut device,
-                    );
-                }
-            }
-            result.map_err(|e| WinError::new(e, "D3D11CreateDevice"))?;
+            unsafe {
+                d3d11_device_with_type(
+                    D3D_DRIVER_TYPE_HARDWARE,
+                    D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+                    &mut device,
+                )
+                .map_err(|e| WinError::new(e, "D3D11CreateDevice"))?
+            };
 
             match device {
                 Some(device) => device,
@@ -70,7 +62,7 @@ impl DirectX {
             .map_err(|e| WinError::new(e, "ID3D11Device::GetImmediateContext"))?;
 
         // Cast to the dgxi device.
-        let dxgi_device: IDXGIDevice = d3d11_device
+        let dxgi_device: IDXGIDevice1 = d3d11_device
             .cast()
             .map_err(|e| WinError::new(e, "ID3D11Device::cast"))?;
 
@@ -103,8 +95,14 @@ impl DirectX {
     }
 
     /// Enumerate the DXGI outputs using `IDXGIAdapter1::EnumOutputs` until `DXGI_ERROR_NOT_FOUND`.
-    pub unsafe fn dxgi_outputs(&self) -> Result<Vec<IDXGIOutput>, windows_result::Error> {
+    pub fn dxgi_outputs(&self) -> Result<Vec<IDXGIOutput>, windows_result::Error> {
         let mut outputs = Vec::new();
+
+        // TODO
+        /* When the EnumOutputs method succeeds and fills the ppOutput parameter with the address of
+        the pointer to the output interface, EnumOutputs increments the output interface's
+        reference count. To avoid a memory leak, when you finish using the output interface, call
+        the Release method to decrement the reference count.  */
 
         let mut index = 0;
         loop {
@@ -132,7 +130,7 @@ impl DirectX {
 
     /// Returns the DXGI_OUTPUT_DESC1 for each IDXGIOutput.
     pub fn dxgi_output_descriptors(&self) -> Result<Vec<DXGI_OUTPUT_DESC1>, WinError> {
-        unsafe { self.dxgi_outputs() }
+        self.dxgi_outputs()
             .map_err(|e| WinError::new(e, "IDXGIAdapter1::EnumOutputs"))?
             .into_iter()
             .map(|output| unsafe {
@@ -154,7 +152,7 @@ impl Drop for DirectX {
     }
 }
 
-fn d3d11_device_with_type(
+unsafe fn d3d11_device_with_type(
     driver_type: D3D_DRIVER_TYPE,
     flags: D3D11_CREATE_DEVICE_FLAG,
     device: *mut Option<ID3D11Device>,

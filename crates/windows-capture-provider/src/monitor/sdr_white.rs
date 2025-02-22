@@ -1,9 +1,9 @@
 use windows::Win32::{
     Devices::Display::{
-        DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes, QueryDisplayConfig,
         DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL, DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
         DISPLAYCONFIG_MODE_INFO, DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_SDR_WHITE_LEVEL,
-        DISPLAYCONFIG_SOURCE_DEVICE_NAME, QDC_ONLY_ACTIVE_PATHS,
+        DISPLAYCONFIG_SOURCE_DEVICE_NAME, DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes,
+        QDC_ONLY_ACTIVE_PATHS, QueryDisplayConfig,
     },
     Graphics::Dxgi::DXGI_OUTPUT_DESC1,
 };
@@ -49,7 +49,7 @@ impl Monitor {
         let matching_path = {
             let names = paths
                 .iter()
-                .map(|path| match get_device_name(path) {
+                .map(|path| match unsafe { get_device_name(path) } {
                     Ok(name) => Ok(name),
                     Err(e) => Err(e),
                 })
@@ -67,14 +67,14 @@ impl Monitor {
             paths[matching_path_index]
         };
 
-        let sdr_white = get_sdr_white(&matching_path)?;
+        let sdr_white = unsafe { get_sdr_white(&matching_path)? };
 
         Ok(Some(sdr_white))
     }
 }
 
 /// Get device name, matches the descriptor DeviceName
-fn get_device_name(path_info: &DISPLAYCONFIG_PATH_INFO) -> LabelledWinResult<[u16; 32]> {
+unsafe fn get_device_name(path_info: &DISPLAYCONFIG_PATH_INFO) -> LabelledWinResult<[u16; 32]> {
     let header_size = size_of::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>() as u32;
 
     let mut config = DISPLAYCONFIG_SOURCE_DEVICE_NAME::default();
@@ -98,7 +98,7 @@ fn get_device_name(path_info: &DISPLAYCONFIG_PATH_INFO) -> LabelledWinResult<[u1
     Ok(config.viewGdiDeviceName)
 }
 
-fn get_sdr_white(path_info: &DISPLAYCONFIG_PATH_INFO) -> LabelledWinResult<f32> {
+unsafe fn get_sdr_white(path_info: &DISPLAYCONFIG_PATH_INFO) -> LabelledWinResult<f32> {
     let header_size = size_of::<DISPLAYCONFIG_SDR_WHITE_LEVEL>() as u32;
 
     let mut config = DISPLAYCONFIG_SDR_WHITE_LEVEL::default();

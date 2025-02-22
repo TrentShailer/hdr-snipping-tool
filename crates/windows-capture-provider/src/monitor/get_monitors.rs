@@ -50,12 +50,6 @@ impl Monitor {
         unsafe { GetCursorPos(&mut mouse_point) }.map_err(|e| WinError::new(e, "GetCursorPos"))?;
         debug!("Mouse Point: {:#?}", mouse_point);
 
-        // TODO
-        /* The input desktop must be the current desktop when you call GetCursorPos. Call
-        OpenInputDesktop to determine whether the current desktop is the input desktop. If it is
-        not, call SetThreadDesktop with the HDESK returned by OpenInputDesktop to switch to that
-        desktop. */
-
         let monitor = monitors.into_iter().find(|monitor| {
             let left = monitor.desktop_coordinates.left;
             let right = monitor.desktop_coordinates.right;
