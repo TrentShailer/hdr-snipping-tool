@@ -10,8 +10,9 @@ use windows::{
                 D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext,
             },
             Dxgi::{
-                DXGI_ERROR_NOT_FOUND, DXGI_OUTPUT_DESC1, IDXGIAdapter1, IDXGIDevice1, IDXGIOutput,
-                IDXGIOutput6,
+                DXGI_ERROR_DEVICE_HUNG, DXGI_ERROR_DEVICE_REMOVED, DXGI_ERROR_DEVICE_RESET,
+                DXGI_ERROR_DRIVER_INTERNAL_ERROR, DXGI_ERROR_INVALID_CALL, DXGI_ERROR_NOT_FOUND,
+                DXGI_OUTPUT_DESC1, IDXGIAdapter1, IDXGIDevice1, IDXGIOutput, IDXGIOutput6,
             },
         },
         System::WinRT::Direct3D11::CreateDirect3D11DeviceFromDXGIDevice,
@@ -135,6 +136,32 @@ impl DirectX {
                     .map_err(|e| WinError::new(e, "IDXGIOutput6::GetDesc1"))
             })
             .collect::<Result<_, _>>()
+    }
+
+    /// Returns if the d3d11 device is still valid.
+    ///
+    /// Logs an error with the reason it is invalid.
+    pub fn devices_valid(&self) -> bool {
+        if let Err(e) = unsafe { self.d3d11_device.GetDeviceRemovedReason() } {
+            // Variants from https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11device-getdeviceremovedreason
+            let reason = match e.code() {
+                DXGI_ERROR_DEVICE_HUNG => "DXGI_ERROR_DEVICE_HUNG",
+                DXGI_ERROR_DEVICE_REMOVED => "DXGI_ERROR_DEVICE_REMOVED",
+                DXGI_ERROR_DEVICE_RESET => "DXGI_ERROR_DEVICE_RESET",
+                DXGI_ERROR_DRIVER_INTERNAL_ERROR => "DXGI_ERROR_DRIVER_INTERNAL_ERROR",
+                DXGI_ERROR_INVALID_CALL => "DXGI_ERROR_INVALID_CALL",
+
+                code => unreachable!(
+                    "ID3D11Device::GetDeviceRemovedReason should only return the values listed in https://learn.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-id3d11device-getdeviceremovedreason, but {code} was returned"
+                ),
+            };
+
+            error!("D3D11 device was lost: {reason}");
+
+            false
+        } else {
+            true
+        }
     }
 }
 

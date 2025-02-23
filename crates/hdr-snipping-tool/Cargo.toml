@@ -52,6 +52,9 @@ mimalloc = { workspace = true }
 [features]
 mimalloc_debug = ["mimalloc/debug"]
 
+# Hides the console when starting the app, detatches stdout.
+hide-console = []
+
 [build-dependencies]
 embed-resource = "3.0"
 
