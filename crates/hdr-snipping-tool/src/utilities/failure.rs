@@ -14,7 +14,8 @@ pub fn log_and_panic<Err: core::fmt::Display>(error: Err, message: &str) -> ! {
 pub fn report_and_panic<Err: core::fmt::Display>(error: Err, message: &str) -> ! {
     error!("{message}: {error}");
 
-    let user_message = format!("ERROR:\n{message}.\nSee the logs for more details.");
+    let user_message =
+        format!("ERROR:\n{message}.\nSee the logs for more details, the application will exit.");
     display_message(&user_message, MB_ICONERROR | MB_OK | MB_SETFOREGROUND);
 
     panic!("{message}: {error}");
