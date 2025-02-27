@@ -17,7 +17,7 @@ use windows::Win32::Foundation::CloseHandle;
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCapture};
 use winit::event_loop::EventLoopProxy;
 
-use crate::utilities::failure::{Failure, report};
+use crate::utilities::failure::{Failure, report, report_and_panic};
 
 use super::WindowMessage;
 
@@ -174,6 +174,13 @@ impl InnerCaptureTaker {
     pub fn shutdown(&mut self) {}
 
     pub fn refresh_cache(&mut self) {
+        if !self.direct_x.devices_valid() {
+            report_and_panic(
+                "DirectX device lost",
+                "Could not refresh the cache.\nThe DirectX device was lost.",
+            );
+        }
+
         if let Err(e) = self.cache.prune(&self.direct_x) {
             error!("Could not prune the cache: {e}");
         };
@@ -185,6 +192,13 @@ impl InnerCaptureTaker {
 
     #[allow(clippy::needless_pass_by_value)]
     pub fn take_capture(&mut self, proxy: EventLoopProxy<WindowMessage>) {
+        if !self.direct_x.devices_valid() {
+            report_and_panic(
+                "DirectX device lost",
+                "Could not refresh the cache.\nThe DirectX device was lost.",
+            );
+        }
+
         // Get the monitor
         let monitor = {
             let maybe_monitor = match Monitor::get_hovered_monitor(&self.direct_x) {

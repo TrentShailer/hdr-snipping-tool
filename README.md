@@ -10,9 +10,9 @@ A Windows Snipping Tool alternative that doesn't overexpose HDR content.
 
 ## Installation
 
-Requires Rust v1.84 or later.
+Requires Rust v1.85 or later.
 
-`cargo install --git 'https://github.com/TrentShailer/hdr-snipping-tool.git' --locked`
+`cargo install --git 'https://github.com/TrentShailer/hdr-snipping-tool.git' hdr-snipping-tool --locked --features hide-console`
 
 ## Usage
 
@@ -38,7 +38,7 @@ Requires Rust v1.84 or later.
 
 ## Limitations
 
-* The screenshots will slightly clip highlights to preserve screenshot details.
+* Quality of results depend on monitor being configured and behaving correctly.
 * Screenshots can only be of one monitor at a time.
 * Windows only.
 

@@ -4,10 +4,7 @@
 
 #![allow(clippy::std_instead_of_alloc)]
 // hide console window on Windows in release
-#![cfg_attr(
-    all(not(debug_assertions), not(feature = "mimalloc_debug")),
-    windows_subsystem = "windows"
-)]
+#![cfg_attr(feature = "hide-console", windows_subsystem = "windows")]
 
 use mimalloc::MiMalloc;
 
@@ -18,12 +15,12 @@ pub use utilities::directories::{config_dir, screenshot_dir};
 
 use application::{WindowMessage, WinitApp};
 use config::Config;
-use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState, hotkey::HotKey};
 use logger::setup_logger;
 use tracing::{info, info_span, warn};
 use utilities::{
     directories::create_dirs,
-    failure::{report_and_panic, Failure},
+    failure::{Failure, report_and_panic},
     windows_helpers::{display_message, is_first_instance},
 };
 use windows::Win32::UI::WindowsAndMessaging::{
