@@ -74,5 +74,6 @@ mimalloc = { version = "0.1" }
 
 "default_trait_access" = "warn"
 "clone_on_ref_ptr" = "warn"
+"todo" = "warn"
 
 "missing_safety_doc" = "allow"
