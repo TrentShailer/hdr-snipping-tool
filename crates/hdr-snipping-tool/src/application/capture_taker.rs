@@ -181,6 +181,18 @@ impl InnerCaptureTaker {
             );
         }
 
+        if self
+            .direct_x
+            .dxgi_adapter_outdated()
+            .report("Could not check if the DirectX devices were outdated.")
+            .unwrap_or(true)
+        {
+            self.direct_x.recreate_dxgi_adapter().report_and_panic(
+                "Could not refresh the DirectX devices.\nThe DirectX device creation failed.",
+            );
+            debug!("Recreated out-of-date DXGI device");
+        }
+
         if let Err(e) = self.cache.prune(&self.direct_x) {
             error!("Could not prune the cache: {e}");
         };
@@ -197,6 +209,19 @@ impl InnerCaptureTaker {
                 "DirectX device lost",
                 "Could not refresh the cache.\nThe DirectX device was lost.",
             );
+        }
+
+        if self
+            .direct_x
+            .dxgi_adapter_outdated()
+            .report("Could not check if the DirectX devices were outdated.")
+            .unwrap_or(true)
+        {
+            self.direct_x.recreate_dxgi_adapter().report_and_panic(
+                "Could not refresh the DirectX devices.\nThe DirectX device creation failed.",
+            );
+
+            debug!("Recreated out-of-date DXGI device");
         }
 
         // Get the monitor

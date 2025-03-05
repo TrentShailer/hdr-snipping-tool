@@ -1,4 +1,4 @@
-use tracing::error;
+use tracing::{error, warn};
 use windows::{
     Graphics::DirectX::Direct3D11::IDirect3DDevice,
     Win32::{
@@ -10,9 +10,10 @@ use windows::{
                 D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext,
             },
             Dxgi::{
-                DXGI_ERROR_DEVICE_HUNG, DXGI_ERROR_DEVICE_REMOVED, DXGI_ERROR_DEVICE_RESET,
-                DXGI_ERROR_DRIVER_INTERNAL_ERROR, DXGI_ERROR_INVALID_CALL, DXGI_ERROR_NOT_FOUND,
-                DXGI_OUTPUT_DESC1, IDXGIAdapter1, IDXGIDevice1, IDXGIOutput, IDXGIOutput6,
+                CreateDXGIFactory1, DXGI_ERROR_DEVICE_HUNG, DXGI_ERROR_DEVICE_REMOVED,
+                DXGI_ERROR_DEVICE_RESET, DXGI_ERROR_DRIVER_INTERNAL_ERROR, DXGI_ERROR_INVALID_CALL,
+                DXGI_ERROR_NOT_FOUND, DXGI_OUTPUT_DESC1, IDXGIAdapter1, IDXGIDevice1,
+                IDXGIFactory1, IDXGIOutput, IDXGIOutput6,
             },
         },
         System::WinRT::Direct3D11::CreateDirect3D11DeviceFromDXGIDevice,
@@ -93,6 +94,64 @@ impl DirectX {
             d3d11_device,
             d3d11_context,
         })
+    }
+
+    /// Returns if the DXGI Adapter is outdated (not current).
+    pub fn dxgi_adapter_outdated(&self) -> Result<bool, windows_result::Error> {
+        let dxgi_factory: IDXGIFactory1 = unsafe { self.dxgi_adapter.GetParent() }?;
+        Ok(!unsafe { dxgi_factory.IsCurrent() }.as_bool())
+    }
+
+    /// Recreates the DXGI Adapter. If no DXGI Adapter with a matching LUID could be found, this
+    /// will do nothing and return false.
+    pub fn recreate_dxgi_adapter(&mut self) -> Result<bool, WinError> {
+        let old_luid = unsafe { self.dxgi_adapter.GetDesc1() }
+            .map_err(|e| WinError::new(e, "IDXGIAdapter1::GetDesc1"))?
+            .AdapterLuid;
+
+        let factory = unsafe { CreateDXGIFactory1::<IDXGIFactory1>() }
+            .map_err(|e| WinError::new(e, "CreateDXGIFactory1"))?;
+
+        let mut new_adapter = None;
+        let mut index = 0;
+        loop {
+            let result = unsafe { factory.EnumAdapters1(index) };
+
+            let adapter = match result {
+                Ok(adapter) => adapter,
+                Err(e) => {
+                    if e.code() == DXGI_ERROR_NOT_FOUND {
+                        break;
+                    } else {
+                        return Err(WinError::new(e, "IDXGIFactory1::EnumAdapters1"));
+                    }
+                }
+            };
+
+            let new_luid = unsafe { adapter.GetDesc1() }
+                .map_err(|e| WinError::new(e, "IDXGIAdapter1::GetDesc1"))?
+                .AdapterLuid;
+
+            if new_luid == old_luid {
+                new_adapter = Some(adapter);
+                break;
+            }
+
+            index += 1;
+        }
+
+        match new_adapter {
+            Some(adapter) => {
+                self.dxgi_adapter = adapter;
+                Ok(true)
+            }
+            None => {
+                warn!(
+                    "DXGI Adapter recreation could not find a DXGI adapter with an LUID matching the old DXGI Adapter."
+                );
+                Ok(false)
+            }
+        }
     }
 
     /// Enumerate the DXGI outputs using `IDXGIAdapter1::EnumOutputs` until `DXGI_ERROR_NOT_FOUND`.
