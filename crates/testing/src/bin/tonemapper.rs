@@ -37,7 +37,7 @@ fn main() {
         let mut hdr_scanner = HdrScanner::new(Arc::clone(&vulkan)).unwrap();
 
         let maximum = unsafe {
-            let _span = info_span!("HDR Scanner");
+            let _span = info_span!("HDR Scanner").entered();
             hdr_scanner.scan(hdr_image).unwrap()
         };
 
@@ -55,7 +55,7 @@ fn main() {
     let image_values = hdr_image.extent.width as u64 * hdr_image.extent.height as u64 * 4;
 
     let sdr_image = unsafe {
-        let _span = info_span!("Tonemap");
+        let _span = info_span!("Tonemap").entered();
         tonemapper.tonemap(hdr_image, whitepoint).unwrap()
     };
 

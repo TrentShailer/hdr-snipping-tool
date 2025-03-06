@@ -105,8 +105,8 @@ impl HdrScanner {
 
             // Dispatch
             {
-                let dispatches_x = image.extent.width.div_ceil(16);
-                let dispatches_y = image.extent.height.div_ceil(16);
+                let dispatches_x = image.extent.width.div_ceil(64);
+                let dispatches_y = image.extent.height.div_ceil(4);
 
                 self.vulkan.device().cmd_dispatch(
                     self.command_buffer,

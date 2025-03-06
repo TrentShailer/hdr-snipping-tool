@@ -161,8 +161,8 @@ impl HdrToSdrTonemapper {
 
                     // Calculate the dispatches
                     let dispatches = [
-                        hdr_image.extent.width.div_ceil(16),
-                        hdr_image.extent.height.div_ceil(16),
+                        hdr_image.extent.width.div_ceil(64),
+                        hdr_image.extent.height.div_ceil(4),
                     ];
 
                     // Dispatch

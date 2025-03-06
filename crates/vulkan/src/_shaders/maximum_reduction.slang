@@ -13,7 +13,7 @@ struct Descriptor
 static const uint2 OUT_OF_BOUNDS_INDEX = { 0, 0 };
 
 [shader("compute")]
-[numthreads(16, 16, 1)]
+[numthreads(64, 4, 1)]
 void main(
     uint3 global_id: SV_DispatchThreadID,
     uint3 group_id: SV_GroupID,
