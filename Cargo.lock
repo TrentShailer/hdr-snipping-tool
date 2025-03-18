@@ -1025,6 +1025,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "tray-icon",
+ "utilities",
  "vulkan",
  "windows",
  "windows-capture-provider",
@@ -2668,6 +2669,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
+name = "utilities"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
 name = "v_frame"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2741,6 +2749,7 @@ dependencies = [
  "rayon",
  "thiserror 2.0.11",
  "tracing",
+ "utilities",
  "vp-ash",
  "windows-capture-provider",
 ]

@@ -32,6 +32,9 @@ ash-window = { workspace = true }
 half = { workspace = true }
 bytemuck = { workspace = true }
 
+# Utilities
+utilities = { workspace = true }
+
 [dev-dependencies]
 # Generating Data
 rayon = "1.10"

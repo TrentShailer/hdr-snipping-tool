@@ -1,12 +1,11 @@
 use core::slice;
-use std::time::Instant;
 
 use ash::vk;
 use ash_helper::{
     LabelledVkResult, VkError, VulkanContext, cmd_try_begin_label, cmd_try_end_label,
     queue_try_begin_label, queue_try_end_label, try_name,
 };
-use tracing::debug;
+use utilities::DebugTime;
 
 use crate::{HdrImage, QueuePurpose};
 
@@ -244,7 +243,7 @@ impl HdrScanner {
 
             // Wait for submission to complete
             unsafe {
-                let start = Instant::now();
+                let _timer = DebugTime::start("Waiting for HDR Scanner");
 
                 let wait_info = vk::SemaphoreWaitInfo::default()
                     .values(slice::from_ref(&self.semaphore_value))
@@ -254,11 +253,6 @@ impl HdrScanner {
                     .device()
                     .wait_semaphores(&wait_info, u64::MAX)
                     .map_err(|e| VkError::new(e, "vkWaitSemaphores"))?;
-
-                debug!(
-                    "Waiting for HDR Scanner took {}ms",
-                    start.elapsed().as_millis()
-                );
             }
 
             // Copy data to cpu

@@ -8,10 +8,10 @@ use std::{
         mpsc::{Sender, channel},
     },
     thread::{self, JoinHandle},
-    time::Instant,
 };
 
 use tracing::{debug, error, info_span};
+use utilities::DebugTime;
 use vulkan::{HdrImage, HdrScanner, Vulkan};
 use windows::Win32::Foundation::CloseHandle;
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCapture};
@@ -265,41 +265,39 @@ impl InnerCaptureTaker {
 
         // Take the capture
         let (windows_capture, windows_capture_resources) = {
-            let start = Instant::now();
+            let capture_item = {
+                let _timer = DebugTime::start("Getting capture item");
 
-            let capture_item = match self.cache.get_capture_item(monitor.handle.0) {
-                Ok(capture_item) => capture_item,
-                Err(e) => {
-                    report(
-                        e,
-                        "Could not take the screenshot.\nEncountered an error while creating the required resources",
-                    );
-                    let _ =
-                        proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
-                    return;
+                match self.cache.get_capture_item(monitor.handle.0) {
+                    Ok(capture_item) => capture_item,
+                    Err(e) => {
+                        report(
+                            e,
+                            "Could not take the screenshot.\nEncountered an error while creating the required resources",
+                        );
+                        let _ = proxy
+                            .send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
+                        return;
+                    }
                 }
             };
 
-            debug!("Got capture item in {}ms", start.elapsed().as_millis());
-            let start = Instant::now();
+            let (capture, resources) = {
+                let _timer = DebugTime::start("Taking capture");
 
-            let (capture, resources) = match WindowsCapture::take_capture(
-                &self.direct_x,
-                &capture_item,
-            ) {
-                Ok(capture) => capture,
-                Err(e) => {
-                    report(
-                        e,
-                        "Could not take the screenshot.\nEncountered an error while taking the screenshot",
-                    );
-                    let _ =
-                        proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
-                    return;
+                match WindowsCapture::take_capture(&self.direct_x, &capture_item) {
+                    Ok(capture) => capture,
+                    Err(e) => {
+                        report(
+                            e,
+                            "Could not take the screenshot.\nEncountered an error while taking the screenshot",
+                        );
+                        let _ = proxy
+                            .send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
+                        return;
+                    }
                 }
             };
-
-            debug!("Took capture in {}ms", start.elapsed().as_millis());
 
             proxy
                 .send_event(WindowMessage::CaptureProgress(

@@ -80,7 +80,9 @@ impl CapturePipeline {
                 .binding(0)
                 .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                 .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::FRAGMENT | vk::ShaderStageFlags::VERTEX)
+                .stage_flags(
+                    vk::ShaderStageFlags::FRAGMENT, /*  | vk::ShaderStageFlags::VERTEX */
+                )
                 .immutable_samplers(slice::from_ref(&sampler));
 
             let create_info = vk::DescriptorSetLayoutCreateInfo::default()
@@ -88,12 +90,10 @@ impl CapturePipeline {
                 .flags(vk::DescriptorSetLayoutCreateFlags::PUSH_DESCRIPTOR_KHR);
 
             let layout = unsafe {
-                {
-                    vulkan
-                        .device()
-                        .create_descriptor_set_layout(&create_info, None)
-                }
-                .map_err(|e| VkError::new(e, "vkCreateDescriptorSetLayout"))?
+                vulkan
+                    .device()
+                    .create_descriptor_set_layout(&create_info, None)
+                    .map_err(|e| VkError::new(e, "vkCreateDescriptorSetLayout"))?
             };
 
             unsafe {
@@ -107,7 +107,7 @@ impl CapturePipeline {
             let push_constant_range = vk::PushConstantRange::default()
                 .offset(0)
                 .size(size_of::<PushConstants>() as u32)
-                .stage_flags(vk::ShaderStageFlags::FRAGMENT | vk::ShaderStageFlags::VERTEX);
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT);
 
             let create_info = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(slice::from_ref(&set_layout))

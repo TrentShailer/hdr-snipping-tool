@@ -67,7 +67,7 @@ impl Renderer {
             self.vulkan.device().cmd_push_constants(
                 command_buffer,
                 self.capture_pipeline.layout,
-                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                vk::ShaderStageFlags::FRAGMENT,
                 0,
                 bytes_of(&push_constants),
             );

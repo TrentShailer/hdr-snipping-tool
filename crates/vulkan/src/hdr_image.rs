@@ -1,11 +1,9 @@
-use std::time::Instant;
-
 use ash::vk;
 use ash_helper::{
     AllocationError, VkError, VulkanContext, cmd_transition_image, find_memorytype_index,
     onetime_command,
 };
-use tracing::debug;
+use utilities::DebugTime;
 
 use crate::{QueuePurpose, Vulkan};
 
@@ -33,7 +31,7 @@ impl HdrImage {
         size: [u32; 2],
         handle: isize,
     ) -> Result<Self, AllocationError> {
-        let start = Instant::now();
+        let _timer = DebugTime::start("Importing Windows capture");
 
         let extent = vk::Extent2D::default().width(size[0]).height(size[1]);
 
@@ -138,11 +136,6 @@ impl HdrImage {
                 "Transition Capture",
             )?;
         }
-
-        debug!(
-            "Importing Windows capture took {}ms",
-            start.elapsed().as_millis()
-        );
 
         Ok(Self {
             image,

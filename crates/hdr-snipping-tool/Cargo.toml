@@ -49,6 +49,9 @@ windows = { workspace = true, features = ["Win32_System_Threading"] }
 # Allocator
 mimalloc = { workspace = true }
 
+# Utilities
+utilities = { workspace = true }
+
 [features]
 mimalloc_debug = ["mimalloc/debug"]
 

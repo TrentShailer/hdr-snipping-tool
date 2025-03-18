@@ -50,6 +50,9 @@ image = { version = "0.25", default-features = false }
 # Taking Screenshot
 windows-capture-provider = { path = "crates/windows-capture-provider" }
 
+# Utilities
+utilities = { path = "crates/utilities" }
+
 # Random data
 rand = "0.9"
 
