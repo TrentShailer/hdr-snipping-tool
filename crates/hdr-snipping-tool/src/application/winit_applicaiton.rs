@@ -80,58 +80,59 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
 
                 match message {
                     CaptureProgress::FoundMonitor(monitor) => {
+                        // Create capture for that monitor
                         let capture = Capture::new(
                             Arc::clone(&application.vulkan),
                             Arc::clone(&application.capture_taker),
                             monitor,
                         );
 
-                        // Update window
-                        {
-                            let size = monitor.size();
-                            let _ = application
-                                .window
-                                .request_inner_size(PhysicalSize::new(size[0], size[1]));
-
-                            application.window.set_outer_position(PhysicalPosition::new(
-                                monitor.desktop_coordinates.left,
-                                monitor.desktop_coordinates.top,
-                            ));
-                        }
-
-                        // Update renderer
+                        // Reset renderer state
                         {
                             application.renderer.set_mouse_position(self.mouse_position);
                             application.renderer.set_selection(capture.selection);
-
-                            // Set preliminary max brightness
-                            // application
-                            //     .renderer
-                            //     .set_max_brightness(monitor.max_brightness);
                         }
+
+                        // Update application
+                        application.capture = Some(capture);
+                        application.update_window();
 
                         // Request redraw
                         if application.renderer.render().is_err() {
                             event_loop.exit();
                             warn!("Exiting: Renderer::render returned Err");
                         }
-
-                        application.capture = Some(capture);
                     }
 
                     CaptureProgress::CaptureTaken(windows_capture) => {
                         if let Some(capture) = application.capture.as_mut() {
                             capture.windows_capture = Some(windows_capture);
 
-                            application.window.set_visible(true);
-                            application.window.focus_window();
+                            // Update window
+                            {
+                                application.window.set_visible(true);
+                                application.window.focus_window();
+
+                                application.update_window();
+                            }
+
+                            if application.renderer.render().is_err() {
+                                event_loop.exit();
+                                warn!("Exiting: Renderer::render returned Err");
+                            }
                         }
                     }
 
                     CaptureProgress::Imported(hdr_image) => {
                         if let Some(capture) = application.capture.as_mut() {
                             capture.hdr_capture = Some(hdr_image);
+
                             application.renderer.set_hdr_capture(capture.hdr_capture);
+
+                            if application.renderer.render().is_err() {
+                                event_loop.exit();
+                                warn!("Exiting: Renderer::render returned Err");
+                            }
                         }
                     }
 
@@ -148,6 +149,7 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
 
                                     whitepoint
                                 }
+
                                 Whitepoint::Hdr(whitepoint) => {
                                     application
                                         .renderer
@@ -165,6 +167,10 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                             // Set the whitepoint
                             capture.whitepoint = whitepoint;
                             application.renderer.set_whitepoint(capture.whitepoint);
+                            if application.renderer.render().is_err() {
+                                event_loop.exit();
+                                warn!("Exiting: Renderer::render returned Err");
+                            }
                         }
                     }
 
@@ -272,6 +278,10 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                     set_foreground_window(capture.formerly_focused_window.0);
                     application.window.set_visible(false);
                     application.renderer.set_hdr_capture(None);
+                    if application.renderer.render().is_err() {
+                        event_loop.exit();
+                        warn!("Exiting: Renderer::render returned Err");
+                    }
 
                     info!("Cancelled screenshot");
 
@@ -288,6 +298,10 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                         warn!("Exiting: CaptureSaver::save returned Err");
                     }
                     application.renderer.set_hdr_capture(None);
+                    if application.renderer.render().is_err() {
+                        event_loop.exit();
+                        warn!("Exiting: Renderer::render returned Err");
+                    }
 
                     return;
                 }
@@ -350,6 +364,10 @@ impl ApplicationHandler<WindowMessage> for WinitApp {
                                 warn!("Exiting: CaptureSaver::save returned Err");
                             }
                             application.renderer.set_hdr_capture(None);
+                            if application.renderer.render().is_err() {
+                                event_loop.exit();
+                                warn!("Exiting: Renderer::render returned Err");
+                            }
 
                             return;
                         }

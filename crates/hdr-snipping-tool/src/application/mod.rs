@@ -1,3 +1,4 @@
+use windows_capture_provider::Monitor;
 pub use winit_applicaiton::{WindowMessage, WinitApp};
 
 use std::sync::Arc;
@@ -12,8 +13,11 @@ use tray_icon::{
 };
 use vulkan::Vulkan;
 use winit::{
-    dpi::PhysicalSize, event_loop::ActiveEventLoop, platform::windows::IconExtWindows,
-    raw_window_handle::HasDisplayHandle, window::Window,
+    dpi::{PhysicalPosition, PhysicalSize},
+    event_loop::ActiveEventLoop,
+    platform::windows::IconExtWindows,
+    raw_window_handle::HasDisplayHandle,
+    window::Window,
 };
 
 use crate::{
@@ -150,5 +154,20 @@ impl Application {
 
             capture: None,
         }
+    }
+
+    pub fn update_window(&self) {
+        if let Some(capture) = self.capture.as_ref() {
+            let size = capture.monitor.size();
+            let _ = self
+                .window
+                .request_inner_size(PhysicalSize::new(size[0], size[1]));
+
+            self.window.set_outer_position(PhysicalPosition::new(
+                capture.monitor.desktop_coordinates.left,
+                capture.monitor.desktop_coordinates.top,
+            ));
+        }
+        // TODO visibility
     }
 }
