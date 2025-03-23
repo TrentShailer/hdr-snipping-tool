@@ -4,8 +4,8 @@ use alloc::sync::Arc;
 
 pub use new::VulkanCreationError;
 
-use ash::{khr, vk};
-use ash_helper::{DebugUtils, VulkanContext};
+use ash::{ext, khr, vk};
+use ash_helper::{Context, DebugUtils, VulkanContext};
 use parking_lot::Mutex;
 
 mod drop;
@@ -31,6 +31,7 @@ pub struct Vulkan {
 
     debug_utils: Option<DebugUtils>,
     push_descriptor_device: khr::push_descriptor::Device,
+    shader_object_device: ext::shader_object::Device,
 
     /// A command pool with the Transient Flag, used for any component to run onetime commands.
     transient_pool: Arc<Mutex<vk::CommandPool>>,
@@ -76,11 +77,6 @@ pub enum QueuePurpose {
 }
 
 impl Vulkan {
-    /// Gets a reference to the push descriptor device.
-    pub unsafe fn push_descriptor_device(&self) -> &khr::push_descriptor::Device {
-        &self.push_descriptor_device
-    }
-
     /// Gets a reference to the mutex for the transient pool.
     /// The transient pool is a command pool with the Transient Flag, used for any component to run
     /// onetime commands.
@@ -103,11 +99,19 @@ impl Vulkan {
             QueuePurpose::Graphics => self.queues.last().unwrap(),
         }
     }
+}
 
-    /// Returns the queue family index as a reference.
+impl Context<khr::push_descriptor::Device> for Vulkan {
     #[inline]
-    pub fn queue_family_index_as_ref(&self) -> &u32 {
-        &self.queue_family_index
+    unsafe fn context(&self) -> &khr::push_descriptor::Device {
+        &self.push_descriptor_device
+    }
+}
+
+impl Context<ext::shader_object::Device> for Vulkan {
+    #[inline]
+    unsafe fn context(&self) -> &ext::shader_object::Device {
+        &self.shader_object_device
     }
 }
 
@@ -133,7 +137,7 @@ impl VulkanContext for Vulkan {
     }
 
     #[inline]
-    unsafe fn debug(&self) -> Option<&ash::ext::debug_utils::Device> {
+    unsafe fn debug(&self) -> Option<&ext::debug_utils::Device> {
         if let Some(debug_utils) = self.debug_utils.as_ref() {
             Some(&debug_utils.device)
         } else {
@@ -144,5 +148,10 @@ impl VulkanContext for Vulkan {
     #[inline]
     fn queue_family_index(&self) -> u32 {
         self.queue_family_index
+    }
+
+    #[inline]
+    fn queue_family_index_as_slice(&self) -> &[u32] {
+        core::slice::from_ref(&self.queue_family_index)
     }
 }

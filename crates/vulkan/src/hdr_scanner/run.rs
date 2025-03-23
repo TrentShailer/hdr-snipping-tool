@@ -1,13 +1,16 @@
 use core::slice;
 
-use ash::vk;
+use ash::{ext, khr, vk};
 use ash_helper::{
-    LabelledVkResult, VkError, VulkanContext, cmd_try_begin_label, cmd_try_end_label,
+    Context, LabelledVkResult, VkError, VulkanContext, cmd_try_begin_label, cmd_try_end_label,
     queue_try_begin_label, queue_try_end_label, try_name,
 };
 use utilities::DebugTime;
 
-use crate::{HdrImage, QueuePurpose};
+use crate::{
+    HdrImage, QueuePurpose,
+    shaders::maximum_reduction::compute_main::{self, DISPATCH_SIZE},
+};
 
 use super::HdrScanner;
 
@@ -67,6 +70,7 @@ impl HdrScanner {
                 );
             }
 
+            // Bind descriptors
             {
                 let descriptor_writes = [
                     // Image
@@ -85,27 +89,30 @@ impl HdrScanner {
                         .buffer_info(slice::from_ref(&buffer_descriptor)),
                 ];
 
-                self.vulkan
-                    .push_descriptor_device()
-                    .cmd_push_descriptor_set(
-                        self.command_buffer,
-                        vk::PipelineBindPoint::COMPUTE,
-                        self.layout,
-                        0,
-                        &descriptor_writes,
-                    );
+                let device: &khr::push_descriptor::Device = self.vulkan.context();
+                device.cmd_push_descriptor_set(
+                    self.command_buffer,
+                    vk::PipelineBindPoint::COMPUTE,
+                    self.pipeline_layout,
+                    0,
+                    &descriptor_writes,
+                );
             }
 
-            self.vulkan.device().cmd_bind_pipeline(
-                self.command_buffer,
-                vk::PipelineBindPoint::COMPUTE,
-                self.pipeline,
-            );
+            // Bind shader
+            {
+                let device: &ext::shader_object::Device = self.vulkan.context();
+                device.cmd_bind_shaders(
+                    self.command_buffer,
+                    slice::from_ref(&compute_main::STAGE),
+                    slice::from_ref(&self.shader),
+                );
+            }
 
             // Dispatch
             {
-                let dispatches_x = image.extent.width.div_ceil(64);
-                let dispatches_y = image.extent.height.div_ceil(4);
+                let dispatches_x = image.extent.width.div_ceil(DISPATCH_SIZE[0]);
+                let dispatches_y = image.extent.height.div_ceil(DISPATCH_SIZE[1]);
 
                 self.vulkan.device().cmd_dispatch(
                     self.command_buffer,

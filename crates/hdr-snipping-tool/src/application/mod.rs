@@ -1,4 +1,3 @@
-use windows_capture_provider::Monitor;
 pub use winit_applicaiton::{WindowMessage, WinitApp};
 
 use std::sync::Arc;

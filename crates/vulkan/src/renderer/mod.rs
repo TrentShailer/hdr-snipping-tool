@@ -45,9 +45,9 @@ pub struct Renderer {
 
     render_buffer: RenderBuffer,
 
-    line_pipeline: LinePipeline,
-    selection_pipeline: SelectionPipeline,
-    capture_pipeline: CapturePipeline,
+    line_shader: LinePipeline,
+    selection_shader: SelectionPipeline,
+    capture_shader: CapturePipeline,
 
     /// The dynamic state for the renderer, expected to be written to by the main window thread
     /// and read from the render thread.
@@ -87,10 +87,6 @@ impl Drop for Renderer {
             self.vulkan
                 .device()
                 .free_memory(self.render_buffer.memory, None);
-
-            self.line_pipeline.destroy(&self.vulkan);
-            self.selection_pipeline.destroy(&self.vulkan);
-            self.capture_pipeline.destroy(&self.vulkan);
 
             self.swapchain.destroy(self.vulkan.as_ref(), &self.surface);
         }

@@ -1,4 +1,4 @@
-use tracing::{subscriber::set_global_default, Level};
+use tracing::{Level, subscriber::set_global_default};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -27,7 +27,7 @@ pub fn setup_logger(should_debug: bool) -> [WorkerGuard; 2] {
     let (std_writer, _std_guard) = tracing_appender::non_blocking(std::io::stdout());
     let std_logger = tracing_subscriber::fmt::layer()
         .with_writer(std_writer)
-        .with_ansi(false)
+        .with_ansi(true)
         .with_target(false)
         .without_time();
 

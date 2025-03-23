@@ -1,108 +1,67 @@
 use core::slice;
 
 use alloc::sync::Arc;
-use ash::vk;
-use ash_helper::{
-    VkError, VulkanContext, allocate_buffer, create_shader_module_from_spv, try_name,
-};
+use ash::{ext, vk};
+use ash_helper::{Context, VkError, VulkanContext, allocate_buffer, try_name, try_name_all};
 
-use crate::Vulkan;
+use crate::{Vulkan, shaders::maximum_reduction};
 
 use super::{HdrScanner, HdrScannerError};
 
 impl HdrScanner {
     /// Creates a new HDR Scanner.
     pub fn new(vulkan: Arc<Vulkan>) -> Result<Self, HdrScannerError> {
-        // Create descriptor layout
-        let descriptor_layout = {
-            let bindings = [
-                // Image
-                vk::DescriptorSetLayoutBinding::default()
-                    .binding(0)
-                    .descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
-                    .descriptor_count(1)
-                    .stage_flags(vk::ShaderStageFlags::COMPUTE),
-                // Buffer
-                vk::DescriptorSetLayoutBinding::default()
-                    .binding(1)
-                    .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-                    .descriptor_count(1)
-                    .stage_flags(vk::ShaderStageFlags::COMPUTE),
-            ];
-
-            let layout_info = vk::DescriptorSetLayoutCreateInfo::default()
-                .bindings(&bindings)
-                .flags(vk::DescriptorSetLayoutCreateFlags::PUSH_DESCRIPTOR_KHR);
-
-            let layout = unsafe {
-                vulkan
-                    .device()
-                    .create_descriptor_set_layout(&layout_info, None)
-            }
-            .map_err(|e| VkError::new(e, "vkCreateDescriptorSetLayout"))?;
-
-            unsafe { try_name(vulkan.as_ref(), layout, "HDR Scanner Descriptor Layout") };
-
-            layout
-        };
-
-        // Create Pipeline Layout
-        let layout = {
-            let layout_info = vk::PipelineLayoutCreateInfo::default()
-                .set_layouts(slice::from_ref(&descriptor_layout));
-
-            let layout = unsafe { vulkan.device().create_pipeline_layout(&layout_info, None) }
-                .map_err(|e| VkError::new(e, "vkCreatePipelineLayout"))?;
-
-            unsafe { try_name(vulkan.as_ref(), layout, "HDR Scanner Layout") };
-
-            layout
-        };
-
-        // Create shader module
-        let shader = {
-            let shader = unsafe {
-                create_shader_module_from_spv(
-                    vulkan.as_ref(),
-                    include_bytes!("../_shaders/spv/maximum_reduction.spv"),
-                )?
+        // Descriptor layouts
+        let descriptor_layouts = {
+            let layouts = unsafe {
+                maximum_reduction::set_layouts(
+                    vulkan.device(),
+                    vk::DescriptorSetLayoutCreateFlags::PUSH_DESCRIPTOR_KHR,
+                )
+                .map_err(|e| VkError::new(e, "vkCreateDescriptorSetLayout"))?
             };
 
-            unsafe { try_name(vulkan.as_ref(), shader, "HDR Scanner Shader") };
+            unsafe { try_name_all(vulkan.as_ref(), &layouts, "HDR Scanner Descriptor Layout") };
+
+            layouts
+        };
+
+        // Pipeline layout
+        let pipeline_layout = {
+            let create_info =
+                vk::PipelineLayoutCreateInfo::default().set_layouts(&descriptor_layouts);
+
+            let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
+                .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
+
+            unsafe { try_name(vulkan.as_ref(), layout, "HDR Scanner Pipeline Layout") };
+
+            layout
+        };
+
+        // Shader object
+        let shader = {
+            let create_info = vk::ShaderCreateInfoEXT::default()
+                .code(maximum_reduction::BYTES)
+                .code_type(vk::ShaderCodeTypeEXT::SPIRV)
+                .stage(maximum_reduction::compute_main::STAGE)
+                .name(maximum_reduction::compute_main::ENTRY_POINT)
+                .set_layouts(&descriptor_layouts);
+
+            let device: &ext::shader_object::Device = unsafe { vulkan.context() };
+            let shaders = unsafe { device.create_shaders(slice::from_ref(&create_info), None) }
+                .map_err(|(_, e)| VkError::new(e, "vkCreateShadersEXT"))?;
+
+            let shader = shaders[0];
+            unsafe { try_name(vulkan.as_ref(), shader, "HDR SCANNER COMPUTE SHADER") };
 
             shader
         };
 
-        // Create pipeline
-        let pipeline = {
-            let stage_info = vk::PipelineShaderStageCreateInfo::default()
-                .stage(vk::ShaderStageFlags::COMPUTE)
-                .module(shader)
-                .name(c"main");
-
-            let create_info = vk::ComputePipelineCreateInfo::default()
-                .stage(stage_info)
-                .layout(layout);
-
-            let pipeline = unsafe {
-                vulkan
-                    .device()
-                    .create_compute_pipelines(
-                        vk::PipelineCache::null(),
-                        slice::from_ref(&create_info),
-                        None,
-                    )
-                    .map_err(|e| VkError::new(e.1, "vkCreateComputePipelines"))?[0]
-            };
-
-            unsafe { try_name(vulkan.as_ref(), layout, "HDR Scanner Pipeline") };
-
-            pipeline
-        };
-
+        // Buffers
         let (buffer, memory, _) = {
             let create_info = vk::BufferCreateInfo::default()
-                .queue_family_indices(slice::from_ref(vulkan.queue_family_index_as_ref()))
+                .queue_family_indices(vulkan.queue_family_index_as_slice())
                 .size(4)
                 .usage(
                     vk::BufferUsageFlags::STORAGE_BUFFER
@@ -122,7 +81,7 @@ impl HdrScanner {
 
         let (staging_buffer, staging_memory, _) = {
             let create_info = vk::BufferCreateInfo::default()
-                .queue_family_indices(slice::from_ref(vulkan.queue_family_index_as_ref()))
+                .queue_family_indices(vulkan.queue_family_index_as_slice())
                 .size(4)
                 .usage(vk::BufferUsageFlags::TRANSFER_DST);
 
@@ -136,6 +95,7 @@ impl HdrScanner {
             }
         };
 
+        // Command objects
         let (command_pool, command_buffer, semaphore) = {
             let pool = {
                 let pool_create_info = vk::CommandPoolCreateInfo::default()
@@ -181,20 +141,15 @@ impl HdrScanner {
 
         Ok(Self {
             vulkan,
-
-            descriptor_layout,
-            layout,
+            descriptor_layouts,
+            pipeline_layout,
             shader,
-            pipeline,
-
             semaphore,
             semaphore_value: 0,
             command_pool,
             command_buffer,
-
             buffer,
             memory,
-
             staging_buffer,
             staging_memory,
         })

@@ -1,5 +1,3 @@
-// slangc -g2 -emit-spirv-directly -target spirv -profile spirv_1_4  crates/vulkan/src/_shaders/render_capture.slang -o crates/vulkan/src/_shaders/spv/render_capture.spv
-
 import utilities;
 
 struct VSInput
@@ -18,6 +16,7 @@ struct PushConstants
 {
     float whitepoint;
     float max_brightness;
+    uint present_srgb;
 }
 
 [vk::push_constant]
@@ -30,9 +29,6 @@ struct Descriptor
     [format("rgba16f")]
     Sampler2D<float4> sampler;
 }
-
-[SpecializationConstant]
-const uint present_srgb = 0;
 
 [shader("vertex")]
 FSInput vertexMain(VSInput input)
@@ -54,7 +50,7 @@ float4 fragmentMain(FSInput input)
 
     let colour = descriptor.sampler.Sample(input.uv);
 
-    if (present_srgb == 1)
+    if (push_constants.present_srgb == 1)
     {
         return {
             tonemap(colour.r, push_constants.whitepoint),

@@ -1,6 +1,6 @@
 pub use capture_pipeline::CapturePipeline;
-pub use line_pipeline::{Line, LinePipeline};
-pub use selection_pipeline::{Selection, SelectionPipeline};
+pub use line_pipeline::LinePipeline;
+pub use selection_pipeline::SelectionPipeline;
 
 pub mod capture_pipeline;
 pub mod line_pipeline;

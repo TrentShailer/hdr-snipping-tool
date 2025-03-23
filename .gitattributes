@@ -1,1 +1,3 @@
 crates/vulkan/vulkan_profiles/** linguist-generated
+package/VkLayer_khronos_shader_object.dll linguist-vendored
+package/VkLayer_khronos_shader_object.json linguist-vendored

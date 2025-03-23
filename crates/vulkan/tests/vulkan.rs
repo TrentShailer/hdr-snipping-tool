@@ -1,8 +1,6 @@
 //! General tests for the Vulkan Context
 //!
 
-use core::slice;
-
 use ash::vk;
 use ash_helper::{VulkanContext, allocate_buffer};
 
@@ -15,7 +13,7 @@ fn valid_vulkan_context() {
     let create_info = vk::BufferCreateInfo::default()
         .size(1024 * 1024 * 4)
         .usage(vk::BufferUsageFlags::STORAGE_BUFFER)
-        .queue_family_indices(slice::from_ref(vulkan.queue_family_index_as_ref()));
+        .queue_family_indices(vulkan.queue_family_index_as_slice());
 
     let (buffer, memory, _requirements) = unsafe {
         allocate_buffer(

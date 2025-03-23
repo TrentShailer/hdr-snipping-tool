@@ -1,7 +1,7 @@
 
 /*
- * Copyright (C) 2021-2024 Valve Corporation
- * Copyright (C) 2021-2024 LunarG, Inc.
+ * Copyright (C) 2021-2025 Valve Corporation
+ * Copyright (C) 2021-2025 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License")
  * you may not use this file except in compliance with the License.
@@ -409,6 +409,7 @@ static const VkStructureType featureStructTypes[] = {
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR,
+    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES,
 };
 
 static const VkStructureType propertyStructTypes[] = {
@@ -454,6 +455,10 @@ static const VpFeatureDesc featureDesc = {
                     s->features.fillModeNonSolid = VK_TRUE;
                     s->features.wideLines = VK_TRUE;
                 } break;
+                case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES: {
+                    VkPhysicalDeviceScalarBlockLayoutFeatures* s = static_cast<VkPhysicalDeviceScalarBlockLayoutFeatures*>(static_cast<void*>(p));
+                    s->scalarBlockLayout = VK_TRUE;
+                } break;
                 default: break;
             }
     },
@@ -472,6 +477,10 @@ static const VpFeatureDesc featureDesc = {
                     VkPhysicalDeviceFeatures2KHR* s = static_cast<VkPhysicalDeviceFeatures2KHR*>(static_cast<void*>(p));
                     ret = ret && (s->features.fillModeNonSolid == VK_TRUE);
                     ret = ret && (s->features.wideLines == VK_TRUE);
+                } break;
+                case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES: {
+                    VkPhysicalDeviceScalarBlockLayoutFeatures* s = static_cast<VkPhysicalDeviceScalarBlockLayoutFeatures*>(static_cast<void*>(p));
+                    ret = ret && (s->scalarBlockLayout == VK_TRUE);
                 } break;
                 default: break;
             }
@@ -492,7 +501,8 @@ static const VpStructChainerDesc chainerDesc = {
     [](VkBaseOutStructure* p, void* pUser, PFN_vpStructChainerCb pfnCb) {
         VkPhysicalDeviceTimelineSemaphoreFeatures physicalDeviceTimelineSemaphoreFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES, nullptr };
         VkPhysicalDeviceDynamicRenderingFeaturesKHR physicalDeviceDynamicRenderingFeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR, &physicalDeviceTimelineSemaphoreFeatures };
-        p->pNext = static_cast<VkBaseOutStructure*>(static_cast<void*>(&physicalDeviceDynamicRenderingFeaturesKHR));
+        VkPhysicalDeviceScalarBlockLayoutFeatures physicalDeviceScalarBlockLayoutFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES, &physicalDeviceDynamicRenderingFeaturesKHR };
+        p->pNext = static_cast<VkBaseOutStructure*>(static_cast<void*>(&physicalDeviceScalarBlockLayoutFeatures));
         pfnCb(p, pUser);
     },
     [](VkBaseOutStructure* p, void* pUser, PFN_vpStructChainerCb pfnCb) {
@@ -553,6 +563,10 @@ static const VpFeatureDesc featureDesc = {
                     s->features.fillModeNonSolid = VK_TRUE;
                     s->features.wideLines = VK_TRUE;
                 } break;
+                case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES: {
+                    VkPhysicalDeviceScalarBlockLayoutFeatures* s = static_cast<VkPhysicalDeviceScalarBlockLayoutFeatures*>(static_cast<void*>(p));
+                    s->scalarBlockLayout = VK_TRUE;
+                } break;
                 default: break;
             }
     },
@@ -571,6 +585,10 @@ static const VpFeatureDesc featureDesc = {
                     VkPhysicalDeviceFeatures2KHR* s = static_cast<VkPhysicalDeviceFeatures2KHR*>(static_cast<void*>(p));
                     ret = ret && (s->features.fillModeNonSolid == VK_TRUE);
                     ret = ret && (s->features.wideLines == VK_TRUE);
+                } break;
+                case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES: {
+                    VkPhysicalDeviceScalarBlockLayoutFeatures* s = static_cast<VkPhysicalDeviceScalarBlockLayoutFeatures*>(static_cast<void*>(p));
+                    ret = ret && (s->scalarBlockLayout == VK_TRUE);
                 } break;
                 default: break;
             }
@@ -773,7 +791,8 @@ static const VpStructChainerDesc chainerDesc = {
     [](VkBaseOutStructure* p, void* pUser, PFN_vpStructChainerCb pfnCb) {
         VkPhysicalDeviceTimelineSemaphoreFeatures physicalDeviceTimelineSemaphoreFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES, nullptr };
         VkPhysicalDeviceDynamicRenderingFeaturesKHR physicalDeviceDynamicRenderingFeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR, &physicalDeviceTimelineSemaphoreFeatures };
-        p->pNext = static_cast<VkBaseOutStructure*>(static_cast<void*>(&physicalDeviceDynamicRenderingFeaturesKHR));
+        VkPhysicalDeviceScalarBlockLayoutFeatures physicalDeviceScalarBlockLayoutFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES, &physicalDeviceDynamicRenderingFeaturesKHR };
+        p->pNext = static_cast<VkBaseOutStructure*>(static_cast<void*>(&physicalDeviceScalarBlockLayoutFeatures));
         pfnCb(p, pUser);
     },
     [](VkBaseOutStructure* p, void* pUser, PFN_vpStructChainerCb pfnCb) {
@@ -1027,6 +1046,7 @@ struct FeaturesChain {
     VkPhysicalDeviceDeviceGeneratedCommandsFeaturesNV physicalDeviceDeviceGeneratedCommandsFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEVICE_GENERATED_COMMANDS_FEATURES_NV, nullptr };
     VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV physicalDeviceDeviceGeneratedCommandsComputeFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEVICE_GENERATED_COMMANDS_COMPUTE_FEATURES_NV, nullptr };
     VkPhysicalDevicePrivateDataFeatures physicalDevicePrivateDataFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES, nullptr };
+    VkPhysicalDeviceClusterAccelerationStructureFeaturesNV physicalDeviceClusterAccelerationStructureFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CLUSTER_ACCELERATION_STRUCTURE_FEATURES_NV, nullptr };
     VkPhysicalDeviceVariablePointersFeatures physicalDeviceVariablePointersFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES, nullptr };
     VkPhysicalDeviceMultiviewFeatures physicalDeviceMultiviewFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES, nullptr };
     VkPhysicalDevicePresentIdFeaturesKHR physicalDevicePresentIdFeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_ID_FEATURES_KHR, nullptr };
@@ -1042,6 +1062,7 @@ struct FeaturesChain {
     VkPhysicalDeviceMaintenance5Features physicalDeviceMaintenance5Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES, nullptr };
     VkPhysicalDeviceMaintenance6Features physicalDeviceMaintenance6Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_6_FEATURES, nullptr };
     VkPhysicalDeviceMaintenance7FeaturesKHR physicalDeviceMaintenance7FeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_7_FEATURES_KHR, nullptr };
+    VkPhysicalDeviceMaintenance8FeaturesKHR physicalDeviceMaintenance8FeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_8_FEATURES_KHR, nullptr };
     VkPhysicalDeviceShaderDrawParametersFeatures physicalDeviceShaderDrawParametersFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES, nullptr };
     VkPhysicalDeviceShaderFloat16Int8Features physicalDeviceShaderFloat16Int8Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES, nullptr };
     VkPhysicalDeviceHostQueryResetFeatures physicalDeviceHostQueryResetFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES, nullptr };
@@ -1114,6 +1135,7 @@ struct FeaturesChain {
     VkPhysicalDeviceExtendedDynamicStateFeaturesEXT physicalDeviceExtendedDynamicStateFeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT, nullptr };
     VkPhysicalDeviceExtendedDynamicState2FeaturesEXT physicalDeviceExtendedDynamicState2FeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT, nullptr };
     VkPhysicalDeviceExtendedDynamicState3FeaturesEXT physicalDeviceExtendedDynamicState3FeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT, nullptr };
+    VkPhysicalDevicePartitionedAccelerationStructureFeaturesNV physicalDevicePartitionedAccelerationStructureFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PARTITIONED_ACCELERATION_STRUCTURE_FEATURES_NV, nullptr };
     VkPhysicalDeviceDiagnosticsConfigFeaturesNV physicalDeviceDiagnosticsConfigFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DIAGNOSTICS_CONFIG_FEATURES_NV, nullptr };
     VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures physicalDeviceZeroInitializeWorkgroupMemoryFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES, nullptr };
     VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR physicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_FEATURES_KHR, nullptr };
@@ -1149,6 +1171,7 @@ struct FeaturesChain {
     VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT physicalDeviceMultisampledRenderToSingleSampledFeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_FEATURES_EXT, nullptr };
     VkPhysicalDevicePipelineProtectedAccessFeatures physicalDevicePipelineProtectedAccessFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_PROTECTED_ACCESS_FEATURES, nullptr };
     VkPhysicalDeviceVideoMaintenance1FeaturesKHR physicalDeviceVideoMaintenance1FeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_MAINTENANCE_1_FEATURES_KHR, nullptr };
+    VkPhysicalDeviceVideoMaintenance2FeaturesKHR physicalDeviceVideoMaintenance2FeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_MAINTENANCE_2_FEATURES_KHR, nullptr };
     VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR physicalDeviceVideoEncodeQuantizationMapFeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_ENCODE_QUANTIZATION_MAP_FEATURES_KHR, nullptr };
     VkPhysicalDeviceVideoEncodeAV1FeaturesKHR physicalDeviceVideoEncodeAV1FeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_ENCODE_AV1_FEATURES_KHR, nullptr };
     VkPhysicalDeviceInheritedViewportScissorFeaturesNV physicalDeviceInheritedViewportScissorFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INHERITED_VIEWPORT_SCISSOR_FEATURES_NV, nullptr };
@@ -1159,6 +1182,7 @@ struct FeaturesChain {
     VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR physicalDeviceFragmentShaderBarycentricFeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_BARYCENTRIC_FEATURES_KHR, nullptr };
     VkPhysicalDeviceRayTracingMotionBlurFeaturesNV physicalDeviceRayTracingMotionBlurFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_MOTION_BLUR_FEATURES_NV, nullptr };
     VkPhysicalDeviceRayTracingValidationFeaturesNV physicalDeviceRayTracingValidationFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV, nullptr };
+    VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV physicalDeviceRayTracingLinearSweptSpheresFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_LINEAR_SWEPT_SPHERES_FEATURES_NV, nullptr };
     VkPhysicalDeviceRGBA10X6FormatsFeaturesEXT physicalDeviceRGBA10X6FormatsFeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RGBA10X6_FORMATS_FEATURES_EXT, nullptr };
     VkPhysicalDeviceDynamicRenderingFeatures physicalDeviceDynamicRenderingFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES, nullptr };
     VkPhysicalDeviceImageViewMinLodFeaturesEXT physicalDeviceImageViewMinLodFeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_VIEW_MIN_LOD_FEATURES_EXT, nullptr };
@@ -1184,7 +1208,6 @@ struct FeaturesChain {
     VkPhysicalDeviceTilePropertiesFeaturesQCOM physicalDeviceTilePropertiesFeaturesQCOM{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TILE_PROPERTIES_FEATURES_QCOM, nullptr };
     VkPhysicalDeviceAmigoProfilingFeaturesSEC physicalDeviceAmigoProfilingFeaturesSEC{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_AMIGO_PROFILING_FEATURES_SEC, nullptr };
     VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT physicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT, nullptr };
-    VkPhysicalDeviceDepthClampZeroOneFeaturesEXT physicalDeviceDepthClampZeroOneFeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLAMP_ZERO_ONE_FEATURES_EXT, nullptr };
     VkPhysicalDeviceAddressBindingReportFeaturesEXT physicalDeviceAddressBindingReportFeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ADDRESS_BINDING_REPORT_FEATURES_EXT, nullptr };
     VkPhysicalDeviceOpticalFlowFeaturesNV physicalDeviceOpticalFlowFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_OPTICAL_FLOW_FEATURES_NV, nullptr };
     VkPhysicalDeviceFaultFeaturesEXT physicalDeviceFaultFeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT, nullptr };
@@ -1222,6 +1245,7 @@ struct FeaturesChain {
     VkPhysicalDeviceSchedulingControlsFeaturesARM physicalDeviceSchedulingControlsFeaturesARM{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCHEDULING_CONTROLS_FEATURES_ARM, nullptr };
     VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG physicalDeviceRelaxedLineRasterizationFeaturesIMG{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RELAXED_LINE_RASTERIZATION_FEATURES_IMG, nullptr };
     VkPhysicalDeviceRenderPassStripedFeaturesARM physicalDeviceRenderPassStripedFeaturesARM{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RENDER_PASS_STRIPED_FEATURES_ARM, nullptr };
+    VkPhysicalDevicePipelineOpacityMicromapFeaturesARM physicalDevicePipelineOpacityMicromapFeaturesARM{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_OPACITY_MICROMAP_FEATURES_ARM, nullptr };
     VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR physicalDeviceShaderMaximalReconvergenceFeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_MAXIMAL_RECONVERGENCE_FEATURES_KHR, nullptr };
     VkPhysicalDeviceShaderSubgroupRotateFeatures physicalDeviceShaderSubgroupRotateFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_ROTATE_FEATURES, nullptr };
     VkPhysicalDeviceShaderExpectAssumeFeatures physicalDeviceShaderExpectAssumeFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_EXPECT_ASSUME_FEATURES, nullptr };
@@ -1238,6 +1262,9 @@ struct FeaturesChain {
     VkPhysicalDeviceCooperativeMatrix2FeaturesNV physicalDeviceCooperativeMatrix2FeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_FEATURES_NV, nullptr };
     VkPhysicalDeviceHdrVividFeaturesHUAWEI physicalDeviceHdrVividFeaturesHUAWEI{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HDR_VIVID_FEATURES_HUAWEI, nullptr };
     VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT physicalDeviceVertexAttributeRobustnessFeaturesEXT{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_ROBUSTNESS_FEATURES_EXT, nullptr };
+    VkPhysicalDeviceDepthClampZeroOneFeaturesKHR physicalDeviceDepthClampZeroOneFeaturesKHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLAMP_ZERO_ONE_FEATURES_KHR, nullptr };
+    VkPhysicalDeviceCooperativeVectorFeaturesNV physicalDeviceCooperativeVectorFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_VECTOR_FEATURES_NV, nullptr };
+    VkPhysicalDevicePresentMeteringFeaturesNV physicalDevicePresentMeteringFeaturesNV{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_METERING_FEATURES_NV, nullptr };
     VkPhysicalDeviceFeatures2KHR physicalDeviceFeatures2KHR{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR, nullptr };
 
     FeaturesChain() {
@@ -1245,6 +1272,7 @@ struct FeaturesChain {
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEVICE_GENERATED_COMMANDS_FEATURES_NV, size<VkPhysicalDeviceDeviceGeneratedCommandsFeaturesNV>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEVICE_GENERATED_COMMANDS_COMPUTE_FEATURES_NV, size<VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES, size<VkPhysicalDevicePrivateDataFeatures>() });
+        this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CLUSTER_ACCELERATION_STRUCTURE_FEATURES_NV, size<VkPhysicalDeviceClusterAccelerationStructureFeaturesNV>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES, size<VkPhysicalDeviceVariablePointersFeatures>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES, size<VkPhysicalDeviceMultiviewFeatures>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_ID_FEATURES_KHR, size<VkPhysicalDevicePresentIdFeaturesKHR>() });
@@ -1260,6 +1288,7 @@ struct FeaturesChain {
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES, size<VkPhysicalDeviceMaintenance5Features>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_6_FEATURES, size<VkPhysicalDeviceMaintenance6Features>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_7_FEATURES_KHR, size<VkPhysicalDeviceMaintenance7FeaturesKHR>() });
+        this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_8_FEATURES_KHR, size<VkPhysicalDeviceMaintenance8FeaturesKHR>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES, size<VkPhysicalDeviceShaderDrawParametersFeatures>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES, size<VkPhysicalDeviceShaderFloat16Int8Features>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES, size<VkPhysicalDeviceHostQueryResetFeatures>() });
@@ -1332,6 +1361,7 @@ struct FeaturesChain {
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT, size<VkPhysicalDeviceExtendedDynamicStateFeaturesEXT>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT, size<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT, size<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>() });
+        this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PARTITIONED_ACCELERATION_STRUCTURE_FEATURES_NV, size<VkPhysicalDevicePartitionedAccelerationStructureFeaturesNV>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DIAGNOSTICS_CONFIG_FEATURES_NV, size<VkPhysicalDeviceDiagnosticsConfigFeaturesNV>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES, size<VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_FEATURES_KHR, size<VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR>() });
@@ -1367,6 +1397,7 @@ struct FeaturesChain {
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_FEATURES_EXT, size<VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_PROTECTED_ACCESS_FEATURES, size<VkPhysicalDevicePipelineProtectedAccessFeatures>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_MAINTENANCE_1_FEATURES_KHR, size<VkPhysicalDeviceVideoMaintenance1FeaturesKHR>() });
+        this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_MAINTENANCE_2_FEATURES_KHR, size<VkPhysicalDeviceVideoMaintenance2FeaturesKHR>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_ENCODE_QUANTIZATION_MAP_FEATURES_KHR, size<VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_ENCODE_AV1_FEATURES_KHR, size<VkPhysicalDeviceVideoEncodeAV1FeaturesKHR>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INHERITED_VIEWPORT_SCISSOR_FEATURES_NV, size<VkPhysicalDeviceInheritedViewportScissorFeaturesNV>() });
@@ -1377,6 +1408,7 @@ struct FeaturesChain {
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_BARYCENTRIC_FEATURES_KHR, size<VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_MOTION_BLUR_FEATURES_NV, size<VkPhysicalDeviceRayTracingMotionBlurFeaturesNV>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV, size<VkPhysicalDeviceRayTracingValidationFeaturesNV>() });
+        this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_LINEAR_SWEPT_SPHERES_FEATURES_NV, size<VkPhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RGBA10X6_FORMATS_FEATURES_EXT, size<VkPhysicalDeviceRGBA10X6FormatsFeaturesEXT>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES, size<VkPhysicalDeviceDynamicRenderingFeatures>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_VIEW_MIN_LOD_FEATURES_EXT, size<VkPhysicalDeviceImageViewMinLodFeaturesEXT>() });
@@ -1402,7 +1434,6 @@ struct FeaturesChain {
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TILE_PROPERTIES_FEATURES_QCOM, size<VkPhysicalDeviceTilePropertiesFeaturesQCOM>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_AMIGO_PROFILING_FEATURES_SEC, size<VkPhysicalDeviceAmigoProfilingFeaturesSEC>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT, size<VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT>() });
-        this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLAMP_ZERO_ONE_FEATURES_EXT, size<VkPhysicalDeviceDepthClampZeroOneFeaturesEXT>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ADDRESS_BINDING_REPORT_FEATURES_EXT, size<VkPhysicalDeviceAddressBindingReportFeaturesEXT>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_OPTICAL_FLOW_FEATURES_NV, size<VkPhysicalDeviceOpticalFlowFeaturesNV>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT, size<VkPhysicalDeviceFaultFeaturesEXT>() });
@@ -1440,6 +1471,7 @@ struct FeaturesChain {
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCHEDULING_CONTROLS_FEATURES_ARM, size<VkPhysicalDeviceSchedulingControlsFeaturesARM>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RELAXED_LINE_RASTERIZATION_FEATURES_IMG, size<VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RENDER_PASS_STRIPED_FEATURES_ARM, size<VkPhysicalDeviceRenderPassStripedFeaturesARM>() });
+        this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_OPACITY_MICROMAP_FEATURES_ARM, size<VkPhysicalDevicePipelineOpacityMicromapFeaturesARM>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_MAXIMAL_RECONVERGENCE_FEATURES_KHR, size<VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_ROTATE_FEATURES, size<VkPhysicalDeviceShaderSubgroupRotateFeatures>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_EXPECT_ASSUME_FEATURES, size<VkPhysicalDeviceShaderExpectAssumeFeatures>() });
@@ -1456,6 +1488,9 @@ struct FeaturesChain {
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_FEATURES_NV, size<VkPhysicalDeviceCooperativeMatrix2FeaturesNV>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HDR_VIVID_FEATURES_HUAWEI, size<VkPhysicalDeviceHdrVividFeaturesHUAWEI>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_ROBUSTNESS_FEATURES_EXT, size<VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT>() });
+        this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLAMP_ZERO_ONE_FEATURES_KHR, size<VkPhysicalDeviceDepthClampZeroOneFeaturesKHR>() });
+        this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_VECTOR_FEATURES_NV, size<VkPhysicalDeviceCooperativeVectorFeaturesNV>() });
+        this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_METERING_FEATURES_NV, size<VkPhysicalDevicePresentMeteringFeaturesNV>() });
         this->structureSize.insert({ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR, size<VkPhysicalDeviceFeatures2KHR>() });
 
         //Initializing the full list of available structure features
@@ -1466,6 +1501,8 @@ struct FeaturesChain {
         pNext = &physicalDeviceDeviceGeneratedCommandsComputeFeaturesNV;
         physicalDevicePrivateDataFeatures.pNext = pNext;
         pNext = &physicalDevicePrivateDataFeatures;
+        physicalDeviceClusterAccelerationStructureFeaturesNV.pNext = pNext;
+        pNext = &physicalDeviceClusterAccelerationStructureFeaturesNV;
         physicalDeviceVariablePointersFeatures.pNext = pNext;
         pNext = &physicalDeviceVariablePointersFeatures;
         physicalDeviceMultiviewFeatures.pNext = pNext;
@@ -1496,6 +1533,8 @@ struct FeaturesChain {
         pNext = &physicalDeviceMaintenance6Features;
         physicalDeviceMaintenance7FeaturesKHR.pNext = pNext;
         pNext = &physicalDeviceMaintenance7FeaturesKHR;
+        physicalDeviceMaintenance8FeaturesKHR.pNext = pNext;
+        pNext = &physicalDeviceMaintenance8FeaturesKHR;
         physicalDeviceShaderDrawParametersFeatures.pNext = pNext;
         pNext = &physicalDeviceShaderDrawParametersFeatures;
         physicalDeviceShaderFloat16Int8Features.pNext = pNext;
@@ -1640,6 +1679,8 @@ struct FeaturesChain {
         pNext = &physicalDeviceExtendedDynamicState2FeaturesEXT;
         physicalDeviceExtendedDynamicState3FeaturesEXT.pNext = pNext;
         pNext = &physicalDeviceExtendedDynamicState3FeaturesEXT;
+        physicalDevicePartitionedAccelerationStructureFeaturesNV.pNext = pNext;
+        pNext = &physicalDevicePartitionedAccelerationStructureFeaturesNV;
         physicalDeviceDiagnosticsConfigFeaturesNV.pNext = pNext;
         pNext = &physicalDeviceDiagnosticsConfigFeaturesNV;
         physicalDeviceZeroInitializeWorkgroupMemoryFeatures.pNext = pNext;
@@ -1708,6 +1749,8 @@ struct FeaturesChain {
         pNext = &physicalDevicePipelineProtectedAccessFeatures;
         physicalDeviceVideoMaintenance1FeaturesKHR.pNext = pNext;
         pNext = &physicalDeviceVideoMaintenance1FeaturesKHR;
+        physicalDeviceVideoMaintenance2FeaturesKHR.pNext = pNext;
+        pNext = &physicalDeviceVideoMaintenance2FeaturesKHR;
         physicalDeviceVideoEncodeQuantizationMapFeaturesKHR.pNext = pNext;
         pNext = &physicalDeviceVideoEncodeQuantizationMapFeaturesKHR;
         physicalDeviceVideoEncodeAV1FeaturesKHR.pNext = pNext;
@@ -1728,6 +1771,8 @@ struct FeaturesChain {
         pNext = &physicalDeviceRayTracingMotionBlurFeaturesNV;
         physicalDeviceRayTracingValidationFeaturesNV.pNext = pNext;
         pNext = &physicalDeviceRayTracingValidationFeaturesNV;
+        physicalDeviceRayTracingLinearSweptSpheresFeaturesNV.pNext = pNext;
+        pNext = &physicalDeviceRayTracingLinearSweptSpheresFeaturesNV;
         physicalDeviceRGBA10X6FormatsFeaturesEXT.pNext = pNext;
         pNext = &physicalDeviceRGBA10X6FormatsFeaturesEXT;
         physicalDeviceDynamicRenderingFeatures.pNext = pNext;
@@ -1776,8 +1821,6 @@ struct FeaturesChain {
         pNext = &physicalDeviceAmigoProfilingFeaturesSEC;
         physicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT.pNext = pNext;
         pNext = &physicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT;
-        physicalDeviceDepthClampZeroOneFeaturesEXT.pNext = pNext;
-        pNext = &physicalDeviceDepthClampZeroOneFeaturesEXT;
         physicalDeviceAddressBindingReportFeaturesEXT.pNext = pNext;
         pNext = &physicalDeviceAddressBindingReportFeaturesEXT;
         physicalDeviceOpticalFlowFeaturesNV.pNext = pNext;
@@ -1846,6 +1889,8 @@ struct FeaturesChain {
         pNext = &physicalDeviceRelaxedLineRasterizationFeaturesIMG;
         physicalDeviceRenderPassStripedFeaturesARM.pNext = pNext;
         pNext = &physicalDeviceRenderPassStripedFeaturesARM;
+        physicalDevicePipelineOpacityMicromapFeaturesARM.pNext = pNext;
+        pNext = &physicalDevicePipelineOpacityMicromapFeaturesARM;
         physicalDeviceShaderMaximalReconvergenceFeaturesKHR.pNext = pNext;
         pNext = &physicalDeviceShaderMaximalReconvergenceFeaturesKHR;
         physicalDeviceShaderSubgroupRotateFeatures.pNext = pNext;
@@ -1878,6 +1923,12 @@ struct FeaturesChain {
         pNext = &physicalDeviceHdrVividFeaturesHUAWEI;
         physicalDeviceVertexAttributeRobustnessFeaturesEXT.pNext = pNext;
         pNext = &physicalDeviceVertexAttributeRobustnessFeaturesEXT;
+        physicalDeviceDepthClampZeroOneFeaturesKHR.pNext = pNext;
+        pNext = &physicalDeviceDepthClampZeroOneFeaturesKHR;
+        physicalDeviceCooperativeVectorFeaturesNV.pNext = pNext;
+        pNext = &physicalDeviceCooperativeVectorFeaturesNV;
+        physicalDevicePresentMeteringFeaturesNV.pNext = pNext;
+        pNext = &physicalDevicePresentMeteringFeaturesNV;
         physicalDeviceFeatures2KHR.pNext = pNext;
 
     }

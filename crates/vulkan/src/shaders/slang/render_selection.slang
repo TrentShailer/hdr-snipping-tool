@@ -1,5 +1,3 @@
-// slangc -g2 -emit-spirv-directly -target spirv -profile spirv_1_4  crates/vulkan/src/_shaders/render_selection.slang -o crates/vulkan/src/_shaders/spv/render_selection.spv
-
 [vk::push_constant]
 ConstantBuffer<Selection> selection;
 struct Selection

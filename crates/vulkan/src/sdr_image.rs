@@ -26,10 +26,8 @@ impl SdrImage {
     pub unsafe fn copy_to_cpu(&self, vulkan: &Vulkan) -> Result<Vec<u8>, SdrImageError> {
         // Create staging
         let (staging_buffer, staging_memory) = {
-            let queue_family = vulkan.queue_family_index();
-
             let buffer_info = vk::BufferCreateInfo::default()
-                .queue_family_indices(slice::from_ref(&queue_family))
+                .queue_family_indices(vulkan.queue_family_index_as_slice())
                 .usage(vk::BufferUsageFlags::TRANSFER_DST)
                 .size(u64::from(self.extent.width) * u64::from(self.extent.height) * 4);
 

@@ -4,7 +4,7 @@ use tracing::{debug, info, warn};
 use tray_icon::menu::MenuEvent;
 use winit::{
     application::ApplicationHandler,
-    dpi::{PhysicalPosition, PhysicalSize},
+    dpi::PhysicalPosition,
     event::{ElementState, KeyEvent, MouseButton, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoopProxy},
     keyboard::{KeyCode, PhysicalKey},

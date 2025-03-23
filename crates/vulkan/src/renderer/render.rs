@@ -1,18 +1,14 @@
 use core::slice;
 
-use ash::vk;
+use ash::{ext, vk};
 use ash_helper::{
-    FrameResources, LabelledVkResult, SurfaceContext, Swapchain, VkError, VulkanContext,
+    Context, FrameResources, LabelledVkResult, SurfaceContext, Swapchain, VkError, VulkanContext,
     cmd_transition_image, cmd_try_begin_label, cmd_try_end_label,
 };
 
 use crate::QueuePurpose;
 
 use super::Renderer;
-
-mod capture;
-mod line;
-mod selection;
 
 impl Renderer {
     /// Render a frame.
@@ -33,15 +29,6 @@ impl Renderer {
             unsafe { self.swapchain.destroy(self.vulkan.as_ref(), &self.surface) };
 
             self.swapchain = swapchain;
-
-            unsafe {
-                self.line_pipeline
-                    .recreate(&self.vulkan, self.swapchain.format)?;
-                self.selection_pipeline
-                    .recreate(&self.vulkan, self.swapchain.format)?;
-                self.capture_pipeline
-                    .recreate(&self.vulkan, self.swapchain.format)?;
-            };
         }
 
         // Get frame resources
@@ -161,37 +148,91 @@ impl Renderer {
                 }
             }
 
-            // Set viewport & Scissor
-            {
+            // Set initial state
+            unsafe {
+                let shader_device: &ext::shader_object::Device = self.vulkan.context();
+
                 let viewport = vk::Viewport::default()
                     .width(self.swapchain.extent.width as f32)
                     .height(self.swapchain.extent.height as f32)
                     .min_depth(0.0)
                     .max_depth(1.0);
-                unsafe {
-                    self.vulkan.device().cmd_set_viewport(
-                        command_buffer,
-                        0,
-                        slice::from_ref(&viewport),
-                    );
-                }
+                shader_device
+                    .cmd_set_viewport_with_count(command_buffer, slice::from_ref(&viewport));
 
                 let scissor = vk::Rect2D::default().extent(self.swapchain.extent);
-                unsafe {
-                    self.vulkan.device().cmd_set_scissor(
-                        command_buffer,
-                        0,
-                        slice::from_ref(&scissor),
-                    );
-                }
+                shader_device.cmd_set_scissor_with_count(command_buffer, slice::from_ref(&scissor));
+
+                shader_device.cmd_set_rasterizer_discard_enable(command_buffer, false);
+
+                shader_device.cmd_set_primitive_restart_enable(command_buffer, false);
+
+                shader_device
+                    .cmd_set_rasterization_samples(command_buffer, vk::SampleCountFlags::TYPE_1);
+
+                shader_device.cmd_set_sample_mask(
+                    command_buffer,
+                    vk::SampleCountFlags::TYPE_1,
+                    &[u32::MAX],
+                );
+
+                shader_device.cmd_set_alpha_to_coverage_enable(command_buffer, false);
+
+                shader_device.cmd_set_cull_mode(command_buffer, vk::CullModeFlags::NONE);
+                shader_device.cmd_set_front_face(command_buffer, vk::FrontFace::COUNTER_CLOCKWISE);
+
+                shader_device.cmd_set_depth_test_enable(command_buffer, false);
+                shader_device.cmd_set_depth_bias_enable(command_buffer, false);
+                shader_device.cmd_set_stencil_test_enable(command_buffer, false);
+
+                shader_device.cmd_set_color_blend_enable(command_buffer, 0, &[vk::TRUE]);
+                shader_device.cmd_set_color_write_mask(
+                    command_buffer,
+                    0,
+                    &[vk::ColorComponentFlags::RGBA],
+                );
+                shader_device.cmd_set_color_blend_equation(
+                    command_buffer,
+                    0,
+                    &[vk::ColorBlendEquationEXT::default()
+                        .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
+                        .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+                        .color_blend_op(vk::BlendOp::ADD)
+                        .src_alpha_blend_factor(vk::BlendFactor::SRC_ALPHA)
+                        .dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
+                        .alpha_blend_op(vk::BlendOp::ADD)],
+                );
+
+                shader_device.cmd_set_depth_write_enable(command_buffer, false);
             }
 
             // Draw
             {
                 let state = *self.state.lock();
-                unsafe { self.cmd_draw_capture(command_buffer, state) };
-                unsafe { self.cmd_draw_selection(command_buffer, state) };
-                unsafe { self.cmd_draw_all_lines(command_buffer, state) };
+                unsafe {
+                    self.capture_shader.cmd_draw(
+                        command_buffer,
+                        self.swapchain.format,
+                        &self.render_buffer,
+                        state,
+                    )
+                };
+                unsafe {
+                    self.selection_shader.cmd_draw(
+                        command_buffer,
+                        &self.swapchain,
+                        &self.render_buffer,
+                        state,
+                    );
+                };
+                unsafe {
+                    self.line_shader
+                        .cmd_setup_draw(command_buffer, &self.render_buffer);
+                    self.line_shader
+                        .cmd_draw_border(command_buffer, state, &self.swapchain);
+                    self.line_shader
+                        .cmd_draw_guides(command_buffer, state, &self.swapchain);
+                }
             }
 
             // End rendering

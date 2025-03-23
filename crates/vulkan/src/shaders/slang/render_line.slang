@@ -1,5 +1,3 @@
-// slangc -g2 -emit-spirv-directly -target spirv -profile spirv_1_4  crates/vulkan/src/_shaders/render_line.slang -o crates/vulkan/src/_shaders/spv/render_line.spv
-
 [vk::push_constant]
 ConstantBuffer<Line> line;
 struct Line

@@ -1,5 +1,3 @@
-// slangc -g2 -emit-spirv-directly -target spirv -profile spirv_1_4 crates/vulkan/src/_shaders/tonemap_hdr_to_sdr.slang -o crates/vulkan/src/_shaders/spv/tonemap_hdr_to_sdr.spv
-
 import utilities;
 
 ParameterBlock<Descriptor> descriptor;

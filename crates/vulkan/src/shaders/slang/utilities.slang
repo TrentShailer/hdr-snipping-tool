@@ -28,12 +28,7 @@ public int3 GetWorkgroupCount()
     case spirv:
         return spirv_asm
         {
-                result:$$int3 = OpLoad builtin(NumWorkgroups:int3);
-           };
+            result:$$int3 = OpLoad builtin(NumWorkgroups:int3);
+        };
     }
-}
-
-public float max4(float4 value)
-{
-    return max(max3(value.x, value.y, value.z), value.w);
 }

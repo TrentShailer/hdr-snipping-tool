@@ -1,51 +1,25 @@
-use ash::vk;
+use core::slice;
+
+use alloc::sync::Arc;
+use ash::{ext, vk};
 use ash_helper::{
-    LabelledVkResult, VkError, VulkanContext, create_shader_module_from_spv, try_name,
+    Context, LabelledVkResult, Swapchain, VkError, VulkanContext, link_shader_objects, try_name,
 };
-use bytemuck::{Pod, Zeroable};
-use core::{mem::offset_of, slice};
+use bytemuck::bytes_of;
 
-use crate::Vulkan;
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct Vertex {
-    pub index: u32,
-}
-
-/// A line defined by a start and end position in Vulkan coordinates.
-#[repr(C)]
-#[derive(Default, Zeroable, Pod, Clone, Copy)]
-pub struct Line {
-    pub start: [f32; 2],
-    pub end: [f32; 2],
-    pub colour: [f32; 4],
-}
-
-impl Line {
-    pub fn start(mut self, start: [f32; 2]) -> Self {
-        self.start[0] = start[0];
-        self.start[1] = start[1];
-        self
-    }
-
-    pub fn end(mut self, end: [f32; 2]) -> Self {
-        self.end[0] = end[0];
-        self.end[1] = end[1];
-        self
-    }
-
-    pub fn colour(mut self, colour: [f32; 4]) -> Self {
-        self.colour = colour;
-        self
-    }
-}
+use crate::{
+    RendererState, Vulkan,
+    renderer::buffer::RenderBuffer,
+    shaders::render_line::{self, Line, vertex_main::Vertex},
+};
 
 #[derive(Clone)]
 pub struct LinePipeline {
-    pub pipeline: vk::Pipeline,
-    pub layout: vk::PipelineLayout,
-    pub shader: vk::ShaderModule,
+    vulkan: Arc<Vulkan>,
+
+    pub pipeline_layout: vk::PipelineLayout,
+    pub shaders: Vec<vk::ShaderEXT>,
+    pub stages: Vec<vk::ShaderStageFlags>,
 }
 
 impl LinePipeline {
@@ -53,169 +27,225 @@ impl LinePipeline {
     pub const VERTICIES: [Vertex; 2] = [Vertex { index: 0 }, Vertex { index: 1 }];
 
     /// Create a new instance of the pipeline.
-    pub unsafe fn new(
-        vulkan: &Vulkan,
-        surface_format: vk::SurfaceFormatKHR,
-    ) -> LabelledVkResult<Self> {
-        let shader = unsafe {
-            create_shader_module_from_spv(
-                vulkan,
-                include_bytes!("../../_shaders/spv/render_line.spv"),
-            )?
-        };
-
-        let layout = {
-            let push_constant_range = vk::PushConstantRange::default()
-                .offset(0)
-                .size(size_of::<Line>() as u32)
-                .stage_flags(vk::ShaderStageFlags::VERTEX);
+    pub unsafe fn new(vulkan: Arc<Vulkan>) -> LabelledVkResult<Self> {
+        let pipeline_layout = {
+            let push_range = Line::push_constant_range();
 
             let create_info = vk::PipelineLayoutCreateInfo::default()
-                .push_constant_ranges(slice::from_ref(&push_constant_range));
+                .push_constant_ranges(slice::from_ref(&push_range));
 
-            unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
-                .map_err(|e| VkError::new(e, "vkCreatePipelineLayout"))?
+            let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
+                .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
+
+            unsafe { try_name(vulkan.as_ref(), layout, "Render Line Pipeline Layout") };
+
+            layout
         };
 
-        let pipeline = unsafe { Self::create_pipeline(vulkan, surface_format, layout, shader)? };
+        let (shaders, stages) = {
+            let push_range = Line::push_constant_range();
+
+            let vertex_create_info = vk::ShaderCreateInfoEXT::default()
+                .code(render_line::BYTES)
+                .code_type(vk::ShaderCodeTypeEXT::SPIRV)
+                .stage(render_line::vertex_main::STAGE)
+                .name(render_line::vertex_main::ENTRY_POINT)
+                .push_constant_ranges(slice::from_ref(&push_range));
+
+            let fragment_create_info = vk::ShaderCreateInfoEXT::default()
+                .code(render_line::BYTES)
+                .code_type(vk::ShaderCodeTypeEXT::SPIRV)
+                .stage(render_line::fragment_main::STAGE)
+                .name(render_line::fragment_main::ENTRY_POINT)
+                .push_constant_ranges(slice::from_ref(&push_range));
+
+            let mut create_infos = [vertex_create_info, fragment_create_info];
+
+            let stages: Vec<_> = create_infos.iter().map(|info| info.stage).collect();
+            let shaders = unsafe {
+                link_shader_objects(vulkan.as_ref(), &mut create_infos, "RENDER LINE")
+                    .map_err(|e| VkError::new(e, "vkCreateShadersEXT"))?
+            };
+
+            (shaders, stages)
+        };
 
         Ok(Self {
-            pipeline,
-            layout,
-            shader,
+            vulkan,
+            pipeline_layout,
+            shaders,
+            stages,
         })
     }
 
-    /// Create the `vk::Pipeline` object.
-    ///
-    /// This is used on first creation and during recreation.
-    pub unsafe fn create_pipeline(
-        vulkan: &Vulkan,
-        surface_format: vk::SurfaceFormatKHR,
-        layout: vk::PipelineLayout,
-        shader: vk::ShaderModule,
-    ) -> LabelledVkResult<vk::Pipeline> {
-        let bindings = [
-            // Vertex
-            vk::VertexInputBindingDescription::default()
-                .binding(0)
-                .stride(size_of::<Vertex>() as u32)
-                .input_rate(vk::VertexInputRate::VERTEX),
-        ];
+    pub unsafe fn cmd_setup_draw(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        render_buffer: &RenderBuffer,
+    ) {
+        unsafe { self.cmd_set_state(command_buffer) };
 
-        let attributes = [
-            // Vertex
-            vk::VertexInputAttributeDescription::default()
-                .location(0)
-                .binding(0)
-                .format(vk::Format::R32_UINT)
-                .offset(offset_of!(Vertex, index) as u32),
-        ];
+        let shader_device: &ext::shader_object::Device = unsafe { self.vulkan.context() };
 
-        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::default()
-            .vertex_attribute_descriptions(&attributes)
-            .vertex_binding_descriptions(&bindings);
+        // Bind shaders
+        unsafe {
+            shader_device.cmd_bind_shaders(command_buffer, &self.stages, &self.shaders);
+        }
 
-        let shader_stages = [
-            vk::PipelineShaderStageCreateInfo::default()
-                .stage(vk::ShaderStageFlags::VERTEX)
-                .module(shader)
-                .name(c"main"),
-            vk::PipelineShaderStageCreateInfo::default()
-                .stage(vk::ShaderStageFlags::FRAGMENT)
-                .module(shader)
-                .name(c"main"),
-        ];
+        // Bind buffers
+        unsafe {
+            self.vulkan.device().cmd_bind_vertex_buffers(
+                command_buffer,
+                0,
+                slice::from_ref(&render_buffer.buffer),
+                slice::from_ref(&render_buffer.line_offset),
+            );
+        }
+    }
 
-        let viewport_state = vk::PipelineViewportStateCreateInfo::default()
-            .viewport_count(1)
-            .scissor_count(1);
+    pub unsafe fn cmd_draw_border(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        state: RendererState,
+        swapchain: &Swapchain,
+    ) {
+        let border_width = 4.0;
+        let border_colour = [1.0, 1.0, 1.0, 1.0];
+        let selection = state.selection;
 
-        let rasterisation_state = vk::PipelineRasterizationStateCreateInfo::default()
-            .front_face(vk::FrontFace::CLOCKWISE)
-            .cull_mode(vk::CullModeFlags::NONE)
-            .polygon_mode(vk::PolygonMode::LINE);
+        let left = selection[0][0].min(selection[1][0]);
+        let right = selection[0][0].max(selection[1][0]);
+        let top = selection[0][1].min(selection[1][1]);
+        let bottom = selection[0][1].max(selection[1][1]);
 
-        let multisample_state = vk::PipelineMultisampleStateCreateInfo::default()
-            .rasterization_samples(vk::SampleCountFlags::TYPE_1);
+        let left_capped = left - border_width / 2.0;
+        let right_capped = right + border_width / 2.0;
+        let top_capped = top - border_width / 2.0;
+        let bottom_capped = bottom + border_width / 2.0;
 
-        let attachment_blend = vk::PipelineColorBlendAttachmentState::default()
-            .blend_enable(true)
-            .src_color_blend_factor(vk::BlendFactor::SRC_ALPHA)
-            .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-            .color_blend_op(vk::BlendOp::ADD)
-            .src_alpha_blend_factor(vk::BlendFactor::SRC_ALPHA)
-            .dst_alpha_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-            .alpha_blend_op(vk::BlendOp::ADD)
-            .color_write_mask(vk::ColorComponentFlags::RGBA);
-
-        let blend_state = vk::PipelineColorBlendStateCreateInfo::default()
-            .logic_op(vk::LogicOp::CLEAR)
-            .attachments(slice::from_ref(&attachment_blend));
-
-        let input_assembly_state = vk::PipelineInputAssemblyStateCreateInfo::default()
-            .primitive_restart_enable(false)
-            .topology(vk::PrimitiveTopology::LINE_LIST);
-
-        let dynamic_state = vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&[
-            vk::DynamicState::LINE_WIDTH,
-            vk::DynamicState::VIEWPORT,
-            vk::DynamicState::SCISSOR,
-        ]);
-
-        let mut rendering_create_info = vk::PipelineRenderingCreateInfo::default()
-            .color_attachment_formats(slice::from_ref(&surface_format.format));
-
-        let create_info = vk::GraphicsPipelineCreateInfo::default()
-            .input_assembly_state(&input_assembly_state)
-            .rasterization_state(&rasterisation_state)
-            .vertex_input_state(&vertex_input_info)
-            .multisample_state(&multisample_state)
-            .color_blend_state(&blend_state)
-            .viewport_state(&viewport_state)
-            .dynamic_state(&dynamic_state)
-            .stages(&shader_stages)
-            .layout(layout)
-            .push_next(&mut rendering_create_info);
-
-        let pipeline = unsafe {
-            vulkan
-                .device()
-                .create_graphics_pipelines(
-                    vk::PipelineCache::null(),
-                    slice::from_ref(&create_info),
-                    None,
-                )
-                .map_err(|(_, e)| VkError::new(e, "vkCreateGraphicsPipelines"))?[0]
+        // Cap the ends of the selection lines
+        let top_line = Line {
+            start: swapchain.screen_space([left_capped, top]),
+            end: swapchain.screen_space([right_capped, top]),
+            colour: border_colour,
+        };
+        let bottom_line = Line {
+            start: swapchain.screen_space([left_capped, bottom]),
+            end: swapchain.screen_space([right_capped, bottom]),
+            colour: border_colour,
+        };
+        let left_line = Line {
+            start: swapchain.screen_space([left, top_capped]),
+            end: swapchain.screen_space([left, bottom_capped]),
+            colour: border_colour,
+        };
+        let right_line = Line {
+            start: swapchain.screen_space([right, top_capped]),
+            end: swapchain.screen_space([right, bottom_capped]),
+            colour: border_colour,
         };
 
-        unsafe { try_name(vulkan, pipeline, "Line Pipeline") };
-
-        Ok(pipeline)
-    }
-
-    /// Recreate the pipeline when required.
-    pub unsafe fn recreate(
-        &mut self,
-        vulkan: &Vulkan,
-        surface_format: vk::SurfaceFormatKHR,
-    ) -> LabelledVkResult<()> {
-        unsafe { vulkan.device().destroy_pipeline(self.pipeline, None) };
-
-        let pipeline =
-            unsafe { Self::create_pipeline(vulkan, surface_format, self.layout, self.shader)? };
-
-        self.pipeline = pipeline;
-
-        Ok(())
-    }
-
-    /// Destroy the Vulkan resources.
-    pub unsafe fn destroy(&self, vulkan: &Vulkan) {
         unsafe {
-            vulkan.device().destroy_pipeline(self.pipeline, None);
-            vulkan.device().destroy_pipeline_layout(self.layout, None);
-            vulkan.device().destroy_shader_module(self.shader, None);
+            self.cmd_draw(
+                command_buffer,
+                border_width,
+                &[top_line, left_line, bottom_line, right_line],
+            );
+        }
+    }
+
+    pub unsafe fn cmd_draw_guides(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        state: RendererState,
+        swapchain: &Swapchain,
+    ) {
+        let guide_colour = [0.5, 0.5, 0.5, 0.25];
+        let mouse_position = swapchain.screen_space(state.mouse_position);
+
+        let horizontal = Line {
+            start: [mouse_position[0], -1.0],
+            end: [mouse_position[0], 1.0],
+            colour: guide_colour,
+        };
+
+        let vertical = Line {
+            start: [-1.0, mouse_position[1]],
+            end: [1.0, mouse_position[1]],
+            colour: guide_colour,
+        };
+
+        unsafe { self.cmd_draw(command_buffer, 1.0, &[horizontal, vertical]) };
+    }
+
+    pub unsafe fn cmd_draw(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        line_width: f32,
+        lines: &[Line],
+    ) {
+        unsafe {
+            self.vulkan
+                .device()
+                .cmd_set_line_width(command_buffer, line_width);
+        }
+
+        for line in lines {
+            // Push constants
+            unsafe {
+                self.vulkan.device().cmd_push_constants(
+                    command_buffer,
+                    self.pipeline_layout,
+                    Line::STAGES,
+                    0,
+                    bytes_of(line),
+                );
+            }
+
+            // Draw
+            unsafe {
+                self.vulkan.device().cmd_draw(
+                    command_buffer,
+                    Self::VERTICIES.len() as u32,
+                    1,
+                    0,
+                    0,
+                );
+            }
+        }
+    }
+
+    pub unsafe fn cmd_set_state(&self, command_buffer: vk::CommandBuffer) {
+        let shader_device: &ext::shader_object::Device = unsafe { self.vulkan.context() };
+
+        unsafe {
+            shader_device.cmd_set_vertex_input(
+                command_buffer,
+                &render_line::vertex_main::vertex_binding_descriptions_2_ext(),
+                &render_line::vertex_main::vertex_attribute_descriptions_2_ext(),
+            );
+        }
+
+        unsafe {
+            shader_device
+                .cmd_set_primitive_topology(command_buffer, vk::PrimitiveTopology::LINE_LIST);
+            shader_device.cmd_set_polygon_mode(command_buffer, vk::PolygonMode::LINE);
+        }
+    }
+}
+
+impl Drop for LinePipeline {
+    fn drop(&mut self) {
+        unsafe {
+            let shader_device: &ext::shader_object::Device = self.vulkan.context();
+
+            self.shaders
+                .iter()
+                .for_each(|shader| shader_device.destroy_shader(*shader, None));
+
+            self.vulkan
+                .device()
+                .destroy_pipeline_layout(self.pipeline_layout, None);
         }
     }
 }

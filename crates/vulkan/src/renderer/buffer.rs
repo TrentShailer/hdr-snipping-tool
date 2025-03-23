@@ -5,15 +5,14 @@ use ash_helper::{
     BufferAlignment, BufferUsageFlags, VkError, VulkanContext, allocate_buffer, onetime_command,
 };
 
-use crate::{QueuePurpose, Vulkan};
+use crate::{
+    QueuePurpose, Vulkan,
+    shaders::{render_capture, render_line, render_selection},
+};
 
 use super::{
     CreationError,
-    pipelines::{
-        CapturePipeline, capture_pipeline,
-        line_pipeline::{self, LinePipeline},
-        selection_pipeline::{self, SelectionPipeline},
-    },
+    pipelines::{CapturePipeline, LinePipeline, SelectionPipeline},
 };
 
 /// A Wrapper around the buffer containing all fo the verticies, indicies, and instance data.
@@ -42,24 +41,24 @@ impl RenderBuffer {
         ) = {
             let (line_offset, line_end) = alignment.calc_slice(
                 0,
-                align_of::<line_pipeline::Vertex>() as u64,
-                size_of::<line_pipeline::Vertex>() as u64,
+                align_of::<render_line::vertex_main::Vertex>() as u64,
+                size_of::<render_line::vertex_main::Vertex>() as u64,
                 LinePipeline::VERTICIES.len() as u64,
                 usage,
             );
 
             let (selection_offset, selection_end) = alignment.calc_slice(
                 line_end,
-                align_of::<selection_pipeline::Vertex>() as u64,
-                size_of::<selection_pipeline::Vertex>() as u64,
+                align_of::<render_selection::vertex_main::Vertex>() as u64,
+                size_of::<render_selection::vertex_main::Vertex>() as u64,
                 SelectionPipeline::VERTICIES.len() as u64,
                 usage,
             );
 
             let (capture_offset, capture_end) = alignment.calc_slice(
                 selection_end,
-                align_of::<capture_pipeline::Vertex>() as u64,
-                size_of::<capture_pipeline::Vertex>() as u64,
+                align_of::<render_capture::vertex_main::Vertex>() as u64,
+                size_of::<render_capture::vertex_main::Vertex>() as u64,
                 CapturePipeline::VERTICIES.len() as u64,
                 usage,
             );
@@ -76,9 +75,8 @@ impl RenderBuffer {
 
         // Allocate the buffer
         let (buffer, memory, _) = {
-            let queue_family = vulkan.queue_family_index();
             let buffer_create_info = vk::BufferCreateInfo::default()
-                .queue_family_indices(slice::from_ref(&queue_family))
+                .queue_family_indices(vulkan.queue_family_index_as_slice())
                 .sharing_mode(vk::SharingMode::EXCLUSIVE)
                 .size(buffer_size)
                 .usage(
@@ -99,9 +97,8 @@ impl RenderBuffer {
 
         // Create staging buffer
         let (staging_buffer, staging_memory, _) = {
-            let queue_family = vulkan.queue_family_index();
             let buffer_create_info = vk::BufferCreateInfo::default()
-                .queue_family_indices(slice::from_ref(&queue_family))
+                .queue_family_indices(vulkan.queue_family_index_as_slice())
                 .sharing_mode(vk::SharingMode::EXCLUSIVE)
                 .size(buffer_size)
                 .usage(vk::BufferUsageFlags::TRANSFER_SRC);
@@ -135,7 +132,7 @@ impl RenderBuffer {
                 let mut align = unsafe {
                     Align::new(
                         pointer,
-                        align_of::<line_pipeline::Vertex>() as u64,
+                        align_of::<render_line::vertex_main::Vertex>() as u64,
                         line_end - line_offset,
                     )
                 };
@@ -162,7 +159,7 @@ impl RenderBuffer {
                 let mut align = unsafe {
                     Align::new(
                         pointer,
-                        align_of::<selection_pipeline::Vertex>() as u64,
+                        align_of::<render_selection::vertex_main::Vertex>() as u64,
                         selection_end - selection_offset,
                     )
                 };
@@ -189,7 +186,7 @@ impl RenderBuffer {
                 let mut align = unsafe {
                     Align::new(
                         pointer,
-                        align_of::<capture_pipeline::Vertex>() as u64,
+                        align_of::<render_capture::vertex_main::Vertex>() as u64,
                         capture_end - capture_offset,
                     )
                 };

@@ -11,9 +11,7 @@ use super::{
     CreationError, Renderer, State,
     buffer::RenderBuffer,
     context::Surface,
-    pipelines::{
-        CapturePipeline, line_pipeline::LinePipeline, selection_pipeline::SelectionPipeline,
-    },
+    pipelines::{CapturePipeline, LinePipeline, SelectionPipeline},
 };
 
 impl Renderer {
@@ -55,9 +53,9 @@ impl Renderer {
         let buffer = RenderBuffer::new(&vulkan)?;
 
         // Create the pipelines
-        let line_pipeline = unsafe { LinePipeline::new(&vulkan, swapchain.format)? };
-        let selection_pipeline = unsafe { SelectionPipeline::new(&vulkan, swapchain.format)? };
-        let capture_pipeline = unsafe { CapturePipeline::new(&vulkan, swapchain.format)? };
+        let line_shader = unsafe { LinePipeline::new(Arc::clone(&vulkan))? };
+        let selection_shader = unsafe { SelectionPipeline::new(Arc::clone(&vulkan))? };
+        let capture_shader = unsafe { CapturePipeline::new(Arc::clone(&vulkan))? };
 
         Ok(Self {
             vulkan,
@@ -65,9 +63,9 @@ impl Renderer {
 
             render_buffer: buffer,
 
-            line_pipeline,
-            selection_pipeline,
-            capture_pipeline,
+            line_shader,
+            selection_shader,
+            capture_shader,
 
             swapchain,
             swapchain_preferences,

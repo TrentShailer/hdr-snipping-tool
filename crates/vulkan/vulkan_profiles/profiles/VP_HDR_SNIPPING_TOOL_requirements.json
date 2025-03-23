@@ -12,6 +12,9 @@
                 "VkPhysicalDeviceFeatures": {
                     "fillModeNonSolid": true,
                     "wideLines": true
+                },
+                "VkPhysicalDeviceScalarBlockLayoutFeatures": {
+                    "scalarBlockLayout": true
                 }
             },
             "extensions": {

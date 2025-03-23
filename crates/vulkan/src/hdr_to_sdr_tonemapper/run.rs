@@ -1,15 +1,21 @@
 use core::slice;
 
-use ash::vk::{self, ImageViewType};
+use ash::{
+    ext, khr,
+    vk::{self, ImageViewType},
+};
 use ash_helper::{
-    VkError, VulkanContext, allocate_image, cmd_transition_image, cmd_try_begin_label,
+    Context, VkError, VulkanContext, allocate_image, cmd_transition_image, cmd_try_begin_label,
     cmd_try_end_label, onetime_command,
 };
 use bytemuck::bytes_of;
 
-use crate::{HdrImage, QueuePurpose, SdrImage};
+use crate::{
+    HdrImage, QueuePurpose, SdrImage,
+    shaders::tonemap_hdr_to_sdr::{self, PushConstants},
+};
 
-use super::{HdrToSdrTonemapper, PushConstants, TonemapperError};
+use super::{HdrToSdrTonemapper, TonemapperError};
 
 impl HdrToSdrTonemapper {
     /// Runs the HDR to SDR tonemapper over an input image.
@@ -34,8 +40,6 @@ impl HdrToSdrTonemapper {
     ) -> Result<SdrImage, TonemapperError> {
         // Create the output image
         let (sdr_image, sdr_memory) = {
-            let queue_family = self.vulkan.queue_family_index();
-
             let create_info = vk::ImageCreateInfo::default()
                 .array_layers(1)
                 .extent(hdr_image.extent.into())
@@ -43,7 +47,7 @@ impl HdrToSdrTonemapper {
                 .image_type(vk::ImageType::TYPE_2D)
                 .initial_layout(vk::ImageLayout::UNDEFINED)
                 .mip_levels(1)
-                .queue_family_indices(slice::from_ref(&queue_family))
+                .queue_family_indices(self.vulkan.queue_family_index_as_slice())
                 .samples(vk::SampleCountFlags::TYPE_1)
                 .sharing_mode(vk::SharingMode::EXCLUSIVE)
                 .tiling(vk::ImageTiling::OPTIMAL)
@@ -131,10 +135,11 @@ impl HdrToSdrTonemapper {
                                 .image_info(slice::from_ref(&output_descriptor)),
                         ];
 
-                        vk.push_descriptor_device().cmd_push_descriptor_set(
+                        let device: &khr::push_descriptor::Device = self.vulkan.context();
+                        device.cmd_push_descriptor_set(
                             command_buffer,
                             vk::PipelineBindPoint::COMPUTE,
-                            self.layout,
+                            self.pipeline_layout,
                             0,
                             &descriptor_writes,
                         );
@@ -145,24 +150,33 @@ impl HdrToSdrTonemapper {
                         let push_constants = PushConstants { whitepoint };
                         vk.device().cmd_push_constants(
                             command_buffer,
-                            self.layout,
-                            vk::ShaderStageFlags::COMPUTE,
+                            self.pipeline_layout,
+                            PushConstants::STAGES,
                             0,
                             bytes_of(&push_constants),
                         );
                     }
 
-                    // Bind the pipeline
-                    vk.device().cmd_bind_pipeline(
-                        command_buffer,
-                        vk::PipelineBindPoint::COMPUTE,
-                        self.pipeline,
-                    );
+                    // Bind the shader
+                    {
+                        let device: &ext::shader_object::Device = vk.context();
+                        device.cmd_bind_shaders(
+                            command_buffer,
+                            slice::from_ref(&tonemap_hdr_to_sdr::compute_main::STAGE),
+                            slice::from_ref(&self.shader),
+                        );
+                    }
 
                     // Calculate the dispatches
                     let dispatches = [
-                        hdr_image.extent.width.div_ceil(64),
-                        hdr_image.extent.height.div_ceil(4),
+                        hdr_image
+                            .extent
+                            .width
+                            .div_ceil(tonemap_hdr_to_sdr::compute_main::DISPATCH_SIZE[0]),
+                        hdr_image
+                            .extent
+                            .height
+                            .div_ceil(tonemap_hdr_to_sdr::compute_main::DISPATCH_SIZE[1]),
                     ];
 
                     // Dispatch

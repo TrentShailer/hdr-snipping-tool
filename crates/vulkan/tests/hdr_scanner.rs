@@ -34,7 +34,7 @@ fn hdr_scanner_random_data() {
 
     let (staging_buffer, staging_memory, _) = {
         let create_info = vk::BufferCreateInfo::default()
-            .queue_family_indices(slice::from_ref(vulkan.queue_family_index_as_ref()))
+            .queue_family_indices(vulkan.queue_family_index_as_slice())
             .size(VALUES * 2)
             .usage(vk::BufferUsageFlags::TRANSFER_SRC);
 

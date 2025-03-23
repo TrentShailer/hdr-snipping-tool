@@ -18,4 +18,5 @@ mod hdr_scanner;
 mod hdr_to_sdr_tonemapper;
 mod renderer;
 mod sdr_image;
+mod shaders;
 mod vulkan;

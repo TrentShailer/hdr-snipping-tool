@@ -1,8 +1,9 @@
-use core::slice;
+use core::{ffi::CStr, slice};
+use std::io;
 
 use alloc::sync::Arc;
 
-use ash::{khr, vk};
+use ash::{ext, khr, vk};
 use ash_helper::{DebugUtils, VkError, try_name, vulkan_debug_callback};
 use parking_lot::Mutex;
 use raw_window_handle::RawDisplayHandle;
@@ -14,11 +15,21 @@ use super::{QueuePurpose, Vulkan};
 
 impl Vulkan {
     /// Creates a new instance of the Vulkan Context using the Vulkan Profiles API. Designed to
-    /// support Vulkan 1.2 with the required extensions.
+    /// support Vulkan 1.2 with the required extensions. Uses the shader object emulation layer if
+    /// unsupported.
     pub fn new(
         try_debug: bool,
         display_handle: Option<RawDisplayHandle>,
     ) -> Result<Self, VulkanCreationError> {
+        // Setup additional layers path
+        {
+            let exe = std::env::current_exe().map_err(VulkanCreationError::CurrentExecutable)?;
+            let exe_dir = exe.parent().unwrap().to_string_lossy();
+            let current_path = std::option_env!("VK_LAYER_PATH").unwrap_or("");
+            let path_output = format!("{exe_dir};{current_path}");
+            unsafe { std::env::set_var("VK_LAYER_PATH", path_output) };
+        }
+
         // Setup objects.
         let entry = ash::Entry::linked();
         let vp_entry = vp_ash::Entry::linked();
@@ -89,17 +100,29 @@ impl Vulkan {
                 .api_version(api_version)
                 .application_name(c"HDR Snipping Tool");
 
-            let mut additional_extensions = vec![];
+            let additional_extensions = {
+                let mut additional_extensions = vec![];
 
-            if let Some(handle) = display_handle {
-                let extensions = ash_window::enumerate_required_extensions(handle)
-                    .map_err(|e| VkError::new(e, "enumerateWindowExtensions"))?;
-                additional_extensions.extend_from_slice(extensions);
-            }
+                // Display
+                if let Some(handle) = display_handle {
+                    let extensions = ash_window::enumerate_required_extensions(handle)
+                        .map_err(|e| VkError::new(e, "enumerateWindowExtensions"))?;
+                    additional_extensions.extend_from_slice(extensions);
+                }
+
+                additional_extensions
+            };
+
+            let layers = {
+                let shader_object_layer_name: &'static CStr = c"VK_LAYER_KHRONOS_shader_object";
+
+                vec![shader_object_layer_name.as_ptr()]
+            };
 
             let vk_create_info = vk::InstanceCreateInfo::default()
                 .application_info(&app_info)
-                .enabled_extension_names(&additional_extensions);
+                .enabled_extension_names(&additional_extensions)
+                .enabled_layer_names(&layers);
 
             let vp_create_info = vp::InstanceCreateInfo::default()
                 .create_info(&vk_create_info)
@@ -176,23 +199,32 @@ impl Vulkan {
 
         // Create logical device.
         let device = {
-            let mut additional_extensions = vec![];
+            let additional_extensions = {
+                let mut additional_extensions = vec![];
 
-            // Request portability if the device supports it.
-            {
-                let extensions =
-                    unsafe { instance.enumerate_device_extension_properties(physical_device) }
-                        .map_err(|e| VkError::new(e, "vkEnumerateDeviceExtensionProperties"))?;
+                // Request portability if the device supports it.
+                {
+                    let extensions =
+                        unsafe { instance.enumerate_device_extension_properties(physical_device) }
+                            .map_err(|e| VkError::new(e, "vkEnumerateDeviceExtensionProperties"))?;
 
-                let supports_portability = extensions.into_iter().any(|properties| {
-                    properties.extension_name_as_c_str().unwrap_or(c"")
-                        == khr::portability_subset::NAME
-                });
+                    let supports_portability = extensions.into_iter().any(|properties| {
+                        properties.extension_name_as_c_str().unwrap_or(c"")
+                            == khr::portability_subset::NAME
+                    });
 
-                if supports_portability {
-                    additional_extensions.push(khr::portability_subset::NAME.as_ptr());
+                    if supports_portability {
+                        additional_extensions.push(khr::portability_subset::NAME.as_ptr());
+                    }
                 }
-            }
+
+                additional_extensions.push(ext::shader_object::NAME.as_ptr());
+
+                additional_extensions
+            };
+
+            let mut shader_object_feature =
+                vk::PhysicalDeviceShaderObjectFeaturesEXT::default().shader_object(true);
 
             let queue_priorities = [1.0].repeat(queue_count as usize);
             let queue_create_infos = [vk::DeviceQueueCreateInfo::default()
@@ -201,7 +233,8 @@ impl Vulkan {
 
             let vk_create_info = vk::DeviceCreateInfo::default()
                 .queue_create_infos(&queue_create_infos)
-                .enabled_extension_names(&additional_extensions);
+                .enabled_extension_names(&additional_extensions)
+                .push_next(&mut shader_object_feature);
 
             let vp_create_info = vp::DeviceCreateInfo::default()
                 .create_info(&vk_create_info)
@@ -218,6 +251,9 @@ impl Vulkan {
 
         // Create the push descriptor device
         let push_descriptor_device = khr::push_descriptor::Device::new(&instance, &device);
+
+        // Create the shader object device
+        let shader_object_device = ext::shader_object::Device::new(&instance, &device);
 
         // Create debug utils if we should debug
         let debug_utils = if should_debug {
@@ -251,6 +287,7 @@ impl Vulkan {
             queues,
             debug_utils,
             push_descriptor_device,
+            shader_object_device,
             transient_pool,
         };
 
@@ -283,6 +320,11 @@ impl Vulkan {
                 vulkan.push_descriptor_device.device(),
                 "Push Descriptor Device",
             );
+            try_name(
+                &vulkan,
+                vulkan.shader_object_device.device(),
+                "Shader Object Device",
+            );
             try_name(&vulkan, *vulkan.transient_pool().lock(), "Transient Pool");
         };
 
@@ -306,4 +348,8 @@ pub enum VulkanCreationError {
     /// No Physical Devices meet the requirements to use the application.
     #[error("No Physical Devices meet the requirements.")]
     UnsupportedDevice,
+
+    /// Could not get current executable.
+    #[error("Could not get the path to the application executable:\n{0}")]
+    CurrentExecutable(#[source] io::Error),
 }
