@@ -10,7 +10,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use tracing::{debug, error, info_span};
+use tracing::{debug, error, info, info_span};
 use utilities::DebugTime;
 use vulkan::{HdrImage, HdrScanner, Vulkan};
 use windows::Win32::Foundation::CloseHandle;
@@ -372,6 +372,8 @@ impl InnerCaptureTaker {
                     .report_and_panic("Eventloop exited");
             }
         }
+
+        info!("Got screenshot");
 
         // Clean up
         {
