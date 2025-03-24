@@ -48,7 +48,7 @@ impl Monitor {
 
         let mut mouse_point = POINT::default();
         unsafe { GetCursorPos(&mut mouse_point) }.map_err(|e| WinError::new(e, "GetCursorPos"))?;
-        debug!("Mouse Point: {:#?}", mouse_point);
+        debug!("Mouse {:?}", mouse_point);
 
         let monitor = monitors.into_iter().find(|monitor| {
             let left = monitor.desktop_coordinates.left;

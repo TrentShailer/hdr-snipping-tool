@@ -4,7 +4,7 @@ mod sdr_white;
 use windows::Win32::{Foundation::RECT, Graphics::Dxgi::DXGI_OUTPUT_DESC1};
 use windows_core::PCWSTR;
 
-use crate::{send::SendHMONITOR, WinError};
+use crate::{WinError, send::SendHMONITOR};
 
 /// A monitor and related data
 #[derive(Clone, Copy)]
@@ -72,7 +72,7 @@ impl core::fmt::Debug for Monitor {
             .unwrap_or("Invalid Name".to_string());
 
         f.debug_struct("Monitor")
-            .field("handle", &self.handle)
+            .field("handle", &self.handle.0)
             .field("desktop_coordinates", &self.desktop_coordinates)
             .field("device_name", &name)
             .field("min_brightness", &self.min_brightness)
