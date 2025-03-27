@@ -1000,7 +1000,7 @@ checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
 
 [[package]]
 name = "hdr-snipping-tool"
-version = "4.1.4"
+version = "4.1.5"
 dependencies = [
  "arboard",
  "ash",
@@ -2669,7 +2669,7 @@ checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
 name = "utilities"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tracing",
 ]
@@ -2921,7 +2921,7 @@ dependencies = [
 
 [[package]]
 name = "windows-capture-provider"
-version = "6.1.0"
+version = "6.2.0"
 dependencies = [
  "thiserror 2.0.12",
  "tracing",
