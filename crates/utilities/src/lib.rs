@@ -7,8 +7,8 @@ use tracing::debug;
 /// 1. `>= 10s` displays seconds only.
 /// 1. `>= 1s` displays seconds with 1dp.
 /// 1. `>= 1ms` displays milliseconds only.
-/// 1. `>= 1µs` displays microseconds only.
-/// 1. `< 1µs` displays nanoseconds only.
+/// 1. `>= 1μs` displays microseconds only.
+/// 1. `< 1μs` displays nanoseconds only.
 #[inline]
 pub fn display_duration(duration: Duration) -> String {
     if duration.as_secs() >= 10 {
@@ -18,7 +18,7 @@ pub fn display_duration(duration: Duration) -> String {
     } else if duration.as_millis() >= 1 {
         format!("{}ms", duration.as_millis())
     } else if duration.as_micros() >= 1 {
-        format!("{}µs", duration.as_micros())
+        format!("{}μs", duration.as_micros())
     } else {
         format!("{}ns", duration.as_nanos())
     }
@@ -48,5 +48,43 @@ impl Drop for DebugTime {
             self.label,
             display_duration(self.start.elapsed())
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use core::time::Duration;
+
+    use crate::display_duration;
+
+    #[test]
+    fn displays_duration_gte_10s() {
+        assert_eq!(display_duration(Duration::from_secs_f64(12.5555)), "12s");
+    }
+
+    #[test]
+    fn displays_duration_gte_1s() {
+        assert_eq!(display_duration(Duration::from_secs_f64(2.5555)), "2.6s");
+    }
+
+    #[test]
+    fn displays_duration_gte_1ms() {
+        assert_eq!(display_duration(Duration::from_secs_f64(0.500555)), "500ms");
+    }
+
+    #[test]
+    fn displays_duration_gte_1μs() {
+        assert_eq!(
+            display_duration(Duration::from_secs_f64(0.000500555)),
+            "500μs"
+        );
+    }
+
+    #[test]
+    fn displays_duration_lt_1μs() {
+        assert_eq!(
+            display_duration(Duration::from_secs_f64(0.000000555)),
+            "555ns"
+        );
     }
 }
