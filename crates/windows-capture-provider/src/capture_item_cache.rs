@@ -46,6 +46,11 @@ impl CaptureItemCache {
         Ok(capture_item)
     }
 
+    /// Purges all capture items from the cache.
+    pub fn purge(&mut self) {
+        self.capture_items.clear();
+    }
+
     /// Prunes the monitors in the cache that are no longer connected.
     pub fn prune(&mut self, direct_x: &DirectX) -> Result<(), WinError> {
         let output_descriptors = direct_x.dxgi_output_descriptors()?;

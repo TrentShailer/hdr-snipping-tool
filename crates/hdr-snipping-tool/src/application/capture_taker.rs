@@ -190,7 +190,8 @@ impl InnerCaptureTaker {
             self.direct_x.recreate_dxgi_adapter().report_and_panic(
                 "Could not refresh the DirectX devices.\nThe DirectX device creation failed.",
             );
-            debug!("Recreated out-of-date DXGI device");
+            self.cache.purge();
+            debug!("Recreated out-of-date DXGI device, purged cache");
         }
 
         if let Err(e) = self.cache.prune(&self.direct_x) {
@@ -220,8 +221,8 @@ impl InnerCaptureTaker {
             self.direct_x.recreate_dxgi_adapter().report_and_panic(
                 "Could not refresh the DirectX devices.\nThe DirectX device creation failed.",
             );
-
-            debug!("Recreated out-of-date DXGI device");
+            self.cache.purge();
+            debug!("Recreated out-of-date DXGI device, purged cache");
         }
 
         // Get the monitor
