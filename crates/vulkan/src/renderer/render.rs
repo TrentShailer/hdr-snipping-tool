@@ -5,6 +5,7 @@ use ash_helper::{
     Context, FrameResources, LabelledVkResult, SurfaceContext, Swapchain, VkError, VulkanContext,
     cmd_transition_image, cmd_try_begin_label, cmd_try_end_label,
 };
+use tracing::debug;
 
 use crate::QueuePurpose;
 
@@ -27,6 +28,8 @@ impl Renderer {
             };
 
             unsafe { self.swapchain.destroy(self.vulkan.as_ref(), &self.surface) };
+
+            debug!("Created {:?}", swapchain);
 
             self.swapchain = swapchain;
         }

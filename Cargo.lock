@@ -111,8 +111,8 @@ checksum = "0bb44936d800fea8f016d7f2311c6a4f97aebd5dc86f09906139ec848cf3a46f"
 
 [[package]]
 name = "ash-helper"
-version = "0.2.0"
-source = "git+https://github.com/trentshailer/ash-helper?rev=ea91af5#ea91af53c843a98e62589ace06fa7adbe0212786"
+version = "0.2.1"
+source = "git+https://github.com/trentshailer/ash-helper?rev=b98271b#b98271b9e25f2f0370285c24853228cc9a7fdc8d"
 dependencies = [
  "ash",
  "parking_lot",

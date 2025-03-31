@@ -11,6 +11,7 @@ use arboard::{Clipboard, ImageData};
 use chrono::Local;
 use image::{GenericImageView, ImageBuffer, ImageFormat, Rgba};
 use tracing::{error, info, info_span, warn};
+use utilities::DebugTime;
 use vulkan::{HdrToSdrTonemapper, Vulkan};
 
 use crate::{
@@ -146,6 +147,7 @@ impl InnerCaptureSaver {
 
         // Save to file
         {
+            let _timing = DebugTime::start("Saving to file");
             let name = format!("Screenshot {}.png", Local::now().format("%F %H%M%S"));
             let path = screenshot_dir().join(name);
 
@@ -159,6 +161,8 @@ impl InnerCaptureSaver {
 
         // Save to clipboard
         {
+            let _timing = DebugTime::start("Saving to clipboard");
+
             let mut clipboard = match Clipboard::new() {
                 Ok(clipboard) => clipboard,
                 Err(e) => {

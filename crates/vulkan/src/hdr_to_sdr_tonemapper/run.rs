@@ -9,6 +9,7 @@ use ash_helper::{
     cmd_try_end_label, onetime_command,
 };
 use bytemuck::bytes_of;
+use utilities::DebugTime;
 
 use crate::{
     HdrImage, QueuePurpose, SdrImage,
@@ -38,6 +39,8 @@ impl HdrToSdrTonemapper {
         hdr_image: HdrImage,
         whitepoint: f32,
     ) -> Result<SdrImage, TonemapperError> {
+        let _timing = DebugTime::start("Tonemapping");
+
         // Create the output image
         let (sdr_image, sdr_memory) = {
             let create_info = vk::ImageCreateInfo::default()

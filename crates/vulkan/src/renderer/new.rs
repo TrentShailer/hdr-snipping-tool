@@ -36,7 +36,8 @@ impl Renderer {
             .colour_space(vec![
                 vk::ColorSpaceKHR::EXTENDED_SRGB_LINEAR_EXT,
                 vk::ColorSpaceKHR::SRGB_NONLINEAR,
-            ]);
+            ])
+            .present_mode(vec![vk::PresentModeKHR::FIFO]);
 
         let swapchain = unsafe {
             Swapchain::new(
