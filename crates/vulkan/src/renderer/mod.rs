@@ -1,5 +1,7 @@
 use alloc::sync::Arc;
-use ash_helper::{AllocationError, Swapchain, SwapchainPreferences, VkError, VulkanContext};
+use ash_helper::{
+    AllocationError, Swapchain, SwapchainPreferences, SwapchainRetirement, VkError, VulkanContext,
+};
 use buffer::RenderBuffer;
 use context::Surface;
 use parking_lot::Mutex;
@@ -42,6 +44,7 @@ pub struct Renderer {
 
     swapchain: Swapchain,
     swapchain_preferences: SwapchainPreferences,
+    swapchain_retirement: SwapchainRetirement,
 
     render_buffer: RenderBuffer,
 

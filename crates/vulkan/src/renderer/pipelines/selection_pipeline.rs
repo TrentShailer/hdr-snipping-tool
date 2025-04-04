@@ -181,8 +181,8 @@ impl SelectionPipeline {
         // Push constants
         unsafe {
             let push_constants = Selection {
-                start: swapchain.screen_space(state.selection[0]),
-                end: swapchain.screen_space(state.selection[1]),
+                start: swapchain.screen_to_vulkan_space(state.selection[0]),
+                end: swapchain.screen_to_vulkan_space(state.selection[1]),
             };
 
             self.vulkan.device().cmd_push_constants(

@@ -125,23 +125,23 @@ impl LinePipeline {
 
         // Cap the ends of the selection lines
         let top_line = Line {
-            start: swapchain.screen_space([left_capped, top]),
-            end: swapchain.screen_space([right_capped, top]),
+            start: swapchain.screen_to_vulkan_space([left_capped, top]),
+            end: swapchain.screen_to_vulkan_space([right_capped, top]),
             colour: border_colour,
         };
         let bottom_line = Line {
-            start: swapchain.screen_space([left_capped, bottom]),
-            end: swapchain.screen_space([right_capped, bottom]),
+            start: swapchain.screen_to_vulkan_space([left_capped, bottom]),
+            end: swapchain.screen_to_vulkan_space([right_capped, bottom]),
             colour: border_colour,
         };
         let left_line = Line {
-            start: swapchain.screen_space([left, top_capped]),
-            end: swapchain.screen_space([left, bottom_capped]),
+            start: swapchain.screen_to_vulkan_space([left, top_capped]),
+            end: swapchain.screen_to_vulkan_space([left, bottom_capped]),
             colour: border_colour,
         };
         let right_line = Line {
-            start: swapchain.screen_space([right, top_capped]),
-            end: swapchain.screen_space([right, bottom_capped]),
+            start: swapchain.screen_to_vulkan_space([right, top_capped]),
+            end: swapchain.screen_to_vulkan_space([right, bottom_capped]),
             colour: border_colour,
         };
 
@@ -161,7 +161,7 @@ impl LinePipeline {
         swapchain: &Swapchain,
     ) {
         let guide_colour = [0.5, 0.5, 0.5, 0.25];
-        let mouse_position = swapchain.screen_space(state.mouse_position);
+        let mouse_position = swapchain.screen_to_vulkan_space(state.mouse_position);
 
         let horizontal = Line {
             start: [mouse_position[0], -1.0],

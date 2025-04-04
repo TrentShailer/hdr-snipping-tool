@@ -1,11 +1,11 @@
 use alloc::sync::Arc;
 
 use ash::vk;
-use ash_helper::{Swapchain, SwapchainPreferences};
+use ash_helper::{Swapchain, SwapchainPreferences, SwapchainRetirement};
 use parking_lot::Mutex;
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 
-use crate::{QueuePurpose, Vulkan};
+use crate::Vulkan;
 
 use super::{
     CreationError, Renderer, State,
@@ -26,8 +26,7 @@ impl Renderer {
 
         // Create the swapchain
         let swapchain_preferences = SwapchainPreferences::default()
-            .frames_in_flight(3)
-            .image_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+            .image_count(3)
             .format(vec![
                 vk::Format::R16G16B16A16_SFLOAT,
                 vk::Format::R8G8B8A8_UNORM,
@@ -39,16 +38,14 @@ impl Renderer {
             ])
             .present_mode(vec![vk::PresentModeKHR::FIFO]);
 
-        let swapchain = unsafe {
-            Swapchain::new(
-                vulkan.as_ref(),
-                &surface,
-                vulkan.transient_pool(),
-                vulkan.queue(QueuePurpose::Graphics),
-                None,
-                &swapchain_preferences,
-            )?
+        let swapchain = {
+            let create_info =
+                swapchain_preferences.get_swapchain_create_info(vulkan.as_ref(), &surface)?;
+
+            unsafe { Swapchain::new(vulkan.as_ref(), &surface, None, create_info)? }
         };
+
+        let swapchain_retirement = SwapchainRetirement::new();
 
         // Create an initialise the render Vertex/Index/Instance buffer.
         let buffer = RenderBuffer::new(&vulkan)?;
@@ -70,6 +67,7 @@ impl Renderer {
 
             swapchain,
             swapchain_preferences,
+            swapchain_retirement,
 
             state: Arc::new(Mutex::new(State::default())),
         })

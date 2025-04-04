@@ -2,8 +2,8 @@ use core::slice;
 
 use ash::{ext, vk};
 use ash_helper::{
-    Context, FrameResources, LabelledVkResult, SurfaceContext, Swapchain, VkError, VulkanContext,
-    cmd_transition_image, cmd_try_begin_label, cmd_try_end_label,
+    Context, Frame, FrameResources, LabelledVkResult, Swapchain, VkError, VulkanContext,
+    cmd_transition_image, cmd_try_begin_label, cmd_try_end_label, onetime_command,
 };
 use tracing::debug;
 
@@ -14,79 +14,91 @@ use super::Renderer;
 impl Renderer {
     /// Render a frame.
     pub unsafe fn render(&mut self) -> LabelledVkResult<()> {
+        self.swapchain_retirement
+            .process_retirement(self.vulkan.as_ref(), &self.surface)?;
+
         // Recreate the swapchain if it needs recreating
         if self.swapchain.needs_to_rebuild {
-            let swapchain = unsafe {
-                Swapchain::new(
-                    self.vulkan.as_ref(),
-                    &self.surface,
-                    self.vulkan.transient_pool(),
-                    self.vulkan.queue(QueuePurpose::Graphics),
-                    Some(self.swapchain.swapchain),
-                    &self.swapchain_preferences,
-                )?
+            let new_swapchain = {
+                let create_info = self
+                    .swapchain_preferences
+                    .get_swapchain_create_info(self.vulkan.as_ref(), &self.surface)?;
+
+                unsafe {
+                    Swapchain::new(
+                        self.vulkan.as_ref(),
+                        &self.surface,
+                        Some(&mut self.swapchain),
+                        create_info,
+                    )?
+                }
             };
 
-            unsafe { self.swapchain.destroy(self.vulkan.as_ref(), &self.surface) };
+            debug!("Created {:?}", new_swapchain);
 
-            debug!("Created {:?}", swapchain);
+            let old_swapchain = core::mem::replace(&mut self.swapchain, new_swapchain);
 
-            self.swapchain = swapchain;
+            self.swapchain_retirement.house_swapchain(old_swapchain);
         }
 
-        // Get frame resources
-        let FrameResources {
-            command_buffer,
-            command_pool,
-            in_flight_fence,
-            image_available_semaphore,
-            render_finished_semaphore,
-        } = self.swapchain.current_resources(self.vulkan.as_ref())?;
-
         // Acquire next image
-        let (image_index, image, image_view) = {
-            let result = unsafe {
-                self.surface.swapchain_device().acquire_next_image(
-                    self.swapchain.swapchain,
-                    u64::MAX,
-                    image_available_semaphore,
-                    vk::Fence::null(),
-                )
+        let Frame {
+            image_index,
+            image,
+            view,
+            resources,
+            previously_acquired: _,
+        } = {
+            let acquire_fence = self.swapchain_retirement.get_fence(self.vulkan.as_ref())?;
+
+            let result = self.swapchain.acquire_next_image(
+                self.vulkan.as_ref(),
+                &self.surface,
+                acquire_fence,
+            )?;
+
+            let frame = match result {
+                Some(frame) => frame,
+                None => return Ok(()),
             };
 
-            // If out of date, flag rebuild on next render
-            let (image_index, suboptimal) = match result {
-                Ok(v) => v,
-                Err(e) => match e {
-                    vk::Result::ERROR_OUT_OF_DATE_KHR => {
-                        self.swapchain.needs_to_rebuild = true;
-                        return Ok(());
-                    }
+            self.swapchain_retirement.track_acquisition(
+                self.swapchain.swapchain,
+                acquire_fence,
+                frame.image_index,
+            );
 
-                    vk::Result::NOT_READY => return Ok(()),
-
-                    e => return Err(VkError::new(e, "vkAcquireNextImageKHR")),
-                },
-            };
-
-            if suboptimal {
-                self.swapchain.needs_to_rebuild = true;
+            if !frame.previously_acquired {
+                unsafe {
+                    onetime_command(
+                        self.vulkan.as_ref(),
+                        frame.resources.command_pool,
+                        self.vulkan.queue(QueuePurpose::Graphics),
+                        |vulkan, command_buffer| {
+                            cmd_transition_image(
+                                vulkan,
+                                command_buffer,
+                                frame.image,
+                                vk::ImageLayout::UNDEFINED,
+                                vk::ImageLayout::PRESENT_SRC_KHR,
+                            )
+                            .unwrap();
+                        },
+                        "Transition swapchain image",
+                    )?;
+                }
             }
 
-            // Get the image & view
-            let image_view = self.swapchain.views[image_index as usize];
-            let image = self.swapchain.images[image_index as usize];
-
-            (image_index, image, image_view)
+            frame
         };
 
-        // Reset in-flight fence
-        unsafe {
-            self.vulkan
-                .device()
-                .reset_fences(slice::from_ref(&in_flight_fence))
-                .map_err(|e| VkError::new(e, "vkResetFences"))?;
-        };
+        let FrameResources {
+            acquire_semaphore,
+            render_semaphore,
+            render_fence,
+            command_pool,
+            command_buffer,
+        } = resources;
 
         // Commands
         {
@@ -135,13 +147,13 @@ impl Renderer {
                         },
                     })
                     .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                    .image_view(image_view)
+                    .image_view(view)
                     .load_op(vk::AttachmentLoadOp::CLEAR)
                     .store_op(vk::AttachmentStoreOp::STORE);
 
                 let rendering_info = vk::RenderingInfoKHR::default()
                     .color_attachments(slice::from_ref(&colour_attachment))
-                    .render_area(vk::Rect2D::default().extent(self.swapchain.extent))
+                    .render_area(vk::Rect2D::default().extent(self.swapchain.info.extent))
                     .layer_count(1);
 
                 unsafe {
@@ -156,14 +168,14 @@ impl Renderer {
                 let shader_device: &ext::shader_object::Device = self.vulkan.context();
 
                 let viewport = vk::Viewport::default()
-                    .width(self.swapchain.extent.width as f32)
-                    .height(self.swapchain.extent.height as f32)
+                    .width(self.swapchain.info.extent.width as f32)
+                    .height(self.swapchain.info.extent.height as f32)
                     .min_depth(0.0)
                     .max_depth(1.0);
                 shader_device
                     .cmd_set_viewport_with_count(command_buffer, slice::from_ref(&viewport));
 
-                let scissor = vk::Rect2D::default().extent(self.swapchain.extent);
+                let scissor = vk::Rect2D::default().extent(self.swapchain.info.extent);
                 shader_device.cmd_set_scissor_with_count(command_buffer, slice::from_ref(&scissor));
 
                 shader_device.cmd_set_rasterizer_discard_enable(command_buffer, false);
@@ -215,7 +227,7 @@ impl Renderer {
                 unsafe {
                     self.capture_shader.cmd_draw(
                         command_buffer,
-                        self.swapchain.format,
+                        self.swapchain.info.format,
                         &self.render_buffer,
                         state,
                     )
@@ -277,14 +289,14 @@ impl Renderer {
                 .wait_dst_stage_mask(slice::from_ref(
                     &vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
                 ))
-                .wait_semaphores(slice::from_ref(&image_available_semaphore))
-                .signal_semaphores(slice::from_ref(&render_finished_semaphore));
+                .wait_semaphores(slice::from_ref(&acquire_semaphore))
+                .signal_semaphores(slice::from_ref(&render_semaphore));
 
             let queue = unsafe { self.vulkan.queue(QueuePurpose::Graphics).lock() };
             unsafe {
                 self.vulkan
                     .device()
-                    .queue_submit(*queue, slice::from_ref(&submit), in_flight_fence)
+                    .queue_submit(*queue, slice::from_ref(&submit), render_fence)
                     .map_err(|e| VkError::new(e, "vkQueueSubmit"))?;
             }
             drop(queue);
@@ -292,35 +304,13 @@ impl Renderer {
 
         // Present frame
         {
-            let present_info = vk::PresentInfoKHR::default()
-                .wait_semaphores(slice::from_ref(&render_finished_semaphore))
-                .swapchains(slice::from_ref(&self.swapchain.swapchain))
-                .image_indices(slice::from_ref(&image_index));
-
             let queue = unsafe { self.vulkan.queue(QueuePurpose::Graphics).lock() };
-            let result = unsafe {
-                self.surface
-                    .swapchain_device()
-                    .queue_present(*queue, &present_info)
-            };
+
+            self.swapchain
+                .queue_present(&self.surface, image_index, render_semaphore, *queue)?;
+
             drop(queue);
-
-            let suboptimal = match result {
-                Ok(suboptimal) => suboptimal,
-                Err(e) => match e {
-                    vk::Result::ERROR_OUT_OF_DATE_KHR => true,
-
-                    e => return Err(VkError::new(e, "vkQueuePresentKHR")),
-                },
-            };
-
-            if suboptimal {
-                self.swapchain.needs_to_rebuild = true;
-            }
         }
-
-        self.swapchain.current_resources =
-            (self.swapchain.current_resources + 1) % self.swapchain.max_frames_in_flight;
 
         Ok(())
     }
