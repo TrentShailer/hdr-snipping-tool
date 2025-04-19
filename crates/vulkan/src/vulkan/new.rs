@@ -1,10 +1,10 @@
 use core::{ffi::CStr, slice};
-use std::io;
+use std::{io, path::Path};
 
 use alloc::sync::Arc;
 
 use ash::{ext, khr, vk};
-use ash_helper::{DebugUtils, VkError, try_name, vulkan_debug_callback};
+use ash_helper::{DebugUtils, VkError, VulkanLayer, try_name, vulkan_debug_callback};
 use parking_lot::Mutex;
 use raw_window_handle::RawDisplayHandle;
 use thiserror::Error;
@@ -19,15 +19,20 @@ impl Vulkan {
     /// unsupported.
     pub fn new(
         try_debug: bool,
+        layer_directory: &Path,
         display_handle: Option<RawDisplayHandle>,
     ) -> Result<Self, VulkanCreationError> {
-        // Setup additional layers path
+        // Setup additional layers
         {
-            let exe = std::env::current_exe().map_err(VulkanCreationError::CurrentExecutable)?;
-            let exe_dir = exe.parent().unwrap().to_string_lossy();
-            let current_path = std::option_env!("VK_LAYER_PATH").unwrap_or("");
-            let path_output = format!("{exe_dir};{current_path}");
-            unsafe { std::env::set_var("VK_LAYER_PATH", path_output) };
+            let shader_object_layer = VulkanLayer::new(
+                "VkLayer_khronos_shader_object.json",
+                include_bytes!("../../layers/VkLayer_khronos_shader_object.json"),
+                "VkLayer_khronos_shader_object.dll",
+                include_bytes!("../../layers/VkLayer_khronos_shader_object.dll"),
+            );
+
+            unsafe { VulkanLayer::setup_layers(&[shader_object_layer], layer_directory) }
+                .map_err(VulkanCreationError::SetupVulkanLayers)?;
         }
 
         // Setup objects.
@@ -349,7 +354,7 @@ pub enum VulkanCreationError {
     #[error("No Physical Devices meet the requirements.")]
     UnsupportedDevice,
 
-    /// Could not get current executable.
-    #[error("Could not get the path to the application executable:\n{0}")]
-    CurrentExecutable(#[source] io::Error),
+    /// Could not setup the Vulkan layers.
+    #[error("Could not setup the vulkan layers: {0}")]
+    SetupVulkanLayers(#[source] io::Error),
 }

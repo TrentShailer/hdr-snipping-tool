@@ -72,8 +72,14 @@ impl ActiveApp {
             event_loop.create_window(window_attributes).unwrap()
         };
 
-        let vulkan =
-            Arc::new(Vulkan::new(true, Some(window.display_handle().unwrap().as_raw())).unwrap());
+        let vulkan = Arc::new(
+            Vulkan::new(
+                true,
+                std::env::current_exe().unwrap().parent().unwrap(),
+                Some(window.display_handle().unwrap().as_raw()),
+            )
+            .unwrap(),
+        );
 
         let (render_state, render_sender, render_thread) = {
             let renderer = unsafe {

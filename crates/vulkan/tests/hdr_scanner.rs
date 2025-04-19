@@ -29,7 +29,14 @@ const MAXIMUM_VALUE: f16 = f16::from_f32_const(15.234);
 
 #[test]
 fn hdr_scanner_random_data() {
-    let vulkan = Arc::new(Vulkan::new(true, None).unwrap());
+    let vulkan = Arc::new(
+        Vulkan::new(
+            true,
+            std::env::current_exe().unwrap().parent().unwrap(),
+            None,
+        )
+        .unwrap(),
+    );
     let mut hdr_scanner = HdrScanner::new(Arc::clone(&vulkan)).unwrap();
 
     let (staging_buffer, staging_memory, _) = {

@@ -14,7 +14,14 @@ use vulkan::{HdrImage, HdrScanner, HdrToSdrTonemapper, QueuePurpose, Vulkan};
 fn main() {
     let _guards = setup_logger().unwrap();
 
-    let vulkan = Arc::new(Vulkan::new(true, None).unwrap());
+    let vulkan = Arc::new(
+        Vulkan::new(
+            true,
+            std::env::current_exe().unwrap().parent().unwrap(),
+            None,
+        )
+        .unwrap(),
+    );
     let tonemapper = HdrToSdrTonemapper::new(vulkan.clone()).unwrap();
 
     let (hdr_image, whitepoint) = {

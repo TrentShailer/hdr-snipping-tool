@@ -9,7 +9,14 @@ use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCaptur
 
 #[test]
 fn import_hdr_image() {
-    let vulkan = Arc::new(Vulkan::new(true, None).unwrap());
+    let vulkan = Arc::new(
+        Vulkan::new(
+            true,
+            std::env::current_exe().unwrap().parent().unwrap(),
+            None,
+        )
+        .unwrap(),
+    );
     let direct_x = DirectX::new().unwrap();
 
     let monitor = Monitor::get_hovered_monitor(&direct_x)

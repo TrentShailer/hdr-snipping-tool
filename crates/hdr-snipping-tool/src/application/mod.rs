@@ -22,7 +22,7 @@ use winit::{
 use crate::{
     VERSION,
     config::Config,
-    should_debug,
+    config_dir, should_debug,
     utilities::{
         failure::{Failure, report_and_panic},
         windows_helpers::{get_foreground_window, set_foreground_window},
@@ -108,6 +108,7 @@ impl Application {
         let vulkan = {
             let result = Vulkan::new(
                 should_debug(),
+                &config_dir(),
                 Some(window.display_handle().unwrap().as_raw()),
             );
 

@@ -8,7 +8,12 @@ use vulkan::Vulkan;
 
 #[test]
 fn valid_vulkan_context() {
-    let vulkan = Vulkan::new(true, None).unwrap();
+    let vulkan = Vulkan::new(
+        true,
+        std::env::current_exe().unwrap().parent().unwrap(),
+        None,
+    )
+    .unwrap();
 
     let create_info = vk::BufferCreateInfo::default()
         .size(1024 * 1024 * 4)

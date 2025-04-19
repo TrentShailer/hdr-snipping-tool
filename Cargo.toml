@@ -31,8 +31,7 @@ winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
 raw-window-handle = "0.6"
 
 # Vulkan
-ash-helper = { git = "https://github.com/trentshailer/ash-helper", rev = "96ae9ad" }
-# ash-helper = { path = "../ash-helper" }
+ash-helper = { git = "https://github.com/trentshailer/ash-helper", rev = "25b7003" }
 vulkan = { path = "crates/vulkan" }
 ash = { version = "0.38", default-features = false, features = [
 	"std",
