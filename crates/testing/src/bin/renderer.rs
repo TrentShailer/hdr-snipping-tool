@@ -81,21 +81,6 @@ impl ActiveApp {
             .unwrap(),
         );
 
-        let (render_state, render_sender, render_thread) = {
-            let renderer = unsafe {
-                Renderer::new(
-                    vulkan.clone(),
-                    window.display_handle().unwrap().as_raw(),
-                    window.window_handle().unwrap().as_raw(),
-                )
-                .unwrap()
-            };
-            let render_state = renderer.state.clone();
-            let (render_sender, render_thread) = render_thread(renderer);
-
-            (render_state, render_sender, render_thread)
-        };
-
         let capture = unsafe {
             HdrImage::import_windows_capture(
                 &vulkan,
@@ -105,9 +90,11 @@ impl ActiveApp {
             .unwrap()
         };
 
+        let render_state = Arc::new(Mutex::new(RendererState::default()));
+
         // Update state using the capture
         {
-            let mut hdr_scanner = HdrScanner::new(Arc::clone(&vulkan)).unwrap();
+            let mut hdr_scanner = HdrScanner::new(&vulkan).unwrap();
             let maximum = unsafe { hdr_scanner.scan(capture).unwrap() };
 
             let mut render_state = render_state.lock();
@@ -121,6 +108,13 @@ impl ActiveApp {
 
             drop(render_state);
         }
+
+        let (render_sender, render_thread) = {
+            let (render_sender, render_thread) =
+                render_thread(Arc::clone(&vulkan), Arc::clone(&render_state), &window);
+
+            (render_sender, render_thread)
+        };
 
         window.set_visible(true);
         window.set_maximized(true);
@@ -220,14 +214,24 @@ enum RenderMessage {
     RequestResize,
 }
 
-fn render_thread(mut renderer: Renderer) -> (Sender<RenderMessage>, JoinHandle<()>) {
+fn render_thread(
+    vulkan: Arc<Vulkan>,
+    state: Arc<Mutex<RendererState>>,
+    window: &Window,
+) -> (Sender<RenderMessage>, JoinHandle<()>) {
     let (sender, receiver) = channel::<RenderMessage>();
+
+    let display_handle = window.display_handle().unwrap().as_raw();
+    let window_handle = window.window_handle().unwrap().as_raw();
+
+    let mut renderer =
+        unsafe { Renderer::new(vulkan, display_handle, window_handle, state).unwrap() };
 
     let thread = thread::spawn(move || {
         loop {
             let mut messages = vec![];
 
-            // Pump all of the messages received while rendering
+            // Pump all the messages received while rendering
             while let Ok(message) = receiver.try_recv() {
                 if !messages.contains(&message) {
                     messages.push(message);

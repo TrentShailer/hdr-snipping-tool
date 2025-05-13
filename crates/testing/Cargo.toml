@@ -1,10 +1,12 @@
 [package]
 name = "testing"
-version = "0.2.0"
+version = "0.3.0"
+
 publish = false
+
+authors.workspace = true
 edition.workspace = true
 license.workspace = true
-authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
@@ -17,18 +19,17 @@ tracing = { workspace = true }
 tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-
 # Vulkan
 ash = { workspace = true, features = ["linked"] }
 ash-helper = { workspace = true }
 parking_lot = { workspace = true }
 
 # Windowing
-winit = { workspace = true }
 raw-window-handle = { workspace = true }
+winit = { workspace = true }
 
 # Image
-image = { workspace = true, features = ["rayon", "png"] }
+image = { workspace = true, features = ["png", "rayon"] }
 
 # Allocator
 mimalloc = { workspace = true, features = ["debug"] }

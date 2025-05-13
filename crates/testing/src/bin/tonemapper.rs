@@ -22,7 +22,7 @@ fn main() {
         )
         .unwrap(),
     );
-    let tonemapper = HdrToSdrTonemapper::new(vulkan.clone()).unwrap();
+    let tonemapper = HdrToSdrTonemapper::new(&vulkan).unwrap();
 
     let (hdr_image, whitepoint) = {
         let direct_x = DirectX::new().unwrap();
@@ -41,7 +41,7 @@ fn main() {
                 .unwrap()
         };
 
-        let mut hdr_scanner = HdrScanner::new(Arc::clone(&vulkan)).unwrap();
+        let mut hdr_scanner = HdrScanner::new(&vulkan).unwrap();
 
         let maximum = unsafe {
             let _span = info_span!("HDR Scanner").entered();
