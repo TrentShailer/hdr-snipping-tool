@@ -1,18 +1,18 @@
 [workspace]
-resolver = "2"
 members = ["crates/*"]
+resolver = "2"
 
 [workspace.package]
+authors = ["Trent Shailer"]
 edition = "2024"
 license = "MIT OR Apache-2.0"
-authors = ["Trent Shailer"]
 rust-version = "1.85"
 
 [workspace.dependencies]
 # Logging
 tracing = "0.1"
-tracing-subscriber = "0.3"
 tracing-appender = "0.2"
+tracing-subscriber = "0.3"
 
 # Error Handling
 thiserror = "2"
@@ -27,18 +27,15 @@ windows = { version = "0.61" }
 windows-core = { version = "0.61" }
 
 # Windowing
-winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
 raw-window-handle = "0.6"
+winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
 
 # Vulkan
-ash-helper = { git = "https://github.com/trentshailer/ash-helper", rev = "25b7003" }
-vulkan = { path = "crates/vulkan" }
-ash = { version = "0.38", default-features = false, features = [
-	"std",
-	"debug",
-] }
+ash = { version = "0.38", default-features = false, features = ["debug", "std"] }
+ash-helper = { git = "https://github.com/trentshailer/ash-helper", rev = "5854be5" }
 ash-window = { version = "0.13" }
 parking_lot = "0.12"
+vulkan = { path = "crates/vulkan" }
 
 # Config
 serde = { version = "1.0", features = ["derive"] }
@@ -60,23 +57,23 @@ rand = "0.9"
 mimalloc = { version = "0.1" }
 
 [workspace.lints.rust]
-"missing_docs" = "warn"
-"unused_qualifications" = "warn"
-"rust_2018_idioms" = "warn"
 "deprecated_in_future" = "warn"
+"missing_docs" = "warn"
+"rust_2018_idioms" = "warn"
+"unused_qualifications" = "warn"
 
 [workspace.lints.clippy]
 "alloc_instead_of_core" = "warn"
 "std_instead_of_alloc" = "warn"
 "std_instead_of_core" = "warn"
 
-"use_self" = "warn"
 "cast_lossless" = "warn"
-"unnecessary_self_imports" = "warn"
 "inconsistent_struct_constructor" = "warn"
+"unnecessary_self_imports" = "warn"
+"use_self" = "warn"
 
-"default_trait_access" = "warn"
 "clone_on_ref_ptr" = "warn"
+"default_trait_access" = "warn"
 "todo" = "warn"
 
 "missing_safety_doc" = "allow"

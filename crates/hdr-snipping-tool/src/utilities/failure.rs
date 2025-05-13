@@ -1,4 +1,4 @@
-use tracing::error;
+use tracing::{debug, error};
 use windows::Win32::UI::WindowsAndMessaging::{
     MB_ICONERROR, MB_ICONWARNING, MB_OK, MB_SETFOREGROUND,
 };
@@ -35,6 +35,10 @@ pub trait Failure<T> {
     fn log_and_panic(self, message: &str) -> T;
 }
 
+pub trait Ignore {
+    fn ignore(self);
+}
+
 impl<T, E: core::fmt::Display> Failure<T> for Result<T, E> {
     fn report_and_panic(self, message: &str) -> T {
         match self {
@@ -61,6 +65,15 @@ impl<T, E: core::fmt::Display> Failure<T> for Result<T, E> {
     }
 }
 
+impl<T, E> Ignore for Result<T, E> {
+    #[track_caller]
+    fn ignore(self) {
+        if self.is_err() {
+            debug!("Ignoring error ({})", core::panic::Location::caller());
+        }
+    }
+}
+
 impl<T> Failure<T> for Option<T> {
     fn report_and_panic(self, message: &str) -> T {
         match self {
@@ -83,6 +96,15 @@ impl<T> Failure<T> for Option<T> {
         match self {
             Some(value) => value,
             None => log_and_panic("Was None", message),
+        }
+    }
+}
+
+impl<T> Ignore for Option<T> {
+    #[track_caller]
+    fn ignore(self) {
+        if self.is_none() {
+            debug!("Ignoring None ({})", core::panic::Location::caller());
         }
     }
 }

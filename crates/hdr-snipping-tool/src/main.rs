@@ -6,6 +6,8 @@
 // hide console window on Windows in release
 #![cfg_attr(feature = "hide-console", windows_subsystem = "windows")]
 
+use application::ApplicationEvent;
+use application_event_loop::{ApplicationEventLoop, Event, TrayIcon};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
@@ -13,14 +15,13 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 pub use utilities::directories::{config_dir, screenshot_dir};
 
-use application::{WindowMessage, WinitApp};
 use config::Config;
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState, hotkey::HotKey};
 use logger::setup_logger;
 use tracing::{info, info_span, warn};
 use utilities::{
     directories::create_dirs,
-    failure::{Failure, report_and_panic},
+    failure::{Failure, Ignore, report_and_panic},
     windows_helpers::{display_message, is_first_instance},
 };
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -29,8 +30,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use winit::event_loop::EventLoop;
 
 mod application;
+mod application_event_loop;
+mod capture_saver;
+mod capture_taker;
 mod config;
 mod logger;
+mod renderer_thread;
 mod selection;
 mod utilities;
 
@@ -111,10 +116,22 @@ fn main() {
     };
 
     // Create event loop
-    let event_loop: EventLoop<WindowMessage> = EventLoop::with_user_event()
+    let event_loop: EventLoop<Event> = EventLoop::with_user_event()
         .build()
         .report_and_panic("Could not create the application window");
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Wait);
+
+    // Register tray icon event handler
+    let _tray_icon = {
+        let tray_icon = TrayIcon::new();
+
+        let proxy = event_loop.create_proxy();
+        tray_icon::menu::MenuEvent::set_event_handler(Some(move |event| {
+            proxy.send_event(Event::TrayEvent(event)).ignore();
+        }));
+
+        tray_icon
+    };
 
     // Register screenshot hotkey
     let _hotkey_manager = {
@@ -136,14 +153,16 @@ fn main() {
         GlobalHotKeyEvent::set_event_handler(Some(move |event: GlobalHotKeyEvent| {
             if event.state == HotKeyState::Pressed {
                 info!("Hotkey pressed");
-                let _ = proxy.send_event(WindowMessage::TakeCapture);
+                proxy
+                    .send_event(ApplicationEvent::ScreenshotKeyPressed.into())
+                    .ignore();
             }
         }));
     }
 
     // Create the app
-    let mut app = WinitApp::new(config, event_loop.create_proxy());
+    let mut app = ApplicationEventLoop::new(event_loop.create_proxy());
 
     // Run the app
-    let _ = event_loop.run_app(&mut app);
+    event_loop.run_app(&mut app).ignore();
 }

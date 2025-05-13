@@ -15,7 +15,10 @@ use winit::{
     window::Window,
 };
 
-use crate::{selection::Selection, utilities::failure::Failure};
+use crate::{
+    selection::Selection,
+    utilities::failure::{Failure, Ignore},
+};
 
 #[derive(PartialEq, Eq)]
 enum Message {
@@ -24,27 +27,28 @@ enum Message {
     Shutdown,
 }
 
-pub struct Renderer {
+pub struct RendererThread {
     // Option allows for joining the thread which requires ownership.
     thread: Option<JoinHandle<()>>,
     sender: Sender<Message>,
     state: Arc<Mutex<RendererState>>,
 }
 
-impl Renderer {
+impl RendererThread {
     pub fn new(vulkan: Arc<Vulkan>, window: &Window) -> Self {
         let (sender, receiver) = channel();
+
+        let state = Arc::new(Mutex::new(RendererState::default()));
 
         let mut renderer = unsafe {
             vulkan::Renderer::new(
                 vulkan,
                 window.display_handle().unwrap().as_raw(),
                 window.window_handle().unwrap().as_raw(),
+                Arc::clone(&state),
             )
             .report_and_panic("Could not create the renderer")
         };
-
-        let state = Arc::clone(&renderer.state);
 
         // Start the thread to handle taking the capture
         let thread = thread::Builder::new()
@@ -90,22 +94,16 @@ impl Renderer {
         }
     }
 
-    pub fn resize(&self) -> Result<(), ()> {
-        if let Err(e) = self.sender.send(Message::Resize) {
-            error!("Failed to send message to renderer: {e}");
-            return Err(());
-        }
-
-        Ok(())
+    pub fn resize(&self) {
+        self.sender
+            .send(Message::Resize)
+            .report_and_panic("Could not send message to renderer");
     }
 
-    pub fn render(&self) -> Result<(), ()> {
-        if let Err(e) = self.sender.send(Message::Render) {
-            error!("Failed to send message to renderer: {e}");
-            return Err(());
-        }
-
-        Ok(())
+    pub fn render(&self) {
+        self.sender
+            .send(Message::Render)
+            .report_and_panic("Could not send message to renderer");
     }
 
     pub fn set_mouse_position(&mut self, position: PhysicalPosition<f32>) {
@@ -134,9 +132,9 @@ impl Renderer {
     }
 }
 
-impl Drop for Renderer {
+impl Drop for RendererThread {
     fn drop(&mut self) {
-        let _ = self.sender.send(Message::Shutdown);
+        self.sender.send(Message::Shutdown).ignore();
         if let Some(thread) = self.thread.take() {
             if thread.join().is_err() {
                 error!("Joining Render thread returned an error.");

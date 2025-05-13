@@ -1,167 +1,59 @@
-use core::{
-    fmt::{Debug, Display},
-    time::Duration,
-};
-use std::{
-    sync::{
-        Arc,
-        mpsc::{Sender, channel},
-    },
-    thread::{self, JoinHandle},
-};
-
-use tracing::{debug, error, info, info_span};
+use tracing::{debug, error, info};
 use utilities::DebugTime;
 use vulkan::{HdrImage, HdrScanner, Vulkan};
 use windows::Win32::Foundation::CloseHandle;
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCapture};
 use winit::event_loop::EventLoopProxy;
 
-use crate::utilities::failure::{Failure, report, report_and_panic};
+use crate::{
+    application::LoadingEvent,
+    application_event_loop::Event,
+    utilities::failure::{Failure, Ignore, report, report_and_panic},
+};
 
-use super::WindowMessage;
+pub use capture_taker_thread::CaptureTakerThread;
 
+mod capture_taker_thread;
+
+#[derive(Clone, Copy)]
 pub enum Whitepoint {
     Sdr(f32),
     Hdr(f32),
 }
 
-pub enum CaptureProgress {
-    FoundMonitor(Monitor),
-    CaptureTaken(WindowsCapture),
-    Imported(HdrImage),
-    FoundWhitepoint(Whitepoint),
-    Failed,
-}
-impl Debug for CaptureProgress {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Whitepoint {
+    pub fn value(self) -> f32 {
         match self {
-            Self::FoundMonitor(_) => write!(f, "FoundMonitor"),
-            Self::CaptureTaken(_) => write!(f, "CaptureTaken"),
-            Self::Imported(_) => write!(f, "Imported"),
-            Self::FoundWhitepoint(_) => write!(f, "FoundWhitepoint"),
-            Self::Failed => write!(f, "Failed"),
-        }
-    }
-}
-impl Display for CaptureProgress {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        Debug::fmt(&self, f)
-    }
-}
-
-enum Message {
-    TakeCapture(EventLoopProxy<WindowMessage>),
-    CloseHandle(WindowsCapture),
-    RefreshCache,
-    Shutdown,
-}
-
-pub struct CaptureTaker {
-    // Option allows for joining the thread which requires ownership.
-    thread: Option<JoinHandle<()>>,
-    sender: Sender<Message>,
-}
-
-impl CaptureTaker {
-    pub fn new(vulkan: Arc<Vulkan>) -> Self {
-        let (sender, receiver) = channel();
-
-        // Start the thread to handle taking the capture
-        let thread = thread::Builder::new()
-            .name("Capture Taker".into())
-            .spawn(move || {
-                let _span = info_span!("[Capture Taker]").entered();
-                let mut inner = InnerCaptureTaker::new(vulkan);
-
-                loop {
-                    // unwrap should never happen, CaptureTaker owns the sender and calls shutdown on drop.
-                    let message = receiver.recv().unwrap();
-
-                    match message {
-                        Message::Shutdown => break,
-                        Message::RefreshCache => inner.refresh_cache(),
-                        Message::TakeCapture(proxy) => inner.take_capture(proxy),
-                        Message::CloseHandle(capture) => inner.close_handle(capture),
-                    }
-                }
-
-                inner.shutdown();
-                drop(inner);
-            })
-            .report_and_panic("Could not start the capture taker thread");
-
-        // Start the thread to request cache refresh
-        {
-            let sender = sender.clone();
-            thread::Builder::new()
-                .name("Refresh Cache".into())
-                .spawn(move || {
-                    let _span = info_span!("[Refresh Cache]").entered();
-
-                    loop {
-                        if sender.send(Message::RefreshCache).is_err() {
-                            break;
-                        }
-
-                        thread::sleep(Duration::from_secs(60 * 10));
-                    }
-                })
-                .report_and_panic("Could not start the cache thread");
-        };
-
-        Self {
-            thread: Some(thread),
-            sender,
-        }
-    }
-
-    pub fn take_capture(&self, proxy: EventLoopProxy<WindowMessage>) -> Result<(), ()> {
-        if let Err(e) = self.sender.send(Message::TakeCapture(proxy)) {
-            error!("Failed to send message to capture taker: {e}");
-            return Err(());
-        }
-
-        Ok(())
-    }
-
-    pub fn close_handle(&self, capture: WindowsCapture) -> Result<(), ()> {
-        if let Err(e) = self.sender.send(Message::CloseHandle(capture)) {
-            error!("Failed to send message to capture taker: {e}");
-            return Err(());
-        }
-
-        Ok(())
-    }
-}
-
-impl Drop for CaptureTaker {
-    fn drop(&mut self) {
-        let _ = self.sender.send(Message::Shutdown);
-        if let Some(thread) = self.thread.take() {
-            if thread.join().is_err() {
-                error!("Joining Capture Taker thread returned an error.");
-            };
+            Self::Sdr(value) => value,
+            Self::Hdr(value) => value,
         }
     }
 }
 
-struct InnerCaptureTaker {
+pub trait CaptureTaker {
+    fn refresh_cache(&mut self);
+
+    fn take_capture(&mut self, proxy: EventLoopProxy<Event>);
+
+    fn cleanup_windows_capture(&self, capture: WindowsCapture);
+}
+
+pub struct BlockingCaptureTaker<'vulkan> {
     direct_x: DirectX,
     cache: CaptureItemCache,
 
-    vulkan: Arc<Vulkan>,
+    vulkan: &'vulkan Vulkan,
 
-    hdr_scanner: HdrScanner,
+    hdr_scanner: HdrScanner<'vulkan>,
 }
 
-impl InnerCaptureTaker {
-    pub fn new(vulkan: Arc<Vulkan>) -> Self {
+impl<'vulkan> BlockingCaptureTaker<'vulkan> {
+    pub fn new(vulkan: &'vulkan Vulkan) -> Self {
         let direct_x = DirectX::new().report_and_panic("Could not create DirectX devices");
         let cache = CaptureItemCache::new();
 
-        let hdr_scanner = HdrScanner::new(Arc::clone(&vulkan))
-            .report_and_panic("Could not create the HDR Scanner");
+        let hdr_scanner =
+            HdrScanner::new(vulkan).report_and_panic("Could not create the HDR Scanner");
 
         Self {
             direct_x,
@@ -170,10 +62,10 @@ impl InnerCaptureTaker {
             hdr_scanner,
         }
     }
+}
 
-    pub fn shutdown(&mut self) {}
-
-    pub fn refresh_cache(&mut self) {
+impl CaptureTaker for BlockingCaptureTaker<'_> {
+    fn refresh_cache(&mut self) {
         if !self.direct_x.devices_valid() {
             report_and_panic(
                 "DirectX device lost",
@@ -184,7 +76,7 @@ impl InnerCaptureTaker {
         if self
             .direct_x
             .dxgi_adapter_outdated()
-            .report("Could not check if the DirectX devices were outdated.")
+            .inspect_err(|e| error!("Could not check if the DirectX devices were outdated: {e}"))
             .unwrap_or(true)
         {
             self.direct_x.recreate_dxgi_adapter().report_and_panic(
@@ -203,8 +95,7 @@ impl InnerCaptureTaker {
         };
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn take_capture(&mut self, proxy: EventLoopProxy<WindowMessage>) {
+    fn take_capture(&mut self, proxy: EventLoopProxy<Event>) {
         if !self.direct_x.devices_valid() {
             report_and_panic(
                 "DirectX device lost",
@@ -234,8 +125,7 @@ impl InnerCaptureTaker {
                         e,
                         "Could not take the screenshot.\nAn error was encountered while finding the hovered monitor",
                     );
-                    let _ =
-                        proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
+                    proxy.send_event(LoadingEvent::Error.into()).ignore();
                     return;
                 }
             };
@@ -247,8 +137,7 @@ impl InnerCaptureTaker {
                         "Monitor::get_hovered_monitor was None",
                         "Could not take the screenshot.\nCould not find the monitor that the cursor is on",
                     );
-                    let _ =
-                        proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
+                    proxy.send_event(LoadingEvent::Error.into()).ignore();
                     return;
                 }
             };
@@ -256,9 +145,7 @@ impl InnerCaptureTaker {
             debug!("Hovered {monitor:?}");
 
             proxy
-                .send_event(WindowMessage::CaptureProgress(
-                    CaptureProgress::FoundMonitor(monitor),
-                ))
+                .send_event(LoadingEvent::FoundMonitor(monitor).into())
                 .report_and_panic("Eventloop exited");
 
             monitor
@@ -276,8 +163,7 @@ impl InnerCaptureTaker {
                             e,
                             "Could not take the screenshot.\nEncountered an error while creating the required resources",
                         );
-                        let _ = proxy
-                            .send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
+                        proxy.send_event(LoadingEvent::Error.into()).ignore();
                         return;
                     }
                 }
@@ -293,17 +179,14 @@ impl InnerCaptureTaker {
                             e,
                             "Could not take the screenshot.\nEncountered an error while taking the screenshot",
                         );
-                        let _ = proxy
-                            .send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
+                        proxy.send_event(LoadingEvent::Error.into()).ignore();
                         return;
                     }
                 }
             };
 
             proxy
-                .send_event(WindowMessage::CaptureProgress(
-                    CaptureProgress::CaptureTaken(capture),
-                ))
+                .send_event(LoadingEvent::GotCapture(capture).into())
                 .report_and_panic("Eventloop exited");
 
             (capture, resources)
@@ -312,28 +195,24 @@ impl InnerCaptureTaker {
         // Import the capture
         let hdr_capture = unsafe {
             let capture = match HdrImage::import_windows_capture(
-                &self.vulkan,
+                self.vulkan,
                 windows_capture.size,
                 windows_capture.handle.0.0 as isize,
             ) {
                 Ok(capture) => capture,
                 Err(e) => {
-                    let _ = windows_capture_resources.destroy(&self.direct_x);
-
+                    windows_capture_resources.destroy(&self.direct_x).ignore();
                     report(
                         e,
                         "Could not take the screenshot.\nEncountered an error while importing the screenshot from DirectX to the application",
                     );
-                    let _ =
-                        proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
+                    proxy.send_event(LoadingEvent::Error.into()).ignore();
                     return;
                 }
             };
 
             proxy
-                .send_event(WindowMessage::CaptureProgress(CaptureProgress::Imported(
-                    capture,
-                )))
+                .send_event(LoadingEvent::ImportedCapture(capture).into())
                 .report_and_panic("Eventloop exited");
 
             capture
@@ -345,8 +224,7 @@ impl InnerCaptureTaker {
                 Ok(maximum) => maximum,
                 Err(e) => {
                     report(e, "Encountered an error while analysing the screenshot");
-                    let _ =
-                        proxy.send_event(WindowMessage::CaptureProgress(CaptureProgress::Failed));
+                    proxy.send_event(LoadingEvent::Error.into()).ignore();
                     return;
                 }
             };
@@ -359,17 +237,18 @@ impl InnerCaptureTaker {
                 debug!("Selected SDR whitepoint: {}", monitor.sdr_white);
 
                 proxy
-                    .send_event(WindowMessage::CaptureProgress(
-                        CaptureProgress::FoundWhitepoint(Whitepoint::Sdr(monitor.sdr_white)),
-                    ))
+                    .send_event(
+                        LoadingEvent::SelectedWhitepoint(Whitepoint::Sdr(monitor.sdr_white)).into(),
+                    )
                     .report_and_panic("Eventloop exited");
             } else {
                 debug!("Selected HDR whitepoint: {}", monitor.max_brightness);
 
                 proxy
-                    .send_event(WindowMessage::CaptureProgress(
-                        CaptureProgress::FoundWhitepoint(Whitepoint::Hdr(monitor.max_brightness)),
-                    ))
+                    .send_event(
+                        LoadingEvent::SelectedWhitepoint(Whitepoint::Hdr(monitor.max_brightness))
+                            .into(),
+                    )
                     .report_and_panic("Eventloop exited");
             }
         }
@@ -384,7 +263,7 @@ impl InnerCaptureTaker {
         }
     }
 
-    pub fn close_handle(&self, capture: WindowsCapture) {
+    fn cleanup_windows_capture(&self, capture: WindowsCapture) {
         if capture.handle.0.is_invalid() {
             return;
         }

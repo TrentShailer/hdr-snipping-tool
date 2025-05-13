@@ -1,9 +1,10 @@
 [package]
 name = "hdr-snipping-tool"
-version = "4.1.8"
+version = "4.1.9"
+
+authors.workspace = true
 edition.workspace = true
 license.workspace = true
-authors.workspace = true
 rust-version.workspace = true
 
 build = "build.rs"
@@ -11,11 +12,11 @@ build = "build.rs"
 [dependencies]
 # Taking Screenshot
 ash = { workspace = true }
-vulkan = { workspace = true }
 ash-helper = { workspace = true }
+global-hotkey = "0.7"
 parking_lot = { workspace = true }
+vulkan = { workspace = true }
 windows-capture-provider = { workspace = true }
-global-hotkey = "0.6"
 
 # User config
 serde = { workspace = true }
@@ -24,24 +25,21 @@ toml = { workspace = true }
 
 # Logging
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 # Error Handling
 thiserror = { workspace = true }
 
 # Saving Screenshot
-image = { workspace = true }
 arboard = "3.4"
-chrono = { version = "0.4", features = [
-	"clock",
-	"alloc",
-], default-features = false }
+chrono = { version = "0.4", features = ["alloc", "clock"], default-features = false }
 dirs = "6.0"
+image = { workspace = true }
 
 # Windowing
-winit = { workspace = true }
 tray-icon = { version = "0.20", default-features = false }
+winit = { workspace = true }
 
 # Windows API
 windows = { workspace = true, features = ["Win32_System_Threading"] }
@@ -55,7 +53,7 @@ utilities = { workspace = true }
 [features]
 mimalloc_debug = ["mimalloc/debug"]
 
-# Hides the console when starting the app, detatches stdout.
+# Hides the console when starting the app, detaches stdout.
 hide-console = []
 
 [build-dependencies]

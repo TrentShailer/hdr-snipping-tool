@@ -5,7 +5,7 @@ A Windows Snipping Tool alternative that doesn't overexpose HDR content.
 > [!CAUTION] 
 > ### This is a personal project
 >
-> Maintanance, bug fixes, new features, and support will only be provided when/if I feel like it.
+> Maintenance, bug fixes, new features, and support will only be provided when/if I feel like it.
 >
 
 ## Installation
