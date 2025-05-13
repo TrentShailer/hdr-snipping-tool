@@ -37,7 +37,7 @@ fn hdr_scanner_random_data() {
         )
         .unwrap(),
     );
-    let mut hdr_scanner = HdrScanner::new(Arc::clone(&vulkan)).unwrap();
+    let mut hdr_scanner = HdrScanner::new(&vulkan).unwrap();
 
     let (staging_buffer, staging_memory, _) = {
         let create_info = vk::BufferCreateInfo::default()

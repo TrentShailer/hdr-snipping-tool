@@ -1,5 +1,3 @@
-use alloc::sync::Arc;
-
 use ash::{ext, vk};
 use ash_helper::{AllocationError, Context, VkError, VulkanContext};
 use thiserror::Error;
@@ -10,8 +8,8 @@ mod new;
 mod run;
 
 /// Scans an `HdrImage` to find the value of the brightest colour component.
-pub struct HdrScanner {
-    vulkan: Arc<Vulkan>,
+pub struct HdrScanner<'vulkan> {
+    vulkan: &'vulkan Vulkan,
 
     descriptor_layouts: Vec<vk::DescriptorSetLayout>,
     pipeline_layout: vk::PipelineLayout,
@@ -33,7 +31,7 @@ pub struct HdrScanner {
     staging_memory: vk::DeviceMemory,
 }
 
-impl Drop for HdrScanner {
+impl Drop for HdrScanner<'_> {
     fn drop(&mut self) {
         unsafe {
             let shader_device: &ext::shader_object::Device = self.vulkan.context();

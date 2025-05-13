@@ -18,7 +18,7 @@ use crate::{
 
 use super::{HdrToSdrTonemapper, TonemapperError};
 
-impl HdrToSdrTonemapper {
+impl HdrToSdrTonemapper<'_> {
     /// Runs the HDR to SDR tonemapper over an input image.
     ///
     /// ## Whitepoint
@@ -58,7 +58,7 @@ impl HdrToSdrTonemapper {
 
             let (image, memory, _) = unsafe {
                 allocate_image(
-                    self.vulkan.as_ref(),
+                    self.vulkan,
                     &create_info,
                     vk::MemoryPropertyFlags::DEVICE_LOCAL,
                     "HDR to SDR Tonemapper Output",
@@ -103,15 +103,15 @@ impl HdrToSdrTonemapper {
         // Run the shader
         unsafe {
             onetime_command(
-                self.vulkan.as_ref(),
+                self.vulkan,
                 self.vulkan.transient_pool(),
                 self.vulkan.queue(QueuePurpose::Compute),
-                |vk, command_buffer| {
-                    cmd_try_begin_label(vk, command_buffer, "HDR to SDR Tonemap");
+                |vulkan, command_buffer| {
+                    cmd_try_begin_label(vulkan, command_buffer, "HDR to SDR Tonemap");
 
                     // Transition output to general
                     cmd_transition_image(
-                        vk,
+                        vulkan,
                         command_buffer,
                         sdr_image,
                         vk::ImageLayout::UNDEFINED,
@@ -151,7 +151,7 @@ impl HdrToSdrTonemapper {
                     // Push whitepoint
                     {
                         let push_constants = PushConstants { whitepoint };
-                        vk.device().cmd_push_constants(
+                        vulkan.device().cmd_push_constants(
                             command_buffer,
                             self.pipeline_layout,
                             PushConstants::STAGES,
@@ -162,7 +162,7 @@ impl HdrToSdrTonemapper {
 
                     // Bind the shader
                     {
-                        let device: &ext::shader_object::Device = vk.context();
+                        let device: &ext::shader_object::Device = vulkan.context();
                         device.cmd_bind_shaders(
                             command_buffer,
                             slice::from_ref(&tonemap_hdr_to_sdr::compute_main::STAGE),
@@ -183,10 +183,11 @@ impl HdrToSdrTonemapper {
                     ];
 
                     // Dispatch
-                    vk.device()
+                    vulkan
+                        .device()
                         .cmd_dispatch(command_buffer, dispatches[0], dispatches[1], 1);
 
-                    cmd_try_end_label(vk, command_buffer);
+                    cmd_try_end_label(vulkan, command_buffer);
                 },
                 "HDR to SDR Tonemap",
             )?;

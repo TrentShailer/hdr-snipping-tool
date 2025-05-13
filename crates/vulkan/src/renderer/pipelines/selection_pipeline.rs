@@ -1,6 +1,5 @@
-use core::slice;
-
 use alloc::sync::Arc;
+use core::slice;
 
 use ash::{ext, vk};
 use ash_helper::{
@@ -34,7 +33,7 @@ pub struct SelectionPipeline {
 impl SelectionPipeline {
     /// The colour of the selection shading.
     const COLOUR: [f32; 4] = [0.0, 0.0, 0.0, 0.5];
-    /// The verticies to build the selection shading, counter-clockwise, triangle-strip.
+    /// The vertices to build the selection shading, counter-clockwise, triangle-strip.
     pub const VERTICIES: [Vertex; 10] = [
         Vertex {
             position: [-1.0, -1.0],
@@ -138,8 +137,8 @@ impl SelectionPipeline {
 
             let shaders = unsafe {
                 link_shader_objects(vulkan.as_ref(), &mut create_infos, "RENDER SELECTION")
-                    .map_err(|e| VkError::new(e, "vkCreateShadersEXT"))?
-            };
+            }
+            .map_err(|e| VkError::new(e, "vkCreateShadersEXT"))?;
 
             (shaders, stages)
         };

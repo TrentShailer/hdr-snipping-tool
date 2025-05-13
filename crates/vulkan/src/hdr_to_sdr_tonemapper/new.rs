@@ -1,4 +1,3 @@
-use alloc::sync::Arc;
 use core::slice;
 
 use ash::{ext, vk};
@@ -8,9 +7,9 @@ use crate::{Vulkan, shaders::tonemap_hdr_to_sdr};
 
 use super::{HdrToSdrTonemapper, TonemapperError};
 
-impl HdrToSdrTonemapper {
+impl<'vulkan> HdrToSdrTonemapper<'vulkan> {
     /// Creates a new instance of an HDR to SDR Tonemapper.
-    pub fn new(vulkan: Arc<Vulkan>) -> Result<Self, TonemapperError> {
+    pub fn new(vulkan: &'vulkan Vulkan) -> Result<Self, TonemapperError> {
         // Descriptor layouts
         let descriptor_layouts = {
             let layouts = unsafe {
@@ -21,13 +20,7 @@ impl HdrToSdrTonemapper {
                 .map_err(|e| VkError::new(e, "vkCreateDescriptorSetLayout"))?
             };
 
-            unsafe {
-                try_name_all(
-                    vulkan.as_ref(),
-                    &layouts,
-                    "HDR to SDR Tonemapper Descriptor Layout",
-                )
-            };
+            unsafe { try_name_all(vulkan, &layouts, "HDR to SDR Tonemapper Descriptor Layout") };
 
             layouts
         };
@@ -43,13 +36,7 @@ impl HdrToSdrTonemapper {
             let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
                 .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
 
-            unsafe {
-                try_name(
-                    vulkan.as_ref(),
-                    layout,
-                    "HDR to SDR Tonemapper Pipeline Layout",
-                )
-            };
+            unsafe { try_name(vulkan, layout, "HDR to SDR Tonemapper Pipeline Layout") };
 
             layout
         };
@@ -71,7 +58,7 @@ impl HdrToSdrTonemapper {
                 .map_err(|(_, e)| VkError::new(e, "vkCreateShadersEXT"))?;
 
             let shader = shaders[0];
-            unsafe { try_name(vulkan.as_ref(), shader, "TONEMAPPER COMPUTE SHADER") };
+            unsafe { try_name(vulkan, shader, "TONEMAPPER COMPUTE SHADER") };
 
             shader
         };

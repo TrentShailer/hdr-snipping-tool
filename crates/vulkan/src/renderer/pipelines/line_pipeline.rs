@@ -1,6 +1,6 @@
+use alloc::sync::Arc;
 use core::slice;
 
-use alloc::sync::Arc;
 use ash::{ext, vk};
 use ash_helper::{
     Context, LabelledVkResult, Swapchain, VkError, VulkanContext, link_shader_objects, try_name,
@@ -23,7 +23,7 @@ pub struct LinePipeline {
 }
 
 impl LinePipeline {
-    /// The verticies to build the selection shading, line list.
+    /// The vertices to build the selection shading, line list.
     pub const VERTICIES: [Vertex; 2] = [Vertex { index: 0 }, Vertex { index: 1 }];
 
     /// Create a new instance of the pipeline.

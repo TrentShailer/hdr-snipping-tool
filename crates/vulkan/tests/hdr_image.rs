@@ -34,7 +34,7 @@ fn import_hdr_image() {
             .unwrap()
     };
 
-    let mut hdr_scanner = HdrScanner::new(Arc::clone(&vulkan)).unwrap();
+    let mut hdr_scanner = HdrScanner::new(&vulkan).unwrap();
 
     let _maximum = unsafe { hdr_scanner.scan(hdr_image).unwrap() };
 

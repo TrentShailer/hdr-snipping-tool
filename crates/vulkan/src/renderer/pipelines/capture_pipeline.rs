@@ -26,7 +26,7 @@ pub struct CapturePipeline {
 }
 
 impl CapturePipeline {
-    /// The verticies to build the selection shading, counter clockwise, triangle strip.
+    /// The vertices to build the selection shading, counter clockwise, triangle strip.
     pub const VERTICIES: [Vertex; 4] = [
         Vertex {
             position: [1.0, -1.0],

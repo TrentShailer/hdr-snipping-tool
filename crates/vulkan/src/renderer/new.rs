@@ -20,9 +20,10 @@ impl Renderer {
         vulkan: Arc<Vulkan>,
         display_handle: RawDisplayHandle,
         window_handle: RawWindowHandle,
+        state: Arc<Mutex<State>>,
     ) -> Result<Self, CreationError> {
         // Create the surface context
-        let surface = unsafe { Surface::new(vulkan.as_ref(), display_handle, window_handle)? };
+        let surface = unsafe { Surface::new(&vulkan, display_handle, window_handle)? };
 
         // Create the swapchain
         let swapchain_preferences = SwapchainPreferences::default()
@@ -69,7 +70,7 @@ impl Renderer {
             swapchain_preferences,
             swapchain_retirement,
 
-            state: Arc::new(Mutex::new(State::default())),
+            state,
         })
     }
 }

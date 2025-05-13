@@ -1,6 +1,5 @@
 use core::slice;
 
-use alloc::sync::Arc;
 use ash::{ext, vk};
 use ash_helper::{Context, VkError, VulkanContext, allocate_buffer, try_name, try_name_all};
 
@@ -8,9 +7,9 @@ use crate::{Vulkan, shaders::maximum_reduction};
 
 use super::{HdrScanner, HdrScannerError};
 
-impl HdrScanner {
+impl<'vulkan> HdrScanner<'vulkan> {
     /// Creates a new HDR Scanner.
-    pub fn new(vulkan: Arc<Vulkan>) -> Result<Self, HdrScannerError> {
+    pub fn new(vulkan: &'vulkan Vulkan) -> Result<Self, HdrScannerError> {
         // Descriptor layouts
         let descriptor_layouts = {
             let layouts = unsafe {
@@ -21,7 +20,7 @@ impl HdrScanner {
                 .map_err(|e| VkError::new(e, "vkCreateDescriptorSetLayout"))?
             };
 
-            unsafe { try_name_all(vulkan.as_ref(), &layouts, "HDR Scanner Descriptor Layout") };
+            unsafe { try_name_all(vulkan, &layouts, "HDR Scanner Descriptor Layout") };
 
             layouts
         };
@@ -34,7 +33,7 @@ impl HdrScanner {
             let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
                 .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
 
-            unsafe { try_name(vulkan.as_ref(), layout, "HDR Scanner Pipeline Layout") };
+            unsafe { try_name(vulkan, layout, "HDR Scanner Pipeline Layout") };
 
             layout
         };
@@ -53,7 +52,7 @@ impl HdrScanner {
                 .map_err(|(_, e)| VkError::new(e, "vkCreateShadersEXT"))?;
 
             let shader = shaders[0];
-            unsafe { try_name(vulkan.as_ref(), shader, "HDR SCANNER COMPUTE SHADER") };
+            unsafe { try_name(vulkan, shader, "HDR SCANNER COMPUTE SHADER") };
 
             shader
         };
@@ -71,7 +70,7 @@ impl HdrScanner {
 
             unsafe {
                 allocate_buffer(
-                    vulkan.as_ref(),
+                    vulkan,
                     &create_info,
                     vk::MemoryPropertyFlags::DEVICE_LOCAL,
                     "HDR Scanner",
@@ -87,7 +86,7 @@ impl HdrScanner {
 
             unsafe {
                 allocate_buffer(
-                    vulkan.as_ref(),
+                    vulkan,
                     &create_info,
                     vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
                     "HDR Scanner Staging",
@@ -131,9 +130,9 @@ impl HdrScanner {
 
             // Debug: Name the objects.
             unsafe {
-                try_name(vulkan.as_ref(), pool, "HDR Scanner Pool");
-                try_name(vulkan.as_ref(), buffer, "HDR Scanner Command Buffer");
-                try_name(vulkan.as_ref(), semaphore, "HDR Scanner Semaphore");
+                try_name(vulkan, pool, "HDR Scanner Pool");
+                try_name(vulkan, buffer, "HDR Scanner Command Buffer");
+                try_name(vulkan, semaphore, "HDR Scanner Semaphore");
             }
 
             (pool, buffer, semaphore)

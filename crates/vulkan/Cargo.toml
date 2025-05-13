@@ -1,9 +1,10 @@
 [package]
 name = "vulkan"
-version = "0.5.0"
+version = "0.6.0"
+
+authors.workspace = true
 edition.workspace = true
 license.workspace = true
-authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
@@ -20,28 +21,28 @@ parking_lot = { workspace = true }
 ash = { workspace = true, features = ["linked"] }
 ash-helper = { workspace = true }
 vp-ash = { git = "https://github.com/trentshailer/vulkan-profiles-ash", branch = "vulkan-sdk-1.4.304", features = [
-    "debug",
-    "VK_USE_PLATFORM_WIN32_KHR",
     "VK_ENABLE_BETA_EXTENSIONS",
+    "VK_USE_PLATFORM_WIN32_KHR",
+    "debug",
 ] }
 
 # Windowing
-raw-window-handle = { workspace = true }
 ash-window = { workspace = true }
+raw-window-handle = { workspace = true }
 
 # Primitive Types
-half = { workspace = true }
 bytemuck = { workspace = true }
+half = { workspace = true }
 
 # Utilities
 utilities = { workspace = true }
 
 [dev-dependencies]
 # Generating Data
-rayon = "1.10"
-rand_distr = "0.5"
-rand = { workspace = true }
 half = { workspace = true }
+rand = { workspace = true }
+rand_distr = "0.5"
+rayon = "1.10"
 windows-capture-provider = { workspace = true }
 
 [lints]

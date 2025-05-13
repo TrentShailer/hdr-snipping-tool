@@ -84,6 +84,9 @@ impl Drop for Renderer {
                 error!("Failed to wait for device idle: {e}");
             }
 
+            self.swapchain_retirement
+                .destroy(self.vulkan.as_ref(), &self.surface);
+
             self.vulkan
                 .device()
                 .destroy_buffer(self.render_buffer.buffer, None);

@@ -1,19 +1,19 @@
-use core::fmt::Debug;
-
 use alloc::sync::Arc;
+use core::fmt::Debug;
 
 pub use new::VulkanCreationError;
 
 use ash::{ext, khr, vk};
 use ash_helper::{Context, DebugUtils, VulkanContext};
 use parking_lot::Mutex;
+use tracing::error;
 
 mod drop;
 mod new;
 
 /// The Vulkan Context, contains core devices for using Vulkan.
 ///
-/// Exension devices that are relevant across different components are also created here.
+/// Extension devices that are relevant across different components are also created here.
 /// Up to two queues are created, one for Graphics and one for Compute.
 pub struct Vulkan {
     entry: ash::Entry,
@@ -97,6 +97,13 @@ impl Vulkan {
         match purpose {
             QueuePurpose::Compute => self.queues.first().unwrap(),
             QueuePurpose::Graphics => self.queues.last().unwrap(),
+        }
+    }
+
+    /// Waits for the device to idle.
+    pub unsafe fn device_wait_idle(&self) {
+        if let Err(error) = unsafe { self.device.device_wait_idle() } {
+            error!("Failed to wait for device idle: {error}");
         }
     }
 }
