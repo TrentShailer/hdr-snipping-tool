@@ -100,6 +100,7 @@ impl ApplicationState for ActiveApplication {
                 }
                 WindowEvent::Resized => {
                     self.core.renderer.resize();
+                    self.core.window.request_redraw();
                     self
                 }
             },

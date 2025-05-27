@@ -29,6 +29,8 @@ pub struct LoadingApplication {
 
 impl LoadingApplication {
     fn update_window(&mut self) {
+        let mut should_redraw = false;
+
         if let Some(monitor) = self.monitor.as_ref() {
             let window_size = monitor.size();
             let window_size = PhysicalSize::new(window_size[0], window_size[1]);
@@ -44,18 +46,23 @@ impl LoadingApplication {
             if self.core.window.outer_position().unwrap() != window_position {
                 self.core.window.set_outer_position(window_position);
             }
-            self.core.window.request_redraw();
+            should_redraw = true;
         }
 
         if self.hdr_capture.is_some() && !self.is_visible {
             self.is_visible = true;
             self.core.window.set_visible(true);
             self.core.window.focus_window();
-            self.core.window.request_redraw();
+            should_redraw = true;
         }
 
         if self.is_visible {
+            should_redraw = true;
+        }
+
+        if should_redraw {
             self.core.window.request_redraw();
+            self.core.renderer.render();
         }
     }
 
