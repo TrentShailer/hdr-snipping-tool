@@ -48,7 +48,7 @@ impl From<LoadingApplication> for InactiveApplication {
             core.renderer.set_hdr_capture(None);
             core.renderer.render();
 
-            unsafe { core.vulkan.device_wait_idle() };
+            let _queue_guard = unsafe { core.vulkan.device_wait_idle() };
 
             if let Some(capture) = application.hdr_capture.take() {
                 unsafe { capture.destroy(&core.vulkan) };
@@ -74,7 +74,7 @@ impl From<ActiveApplication> for InactiveApplication {
             core.renderer.set_hdr_capture(None);
             core.renderer.render();
 
-            unsafe { core.vulkan.device_wait_idle() };
+            let _queue_guard = unsafe { core.vulkan.device_wait_idle() };
 
             unsafe { application.capture.hdr_capture.destroy(&core.vulkan) };
             core.capture_taker

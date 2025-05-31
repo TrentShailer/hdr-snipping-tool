@@ -19,7 +19,7 @@ impl From<InactiveApplication> for ExitedApplication {
     fn from(value: InactiveApplication) -> Self {
         debug!("[TRANSITION] Inactive -> Exited");
 
-        unsafe { value.core.vulkan.device_wait_idle() };
+        let _queue_guard = unsafe { value.core.vulkan.device_wait_idle() };
 
         Self {}
     }
@@ -29,7 +29,7 @@ impl From<LoadingApplication> for ExitedApplication {
     fn from(value: LoadingApplication) -> Self {
         debug!("[TRANSITION] Loading -> Exited");
 
-        unsafe { value.core.vulkan.device_wait_idle() };
+        let _queue_guard = unsafe { value.core.vulkan.device_wait_idle() };
 
         if let Some(capture) = value.capture {
             value.core.capture_taker.cleanup_windows_capture(capture);
@@ -47,7 +47,7 @@ impl From<ActiveApplication> for ExitedApplication {
     fn from(value: ActiveApplication) -> Self {
         debug!("[TRANSITION] Active -> Exited");
 
-        unsafe { value.core.vulkan.device_wait_idle() };
+        let _queue_guard = unsafe { value.core.vulkan.device_wait_idle() };
 
         value
             .core

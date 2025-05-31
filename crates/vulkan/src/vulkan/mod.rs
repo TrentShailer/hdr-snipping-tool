@@ -5,7 +5,7 @@ pub use new::VulkanCreationError;
 
 use ash::{ext, khr, vk};
 use ash_helper::{Context, DebugUtils, VulkanContext};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, MutexGuard};
 use tracing::error;
 
 mod drop;
@@ -101,10 +101,16 @@ impl Vulkan {
     }
 
     /// Waits for the device to idle.
-    pub unsafe fn device_wait_idle(&self) {
+    /// Takes and returns a lock on all queues.
+    #[must_use]
+    pub unsafe fn device_wait_idle(&self) -> Vec<MutexGuard<'_, vk::Queue>> {
+        let locks = self.queues.iter().map(|queue| queue.lock()).collect();
+
         if let Err(error) = unsafe { self.device.device_wait_idle() } {
             error!("Failed to wait for device idle: {error}");
         }
+
+        locks
     }
 }
 
