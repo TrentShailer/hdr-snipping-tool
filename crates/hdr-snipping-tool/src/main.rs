@@ -20,7 +20,6 @@ use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState, hotkey:
 use logger::setup_logger;
 use tracing::{info, info_span, warn};
 use utilities::{
-    directories::create_dirs,
     failure::{Failure, Ignore, report_and_panic},
     windows_helpers::{display_message, is_first_instance},
 };
@@ -53,8 +52,6 @@ pub fn should_debug() -> bool {
 }
 
 fn main() {
-    create_dirs().report_and_panic("The config and screenshots folders could not be created");
-
     // Set up logger
     let _logger_guards = setup_logger(should_debug());
 

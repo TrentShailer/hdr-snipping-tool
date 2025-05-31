@@ -21,6 +21,10 @@ pub fn report_and_panic<Err: core::fmt::Display>(error: Err, message: &str) -> !
     panic!("{message}: {error}");
 }
 
+/// Reports an error in the formats:
+///
+/// * Log: `"{message}: {error}"`
+/// * Dialogue: `"{message}.\nSee the logs for more details."`
 pub fn report<Err: core::fmt::Display>(error: Err, message: &str) {
     error!("{message}: {error}");
 

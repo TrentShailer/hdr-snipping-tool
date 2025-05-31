@@ -1,6 +1,6 @@
 [package]
 name = "hdr-snipping-tool"
-version = "4.1.10"
+version = "4.1.11"
 
 authors.workspace = true
 edition.workspace = true
@@ -42,7 +42,11 @@ tray-icon = { version = "0.20", default-features = false }
 winit = { workspace = true }
 
 # Windows API
-windows = { workspace = true, features = ["Win32_System_Threading"] }
+windows = { workspace = true, features = [
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 # Allocator
 mimalloc = { workspace = true }

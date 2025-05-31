@@ -23,7 +23,7 @@ Requires Rust v1.85 or later.
   * Valid keys are found in the [global-hotkey docs](https://docs.rs/global-hotkey/latest/global_hotkey/hotkey/enum.Code.html).
 * Use the `Enter` key to save the entire screenshot, or click and drag the mouse to save a portion of the screenshot.
 * Use the `Escape` key to cancel a screenshot.
-* After saving the file is saved to `Pictures\Screenshots` and copied to your clipboard.
+* After saving the file is saved to `%USERPROFILE%\Pictures\Screenshots` and copied to your clipboard.
 
 ## Goals
 

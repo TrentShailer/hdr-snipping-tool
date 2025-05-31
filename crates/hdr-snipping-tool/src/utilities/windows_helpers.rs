@@ -1,13 +1,18 @@
+use std::path::Path;
+
 use windows::{
-    core::{h, HRESULT, HSTRING},
     Win32::{
-        Foundation::HWND,
-        System::Threading::{CreateMutexW, OpenMutexW, MUTEX_ALL_ACCESS},
-        UI::WindowsAndMessaging::{
-            GetForegroundWindow, MessageBoxW, SetForegroundWindow, MESSAGEBOX_RESULT,
-            MESSAGEBOX_STYLE,
+        Foundation::{GetLastError, HWND, WIN32_ERROR},
+        System::Threading::{CreateMutexW, MUTEX_ALL_ACCESS, OpenMutexW},
+        UI::{
+            Shell::ShellExecuteW,
+            WindowsAndMessaging::{
+                GetForegroundWindow, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MessageBoxW,
+                SetForegroundWindow,
+            },
         },
     },
+    core::{HRESULT, HSTRING, h, w},
 };
 use windows_capture_provider::{LabelledWinResult, WinError};
 
@@ -64,4 +69,25 @@ pub fn set_foreground_window(handle: HWND) -> bool {
     }
 
     unsafe { SetForegroundWindow(handle).as_bool() }
+}
+
+/// Open a directory in the default file manager.
+pub unsafe fn explore_directory(directory: &Path) -> Result<(), WIN32_ERROR> {
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            w!("explore"),
+            &HSTRING::from(directory),
+            None,
+            None,
+            windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
+        )
+    };
+
+    // Success
+    if result.0 as i64 > 32 {
+        return Ok(());
+    }
+
+    Err(unsafe { GetLastError() })
 }
