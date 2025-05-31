@@ -1,6 +1,6 @@
 [package]
 name = "hdr-snipping-tool"
-version = "4.1.11"
+version = "4.1.12"
 
 authors.workspace = true
 edition.workspace = true
