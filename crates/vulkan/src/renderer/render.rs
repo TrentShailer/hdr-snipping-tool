@@ -6,6 +6,7 @@ use ash_helper::{
     cmd_transition_image, cmd_try_begin_label, cmd_try_end_label, onetime_command,
 };
 use tracing::debug;
+use utilities::DebugTime;
 
 use crate::QueuePurpose;
 
@@ -19,6 +20,8 @@ impl Renderer {
 
         // Recreate the swapchain if it needs recreating
         if self.swapchain.needs_to_rebuild {
+            let _timing = DebugTime::start("Recreate Swapchain");
+
             let new_swapchain = {
                 let create_info = self
                     .swapchain_preferences
@@ -34,7 +37,7 @@ impl Renderer {
                 }
             };
 
-            debug!("Created {:?}", new_swapchain);
+            debug!("Created {new_swapchain:?}");
 
             let old_swapchain = core::mem::replace(&mut self.swapchain, new_swapchain);
 
