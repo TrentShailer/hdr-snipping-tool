@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use arboard::{Clipboard, ImageData};
 use chrono::Local;
-use image::{GenericImageView, ImageBuffer, ImageFormat, Rgba};
+use image::{ImageBuffer, ImageFormat, Rgba};
 use tracing::{info, warn};
 use utilities::DebugTime;
 use vulkan::{HdrImage, HdrToSdrTonemapper, Vulkan};
@@ -49,8 +49,13 @@ impl CaptureSaver for BlockingCaptureSaver<'_> {
             }
         };
 
+        let selection_position = selection.position_as_usize();
+        let selection_size = selection.size_as_usize();
+
         // Copy the image to CPU Memory
-        let bytes = match unsafe { sdr_image.copy_to_cpu(self.vulkan) } {
+        let bytes = match unsafe {
+            sdr_image.copy_to_cpu(self.vulkan, selection_position, selection_size)
+        } {
             Ok(bytes) => bytes,
             Err(e) => {
                 report(
@@ -64,20 +69,10 @@ impl CaptureSaver for BlockingCaptureSaver<'_> {
         // Destroy SDR image
         unsafe { sdr_image.destroy(self.vulkan) };
 
-        let selection_position = selection.position();
-        let selection_size = selection.size();
-
-        // Create selection view
+        // Create Image Buffer
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-            ImageBuffer::from_raw(sdr_image.extent.width, sdr_image.extent.height, bytes)
-                .unwrap()
-                .view(
-                    selection_position.x as u32,
-                    selection_position.y as u32,
-                    selection_size.width as u32,
-                    selection_size.height as u32,
-                )
-                .to_image();
+            ImageBuffer::from_raw(selection_size[0] as u32, selection_size[1] as u32, bytes)
+                .unwrap();
 
         // Save to file
         {
@@ -104,9 +99,9 @@ impl CaptureSaver for BlockingCaptureSaver<'_> {
             };
 
             let save_result = clipboard.set_image(ImageData {
-                width: selection_size.width as usize,
-                height: selection_size.height as usize,
-                bytes: Cow::Borrowed(img.as_raw()),
+                width: selection_size[0],
+                height: selection_size[1],
+                bytes: Cow::Owned(img.into_vec()),
             });
 
             match save_result {

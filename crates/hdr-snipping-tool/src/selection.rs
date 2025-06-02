@@ -39,6 +39,16 @@ impl Selection {
 
         PhysicalSize::new(right - left, bottom - top)
     }
+
+    pub fn position_as_usize(&self) -> [usize; 2] {
+        let position = self.position();
+        [position.x as usize, position.y as usize]
+    }
+
+    pub fn size_as_usize(&self) -> [usize; 2] {
+        let size = self.size();
+        [size.width as usize, size.height as usize]
+    }
 }
 
 struct Selected(Selection);

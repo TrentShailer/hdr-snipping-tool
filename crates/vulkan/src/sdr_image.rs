@@ -23,7 +23,17 @@ pub struct SdrImage {
 
 impl SdrImage {
     /// Copy the image to a slice in CPU memory.
-    pub unsafe fn copy_to_cpu(&self, vulkan: &Vulkan) -> Result<Vec<u8>, SdrImageError> {
+    pub unsafe fn copy_to_cpu(
+        &self,
+        vulkan: &Vulkan,
+        selection_position: [usize; 2],
+        selection_size: [usize; 2],
+    ) -> Result<Vec<u8>, SdrImageError> {
+        let selection_x = selection_position[0];
+        let selection_y = selection_position[1];
+        let selection_width = selection_size[0];
+        let selection_height = selection_size[1];
+
         // Create staging
         let (staging_buffer, staging_memory) = {
             let buffer_info = vk::BufferCreateInfo::default()
@@ -86,8 +96,10 @@ impl SdrImage {
             )?;
         }
 
-        // Copy tonemapped staging to cpu
-        let tonemapped_bytes = unsafe {
+        let mut bytes: Vec<u8> = vec![0; selection_size[0] * selection_size[1] * 4];
+
+        // Copy tone-mapped staging to CPU
+        unsafe {
             let pointer = vulkan
                 .device()
                 .map_memory(
@@ -98,15 +110,23 @@ impl SdrImage {
                 )
                 .map_err(|e| VkError::new(e, "vkMapMemory"))?;
 
-            let bytes: Vec<u8> = slice::from_raw_parts(
+            let raw = slice::from_raw_parts(
                 pointer as _,
                 self.extent.width as usize * self.extent.height as usize * 4,
-            )
-            .to_vec();
+            );
+            let raw_start = selection_y * self.extent.width as usize * 4 + selection_x * 4;
+
+            for row in 0..selection_height {
+                let output_start = row * selection_width * 4;
+                let output_end = output_start + selection_width * 4;
+
+                let input_start = raw_start + row * self.extent.width as usize * 4;
+                let input_end = input_start + selection_width * 4;
+
+                bytes[output_start..output_end].copy_from_slice(&raw[input_start..input_end]);
+            }
 
             vulkan.device().unmap_memory(staging_memory);
-
-            bytes
         };
 
         // Free resources
@@ -115,7 +135,7 @@ impl SdrImage {
             vulkan.device().free_memory(staging_memory, None);
         }
 
-        Ok(tonemapped_bytes)
+        Ok(bytes)
     }
 
     /// Destroy the image.
