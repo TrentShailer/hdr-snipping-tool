@@ -11,3 +11,6 @@ vulkan_profiles.hpp
 *.afdesign~lock~
 media/details.afdesign
 **/output/
+
+# Debug info
+dhat-heap.json

@@ -8,16 +8,18 @@
 
 use application::ApplicationEvent;
 use application_event_loop::{ApplicationEventLoop, Event, TrayIcon};
-use mimalloc::MiMalloc;
 
+#[cfg(not(feature = "debug-memory"))]
 #[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+#[cfg(feature = "debug-memory")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
 
 pub use utilities::directories::{config_dir, screenshot_dir};
 
 use config::Config;
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState, hotkey::HotKey};
-use logger::setup_logger;
 use tracing::{info, info_span, warn};
 use utilities::{
     failure::{Failure, Ignore, report_and_panic},
@@ -33,6 +35,7 @@ mod application_event_loop;
 mod capture_saver;
 mod capture_taker;
 mod config;
+#[cfg(feature = "log")]
 mod logger;
 mod renderer_thread;
 mod selection;
@@ -52,8 +55,13 @@ pub fn should_debug() -> bool {
 }
 
 fn main() {
+    #[cfg(feature = "debug-memory")]
+    let _profiler = dhat::Profiler::new_heap();
+    // TODO
+
     // Set up logger
-    let _logger_guards = setup_logger(should_debug());
+    #[cfg(feature = "log")]
+    let _logger_guards = logger::setup_logger(should_debug());
 
     // Log application start
     let _span = info_span!("[Main Thread]").entered();

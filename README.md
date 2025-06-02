@@ -13,7 +13,7 @@ A Windows Snipping Tool alternative that doesn't overexpose HDR content.
 Requires Rust v1.85 or later.
 
 1. `git clone https://github.com/TrentShailer/hdr-snipping-tool.git`
-2. `cargo install --path ./crates/hdr-snipping-tool --locked --features hide-console`
+2. `cargo install --path ./crates/hdr-snipping-tool --locked`
 
 ## Usage
 
