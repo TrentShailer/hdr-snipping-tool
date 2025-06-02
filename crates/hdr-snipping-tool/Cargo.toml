@@ -49,7 +49,6 @@ windows = { workspace = true, features = [
 ] }
 
 # Allocator
-dhat = { version = "0.3", optional = true }
 mimalloc = { workspace = true }
 
 # Utilities
@@ -57,9 +56,6 @@ utilities = { workspace = true }
 
 [features]
 default = ["hide-console", "log"]
-
-# Debug memory allocation
-debug-memory = ["dep:dhat"]
 
 # Hides the console when starting the app, detaches stdout.
 hide-console = []

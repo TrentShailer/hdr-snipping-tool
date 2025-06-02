@@ -4,6 +4,7 @@ use ash::vk;
 use ash_helper::{Swapchain, SwapchainPreferences, SwapchainRetirement};
 use parking_lot::Mutex;
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
+use tracing::debug;
 
 use crate::Vulkan;
 
@@ -25,7 +26,7 @@ impl Renderer {
         // Create the surface context
         let surface = unsafe { Surface::new(&vulkan, display_handle, window_handle)? };
 
-        // Create the swapchain
+        // Create the Swapchain
         let swapchain_preferences = SwapchainPreferences::default()
             .image_count(3)
             .format(vec![
@@ -45,6 +46,7 @@ impl Renderer {
 
             unsafe { Swapchain::new(vulkan.as_ref(), &surface, None, create_info)? }
         };
+        debug!("Created {swapchain:?}");
 
         let swapchain_retirement = SwapchainRetirement::new();
 

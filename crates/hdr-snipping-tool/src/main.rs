@@ -9,12 +9,8 @@
 use application::ApplicationEvent;
 use application_event_loop::{ApplicationEventLoop, Event, TrayIcon};
 
-#[cfg(not(feature = "debug-memory"))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-#[cfg(feature = "debug-memory")]
-#[global_allocator]
-static ALLOC: dhat::Alloc = dhat::Alloc;
 
 pub use utilities::directories::{config_dir, screenshot_dir};
 
@@ -45,7 +41,7 @@ mod utilities;
 #[cfg(not(debug_assertions))]
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The Cargo package version or '0.0.0' if a non-release build.
+/// The Cargo package version or `0.0.0` if a non-release build.
 #[cfg(debug_assertions)]
 pub const VERSION: &str = "0.0.0";
 
@@ -55,10 +51,6 @@ pub fn should_debug() -> bool {
 }
 
 fn main() {
-    #[cfg(feature = "debug-memory")]
-    let _profiler = dhat::Profiler::new_heap();
-    // TODO
-
     // Set up logger
     #[cfg(feature = "log")]
     let _logger_guards = logger::setup_logger(should_debug());
