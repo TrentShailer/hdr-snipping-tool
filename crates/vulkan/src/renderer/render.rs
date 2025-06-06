@@ -4,6 +4,7 @@ use ash::{ext, vk};
 use ash_helper::{
     Context, Frame, FrameResources, LabelledVkResult, Swapchain, VkError, VulkanContext,
     cmd_transition_image, cmd_try_begin_label, cmd_try_end_label, onetime_command,
+    queue_try_begin_label, queue_try_end_label,
 };
 use tracing::debug;
 use utilities::DebugTime;
@@ -125,7 +126,9 @@ impl Renderer {
                         .map_err(|e| VkError::new(e, "vkBeginCommandBuffer"))?;
                 }
 
-                unsafe { cmd_try_begin_label(self.vulkan.as_ref(), command_buffer, "Render") };
+                unsafe {
+                    cmd_try_begin_label(self.vulkan.as_ref(), command_buffer, "Renderer::render")
+                };
             }
 
             // Start rendering
@@ -296,12 +299,16 @@ impl Renderer {
                 .signal_semaphores(slice::from_ref(&render_semaphore));
 
             let queue = unsafe { self.vulkan.queue(QueuePurpose::Graphics).lock() };
+            unsafe { queue_try_begin_label(self.vulkan.as_ref(), *queue, "Renderer::render") };
+
             unsafe {
                 self.vulkan
                     .device()
                     .queue_submit(*queue, slice::from_ref(&submit), render_fence)
                     .map_err(|e| VkError::new(e, "vkQueueSubmit"))?;
             }
+
+            unsafe { queue_try_end_label(self.vulkan.as_ref(), *queue) };
             drop(queue);
         }
 

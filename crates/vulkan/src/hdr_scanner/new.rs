@@ -20,7 +20,7 @@ impl<'vulkan> HdrScanner<'vulkan> {
                 .map_err(|e| VkError::new(e, "vkCreateDescriptorSetLayout"))?
             };
 
-            unsafe { try_name_all(vulkan, &layouts, "HDR Scanner Descriptor Layout") };
+            unsafe { try_name_all(vulkan, &layouts, "HdrScanner Descriptor Layout") };
 
             layouts
         };
@@ -33,7 +33,7 @@ impl<'vulkan> HdrScanner<'vulkan> {
             let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
                 .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
 
-            unsafe { try_name(vulkan, layout, "HDR Scanner Pipeline Layout") };
+            unsafe { try_name(vulkan, layout, "HdrScanner Pipeline Layout") };
 
             layout
         };
@@ -52,7 +52,7 @@ impl<'vulkan> HdrScanner<'vulkan> {
                 .map_err(|(_, e)| VkError::new(e, "vkCreateShadersEXT"))?;
 
             let shader = shaders[0];
-            unsafe { try_name(vulkan, shader, "HDR SCANNER COMPUTE SHADER") };
+            unsafe { try_name(vulkan, shader, "HdrScanner Compute Shader") };
 
             shader
         };
@@ -130,9 +130,9 @@ impl<'vulkan> HdrScanner<'vulkan> {
 
             // Debug: Name the objects.
             unsafe {
-                try_name(vulkan, pool, "HDR Scanner Pool");
-                try_name(vulkan, buffer, "HDR Scanner Command Buffer");
-                try_name(vulkan, semaphore, "HDR Scanner Semaphore");
+                try_name(vulkan, pool, "HdrScanner Command Pool");
+                try_name(vulkan, buffer, "HdrScanner Command Buffer");
+                try_name(vulkan, semaphore, "HdrScanner Semaphore");
             }
 
             (pool, buffer, semaphore)

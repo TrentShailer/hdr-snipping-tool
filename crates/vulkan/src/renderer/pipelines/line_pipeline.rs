@@ -37,7 +37,7 @@ impl LinePipeline {
             let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
                 .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
 
-            unsafe { try_name(vulkan.as_ref(), layout, "Render Line Pipeline Layout") };
+            unsafe { try_name(vulkan.as_ref(), layout, "LinePipeline Pipeline Layout") };
 
             layout
         };
@@ -63,7 +63,7 @@ impl LinePipeline {
 
             let stages: Vec<_> = create_infos.iter().map(|info| info.stage).collect();
             let shaders = unsafe {
-                link_shader_objects(vulkan.as_ref(), &mut create_infos, "RENDER LINE")
+                link_shader_objects(vulkan.as_ref(), &mut create_infos, "Line Pipeline Shader")
                     .map_err(|e| VkError::new(e, "vkCreateShadersEXT"))?
             };
 

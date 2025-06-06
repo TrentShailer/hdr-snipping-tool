@@ -109,7 +109,7 @@ impl SelectionPipeline {
             let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
                 .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
 
-            unsafe { try_name(vulkan.as_ref(), layout, "Render Selection Pipeline Layout") };
+            unsafe { try_name(vulkan.as_ref(), layout, "SelectionPipeline Pipeline Layout") };
 
             layout
         };

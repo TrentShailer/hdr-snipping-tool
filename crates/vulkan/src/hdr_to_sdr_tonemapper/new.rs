@@ -20,7 +20,7 @@ impl<'vulkan> HdrToSdrTonemapper<'vulkan> {
                 .map_err(|e| VkError::new(e, "vkCreateDescriptorSetLayout"))?
             };
 
-            unsafe { try_name_all(vulkan, &layouts, "HDR to SDR Tonemapper Descriptor Layout") };
+            unsafe { try_name_all(vulkan, &layouts, "Tonemapper Descriptor Layout") };
 
             layouts
         };
@@ -36,7 +36,7 @@ impl<'vulkan> HdrToSdrTonemapper<'vulkan> {
             let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
                 .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
 
-            unsafe { try_name(vulkan, layout, "HDR to SDR Tonemapper Pipeline Layout") };
+            unsafe { try_name(vulkan, layout, "Tonemapper Pipeline Layout") };
 
             layout
         };
@@ -58,7 +58,7 @@ impl<'vulkan> HdrToSdrTonemapper<'vulkan> {
                 .map_err(|(_, e)| VkError::new(e, "vkCreateShadersEXT"))?;
 
             let shader = shaders[0];
-            unsafe { try_name(vulkan, shader, "TONEMAPPER COMPUTE SHADER") };
+            unsafe { try_name(vulkan, shader, "Tonemapper Compute Shader") };
 
             shader
         };

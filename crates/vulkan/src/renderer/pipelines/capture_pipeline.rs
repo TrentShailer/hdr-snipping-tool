@@ -72,7 +72,7 @@ impl CapturePipeline {
                 try_name_all(
                     vulkan.as_ref(),
                     &layouts,
-                    "Render Capture Descriptor Layout",
+                    "CapturePipeline Descriptor Layout",
                 )
             };
 
@@ -89,7 +89,7 @@ impl CapturePipeline {
             let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
                 .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
 
-            unsafe { try_name(vulkan.as_ref(), layout, "Render Capture Pipeline Layout") };
+            unsafe { try_name(vulkan.as_ref(), layout, "CapturePipeline Pipeline Layout") };
 
             layout
         };
@@ -117,8 +117,12 @@ impl CapturePipeline {
             let stages: Vec<_> = create_infos.iter().map(|info| info.stage).collect();
 
             let shaders = unsafe {
-                link_shader_objects(vulkan.as_ref(), &mut create_infos, "RENDER CAPTURE")
-                    .map_err(|e| VkError::new(e, "vkCreateShadersEXT"))?
+                link_shader_objects(
+                    vulkan.as_ref(),
+                    &mut create_infos,
+                    "Capture Pipeline Shader",
+                )
+                .map_err(|e| VkError::new(e, "vkCreateShadersEXT"))?
             };
 
             (shaders, stages)

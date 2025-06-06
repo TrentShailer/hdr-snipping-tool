@@ -44,7 +44,8 @@ impl HdrScanner<'_> {
                 .begin_command_buffer(self.command_buffer, &begin_info)
                 .map_err(|e| VkError::new(e, "vkBeginCommandBuffer"))?;
 
-            cmd_try_begin_label(self.vulkan, self.command_buffer, "HDR Scan");
+            cmd_try_begin_label(self.vulkan, self.command_buffer, "HdrScanner::scan");
+            cmd_try_begin_label(self.vulkan, self.command_buffer, "Dispatch");
 
             // Zero initialize the buffer
             {
@@ -123,6 +124,7 @@ impl HdrScanner<'_> {
             }
 
             cmd_try_end_label(self.vulkan, self.command_buffer);
+            cmd_try_end_label(self.vulkan, self.command_buffer);
 
             self.vulkan
                 .device()
@@ -144,10 +146,15 @@ impl HdrScanner<'_> {
 
             unsafe {
                 let queue = self.vulkan.queue(QueuePurpose::Compute).lock();
+                queue_try_begin_label(self.vulkan, *queue, "HdrScanner::scan");
+                queue_try_begin_label(self.vulkan, *queue, "Dispatch");
+
                 self.vulkan
                     .device()
                     .queue_submit(*queue, slice::from_ref(&submit_info), vk::Fence::null())
                     .map_err(|e| VkError::new(e, "vkQueueSubmit"))?;
+
+                queue_try_end_label(self.vulkan, *queue);
                 drop(queue);
             }
         }
@@ -171,7 +178,7 @@ impl HdrScanner<'_> {
                 .map_err(|e| VkError::new(e, "vkAllocateCommandBuffers"))?[0];
 
                 unsafe {
-                    try_name(self.vulkan, buffer, "HDR Scanner Result Command Buffer");
+                    try_name(self.vulkan, buffer, "HdrScanner Result Reader");
                 }
 
                 buffer
@@ -186,7 +193,8 @@ impl HdrScanner<'_> {
                     .begin_command_buffer(command_buffer, &begin_info)
                     .map_err(|e| VkError::new(e, "vkBeginCommandBuffer"))?;
 
-                cmd_try_begin_label(self.vulkan, command_buffer, "HdrScanner Read Result");
+                cmd_try_begin_label(self.vulkan, command_buffer, "HdrScanner::scan");
+                cmd_try_begin_label(self.vulkan, command_buffer, "Copy result to staging");
 
                 let buffer_copy = vk::BufferCopy::default()
                     .size(4)
@@ -200,6 +208,7 @@ impl HdrScanner<'_> {
                     slice::from_ref(&buffer_copy),
                 );
 
+                cmd_try_end_label(self.vulkan, command_buffer);
                 cmd_try_end_label(self.vulkan, command_buffer);
 
                 self.vulkan
@@ -227,13 +236,14 @@ impl HdrScanner<'_> {
 
                 unsafe {
                     let queue = self.vulkan.queue(QueuePurpose::Compute).lock();
-                    queue_try_begin_label(self.vulkan, *queue, "HDR Scanner Read Result");
+                    queue_try_begin_label(self.vulkan, *queue, "Copy result to staging");
 
                     self.vulkan
                         .device()
                         .queue_submit(*queue, slice::from_ref(&submit_info), vk::Fence::null())
                         .map_err(|e| VkError::new(e, "vkQueueSubmit"))?;
 
+                    queue_try_end_label(self.vulkan, *queue);
                     queue_try_end_label(self.vulkan, *queue);
                     drop(queue);
                 }

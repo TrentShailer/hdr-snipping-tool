@@ -32,7 +32,7 @@ winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
 
 # Vulkan
 ash = { version = "0.38", default-features = false, features = ["debug", "std"] }
-ash-helper = { git = "https://github.com/trentshailer/ash-helper", rev = "5854be5" }
+ash-helper = { git = "https://github.com/trentshailer/ash-helper", rev = "8155630" }
 ash-window = { version = "0.13" }
 parking_lot = "0.12"
 vulkan = { path = "crates/vulkan" }

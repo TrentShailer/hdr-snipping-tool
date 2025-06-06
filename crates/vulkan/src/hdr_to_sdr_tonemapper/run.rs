@@ -107,7 +107,7 @@ impl HdrToSdrTonemapper<'_> {
                 self.vulkan.transient_pool(),
                 self.vulkan.queue(QueuePurpose::Compute),
                 |vulkan, command_buffer| {
-                    cmd_try_begin_label(vulkan, command_buffer, "HDR to SDR Tonemap");
+                    cmd_try_begin_label(vulkan, command_buffer, "HdrToSdrTonemapper::tonemap");
 
                     // Transition output to general
                     cmd_transition_image(
@@ -189,7 +189,7 @@ impl HdrToSdrTonemapper<'_> {
 
                     cmd_try_end_label(vulkan, command_buffer);
                 },
-                "HDR to SDR Tonemap",
+                "HdrToSdrTonemapper::tonemap > Dispatch",
             )?;
         }
 
