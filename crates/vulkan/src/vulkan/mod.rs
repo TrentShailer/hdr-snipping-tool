@@ -17,11 +17,6 @@ mod new;
 /// Up to two queues are created, one for Graphics and one for Compute.
 pub struct Vulkan {
     entry: ash::Entry,
-
-    #[allow(unused)]
-    vp_entry: vp_ash::Entry,
-    capabilities: vp_ash::Capabilities,
-
     instance: ash::Instance,
     physical_device: vk::PhysicalDevice,
     device: ash::Device,

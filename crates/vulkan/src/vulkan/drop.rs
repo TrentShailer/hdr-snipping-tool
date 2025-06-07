@@ -22,8 +22,6 @@ impl Drop for Vulkan {
             }
 
             self.instance.destroy_instance(None);
-
-            self.capabilities.destroy_capabilities(None);
         }
     }
 }

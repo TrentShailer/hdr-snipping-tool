@@ -283,10 +283,10 @@ impl Vulkan {
             ))
         };
 
+        unsafe { capabilities.destroy_capabilities(None) };
+
         let vulkan = Self {
             entry,
-            vp_entry,
-            capabilities,
             instance,
             physical_device,
             device,
