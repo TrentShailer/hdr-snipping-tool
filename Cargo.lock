@@ -114,6 +114,7 @@ checksum = "0bb44936d800fea8f016d7f2311c6a4f97aebd5dc86f09906139ec848cf3a46f"
 [[package]]
 name = "ash-helper"
 version = "0.7.0"
+source = "git+https://github.com/trentshailer/ash-helper?rev=588e56c#588e56cd72181493583b8b319401ecc3d804dc68"
 dependencies = [
  "ash",
  "parking_lot",
@@ -1012,7 +1013,7 @@ checksum = "84b26c544d002229e640969970a2e74021aadf6e2f96372b9c58eff97de08eb3"
 
 [[package]]
 name = "hdr-snipping-tool"
-version = "4.1.13"
+version = "4.1.14"
 dependencies = [
  "arboard",
  "ash",
@@ -2760,7 +2761,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vp-ash"
 version = "0.5.0+1.4.304"
-source = "git+https://github.com/TrentShailer/vulkan-profiles-ash.git?branch=vulkan-sdk-1.4.304#54d9b8c2319629b64b023f55b6fe50caf67f9c0b"
+source = "git+https://github.com/trentshailer/vulkan-profiles-ash?branch=vulkan-sdk-1.4.304#54d9b8c2319629b64b023f55b6fe50caf67f9c0b"
 dependencies = [
  "ash",
  "cc",
