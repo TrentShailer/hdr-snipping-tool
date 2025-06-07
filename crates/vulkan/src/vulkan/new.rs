@@ -188,7 +188,7 @@ impl Vulkan {
             let queue_properties =
                 unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
 
-            let (index, properties) = queue_properties
+            let (index, _properties) = queue_properties
                 .into_iter()
                 .enumerate()
                 .find(|(_, properties)| {
@@ -198,7 +198,9 @@ impl Vulkan {
                 .map(|(index, properties)| (index as u32, properties))
                 .unwrap();
 
-            let queue_count = properties.queue_count.min(2);
+            // let queue_count = properties.queue_count.min(2);
+            let queue_count = 1;
+
             (index, queue_count)
         };
 
