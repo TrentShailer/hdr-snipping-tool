@@ -114,6 +114,10 @@ impl ApplicationState for ActiveApplication {
 
 impl From<LoadingApplication> for ActiveApplication {
     fn from(application: LoadingApplication) -> Self {
+        debug!(
+            "[MEMORY] Vulkan: {} bytes",
+            application.core.vulkan.get_memory_usage()
+        );
         debug!("[TRANSITION] Loading -> Active");
 
         let core = application.core;

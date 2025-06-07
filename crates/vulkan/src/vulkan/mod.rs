@@ -107,6 +107,11 @@ impl Vulkan {
 
         locks
     }
+
+    /// Returns the memory usage tracked by the Vulkan global allocator.
+    pub fn get_memory_usage(&self) -> usize {
+        ash_helper::vk_global_allocator::get_memory_usage()
+    }
 }
 
 impl Context<khr::push_descriptor::Device> for Vulkan {

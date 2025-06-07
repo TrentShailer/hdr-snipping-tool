@@ -37,6 +37,10 @@ impl ApplicationState for InactiveApplication {
 
 impl From<LoadingApplication> for InactiveApplication {
     fn from(mut application: LoadingApplication) -> Self {
+        debug!(
+            "[MEMORY] Vulkan: {} bytes",
+            application.core.vulkan.get_memory_usage()
+        );
         debug!("[TRANSITION] Loading -> Inactive");
 
         let mut core = application.core;
@@ -64,6 +68,10 @@ impl From<LoadingApplication> for InactiveApplication {
 
 impl From<ActiveApplication> for InactiveApplication {
     fn from(application: ActiveApplication) -> Self {
+        debug!(
+            "[MEMORY] Vulkan: {} bytes",
+            application.core.vulkan.get_memory_usage()
+        );
         debug!("[TRANSITION] Active -> Inactive");
 
         let mut core = application.core;

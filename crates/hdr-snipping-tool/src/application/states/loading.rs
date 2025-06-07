@@ -150,6 +150,10 @@ impl ApplicationState for LoadingApplication {
 
 impl From<InactiveApplication> for LoadingApplication {
     fn from(application: InactiveApplication) -> Self {
+        debug!(
+            "[MEMORY] Vulkan: {} bytes",
+            application.core.vulkan.get_memory_usage()
+        );
         debug!("[TRANSITION] Inactive -> Loading");
 
         let mut application = Self {

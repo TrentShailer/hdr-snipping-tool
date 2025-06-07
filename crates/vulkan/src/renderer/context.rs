@@ -1,5 +1,7 @@
 use ash::{khr, vk};
-use ash_helper::{LabelledVkResult, SurfaceContext, VkError, VulkanContext, try_name};
+use ash_helper::{
+    LabelledVkResult, SurfaceContext, VK_GLOBAL_ALLOCATOR, VkError, VulkanContext, try_name,
+};
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 
 use crate::Vulkan;
@@ -25,7 +27,7 @@ impl Surface {
                 vulkan.instance(),
                 display_handle,
                 window_handle,
-                None,
+                VK_GLOBAL_ALLOCATOR.as_deref(),
             )
             .map_err(|e| VkError::new(e, "createSurface"))?
         };
@@ -83,7 +85,8 @@ impl SurfaceContext for Surface {
 impl Drop for Surface {
     fn drop(&mut self) {
         unsafe {
-            self.surface_instance.destroy_surface(self.surface, None);
+            self.surface_instance
+                .destroy_surface(self.surface, VK_GLOBAL_ALLOCATOR.as_deref());
         }
     }
 }

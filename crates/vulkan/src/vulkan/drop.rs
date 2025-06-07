@@ -1,3 +1,4 @@
+use ash_helper::VK_GLOBAL_ALLOCATOR;
 use tracing::error;
 
 use super::Vulkan;
@@ -10,18 +11,21 @@ impl Drop for Vulkan {
             }
 
             let pool = self.transient_pool.lock();
-            self.device.destroy_command_pool(*pool, None);
+            self.device
+                .destroy_command_pool(*pool, VK_GLOBAL_ALLOCATOR.as_deref());
             drop(pool);
 
-            self.device.destroy_device(None);
+            self.device.destroy_device(VK_GLOBAL_ALLOCATOR.as_deref());
 
             if let Some(debug_utils) = self.debug_utils.as_ref() {
-                debug_utils
-                    .instance
-                    .destroy_debug_utils_messenger(debug_utils.messenger, None);
+                debug_utils.instance.destroy_debug_utils_messenger(
+                    debug_utils.messenger,
+                    VK_GLOBAL_ALLOCATOR.as_deref(),
+                );
             }
 
-            self.instance.destroy_instance(None);
+            self.instance
+                .destroy_instance(VK_GLOBAL_ALLOCATOR.as_deref());
         }
     }
 }

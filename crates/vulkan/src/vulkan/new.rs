@@ -4,7 +4,9 @@ use std::{io, path::Path};
 use alloc::sync::Arc;
 
 use ash::{ext, khr, vk};
-use ash_helper::{DebugUtils, VkError, VulkanLayer, try_name, vulkan_debug_callback};
+use ash_helper::{
+    DebugUtils, VK_GLOBAL_ALLOCATOR, VkError, VulkanLayer, try_name, vulkan_debug_callback,
+};
 use parking_lot::Mutex;
 use raw_window_handle::RawDisplayHandle;
 use thiserror::Error;
@@ -44,7 +46,7 @@ impl Vulkan {
                 .api_version(vk::make_api_version(0, 1, 2, 198))
                 .flags(vp::CapabilitiesCreateFlags::STATIC);
 
-            unsafe { vp_entry.create_capabilities(&create_info, None) }
+            unsafe { vp_entry.create_capabilities(&create_info, VK_GLOBAL_ALLOCATOR.as_deref()) }
                 .map_err(|e| VkError::new(e, "vpCreateCapabilities"))?
         };
 
@@ -133,8 +135,11 @@ impl Vulkan {
                 .create_info(&vk_create_info)
                 .enabled_full_profiles(&enabled_profiles);
 
-            unsafe { capabilities.create_instance(&entry, &vp_create_info, None) }
-                .map_err(|e| VkError::new(e, "vpCreateInstance"))?
+            unsafe {
+                capabilities
+                    .create_instance(&entry, &vp_create_info, VK_GLOBAL_ALLOCATOR.as_deref())
+                    .map_err(|e| VkError::new(e, "vpCreateInstance"))?
+            }
         };
 
         // Select a physical device.
@@ -247,8 +252,15 @@ impl Vulkan {
                 .create_info(&vk_create_info)
                 .enabled_full_profiles(&enabled_profiles);
 
-            unsafe { capabilities.create_device(&instance, physical_device, &vp_create_info, None) }
-                .map_err(|e| VkError::new(e, "vpCreateDevice"))?
+            unsafe {
+                capabilities.create_device(
+                    &instance,
+                    physical_device,
+                    &vp_create_info,
+                    VK_GLOBAL_ALLOCATOR.as_deref(),
+                )
+            }
+            .map_err(|e| VkError::new(e, "vpCreateDevice"))?
         };
 
         // Retrieve the queues.
@@ -278,7 +290,7 @@ impl Vulkan {
                 .queue_family_index(queue_family_index);
 
             Arc::new(Mutex::new(
-                unsafe { device.create_command_pool(&create_info, None) }
+                unsafe { device.create_command_pool(&create_info, VK_GLOBAL_ALLOCATOR.as_deref()) }
                     .map_err(|e| VkError::new(e, "vkCreateCommandPool"))?,
             ))
         };

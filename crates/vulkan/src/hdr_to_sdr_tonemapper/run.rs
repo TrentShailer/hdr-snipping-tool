@@ -5,8 +5,8 @@ use ash::{
     vk::{self, ImageViewType},
 };
 use ash_helper::{
-    Context, VkError, VulkanContext, allocate_image, cmd_transition_image, cmd_try_begin_label,
-    cmd_try_end_label, onetime_command,
+    Context, VK_GLOBAL_ALLOCATOR, VkError, VulkanContext, allocate_image, cmd_transition_image,
+    cmd_try_begin_label, cmd_try_end_label, onetime_command,
 };
 use bytemuck::bytes_of;
 use utilities::DebugTime;
@@ -84,7 +84,7 @@ impl HdrToSdrTonemapper<'_> {
             unsafe {
                 self.vulkan
                     .device()
-                    .create_image_view(&image_view_create_info, None)
+                    .create_image_view(&image_view_create_info, VK_GLOBAL_ALLOCATOR.as_deref())
                     .map_err(|e| VkError::new(e, "vkCreateImageView"))?
             }
         };
@@ -197,7 +197,7 @@ impl HdrToSdrTonemapper<'_> {
         unsafe {
             self.vulkan
                 .device()
-                .destroy_image_view(output_image_view, None);
+                .destroy_image_view(output_image_view, VK_GLOBAL_ALLOCATOR.as_deref());
         }
 
         Ok(SdrImage {

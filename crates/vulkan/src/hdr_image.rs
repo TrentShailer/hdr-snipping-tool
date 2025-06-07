@@ -1,7 +1,7 @@
 use ash::vk;
 use ash_helper::{
-    AllocationError, VkError, VulkanContext, cmd_transition_image, find_memorytype_index,
-    onetime_command,
+    AllocationError, VK_GLOBAL_ALLOCATOR, VkError, VulkanContext, cmd_transition_image,
+    find_memorytype_index, onetime_command,
 };
 use utilities::DebugTime;
 
@@ -55,7 +55,7 @@ impl HdrImage {
 
             vulkan
                 .device()
-                .create_image(&image_create_info, None)
+                .create_image(&image_create_info, VK_GLOBAL_ALLOCATOR.as_deref())
                 .map_err(|e| VkError::new(e, "vkCreateImage"))?
         };
 
@@ -83,7 +83,7 @@ impl HdrImage {
 
             let device_memory = vulkan
                 .device()
-                .allocate_memory(&allocate_info, None)
+                .allocate_memory(&allocate_info, VK_GLOBAL_ALLOCATOR.as_deref())
                 .map_err(|e| VkError::new(e, "vkAllocateMemory"))?;
 
             (device_memory, memory_requirements)
@@ -113,7 +113,7 @@ impl HdrImage {
                 );
             vulkan
                 .device()
-                .create_image_view(&create_info, None)
+                .create_image_view(&create_info, VK_GLOBAL_ALLOCATOR.as_deref())
                 .map_err(|e| VkError::new(e, "vkCreateImageView"))?
         };
 
@@ -148,9 +148,15 @@ impl HdrImage {
     /// Destroy the image.
     pub unsafe fn destroy(self, vulkan: &Vulkan) {
         unsafe {
-            vulkan.device().destroy_image_view(self.view, None);
-            vulkan.device().destroy_image(self.image, None);
-            vulkan.device().free_memory(self.memory, None);
+            vulkan
+                .device()
+                .destroy_image_view(self.view, VK_GLOBAL_ALLOCATOR.as_deref());
+            vulkan
+                .device()
+                .destroy_image(self.image, VK_GLOBAL_ALLOCATOR.as_deref());
+            vulkan
+                .device()
+                .free_memory(self.memory, VK_GLOBAL_ALLOCATOR.as_deref());
         }
     }
 }

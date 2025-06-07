@@ -2,7 +2,8 @@ use core::slice;
 
 use ash::vk;
 use ash_helper::{
-    AllocationError, VkError, VulkanContext, allocate_buffer, cmd_transition_image, onetime_command,
+    AllocationError, VK_GLOBAL_ALLOCATOR, VkError, VulkanContext, allocate_buffer,
+    cmd_transition_image, onetime_command,
 };
 use thiserror::Error;
 
@@ -131,8 +132,12 @@ impl SdrImage {
 
         // Free resources
         unsafe {
-            vulkan.device().destroy_buffer(staging_buffer, None);
-            vulkan.device().free_memory(staging_memory, None);
+            vulkan
+                .device()
+                .destroy_buffer(staging_buffer, VK_GLOBAL_ALLOCATOR.as_deref());
+            vulkan
+                .device()
+                .free_memory(staging_memory, VK_GLOBAL_ALLOCATOR.as_deref());
         }
 
         Ok(bytes)
@@ -141,8 +146,12 @@ impl SdrImage {
     /// Destroy the image.
     pub unsafe fn destroy(self, vulkan: &Vulkan) {
         unsafe {
-            vulkan.device().destroy_image(self.image, None);
-            vulkan.device().free_memory(self.memory, None);
+            vulkan
+                .device()
+                .destroy_image(self.image, VK_GLOBAL_ALLOCATOR.as_deref());
+            vulkan
+                .device()
+                .free_memory(self.memory, VK_GLOBAL_ALLOCATOR.as_deref());
         }
     }
 }

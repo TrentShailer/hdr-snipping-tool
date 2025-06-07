@@ -2,7 +2,7 @@
 //!
 
 use ash::vk;
-use ash_helper::{VulkanContext, allocate_buffer};
+use ash_helper::{VK_GLOBAL_ALLOCATOR, VulkanContext, allocate_buffer};
 
 use vulkan::Vulkan;
 
@@ -31,8 +31,12 @@ fn valid_vulkan_context() {
     };
 
     unsafe {
-        vulkan.device().free_memory(memory, None);
-        vulkan.device().destroy_buffer(buffer, None);
+        vulkan
+            .device()
+            .free_memory(memory, VK_GLOBAL_ALLOCATOR.as_deref());
+        vulkan
+            .device()
+            .destroy_buffer(buffer, VK_GLOBAL_ALLOCATOR.as_deref());
     }
 
     drop(vulkan);

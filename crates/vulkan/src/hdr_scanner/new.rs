@@ -1,7 +1,9 @@
 use core::slice;
 
 use ash::{ext, vk};
-use ash_helper::{Context, VkError, VulkanContext, allocate_buffer, try_name, try_name_all};
+use ash_helper::{
+    Context, VK_GLOBAL_ALLOCATOR, VkError, VulkanContext, allocate_buffer, try_name, try_name_all,
+};
 
 use crate::{Vulkan, shaders::maximum_reduction};
 
@@ -30,8 +32,12 @@ impl<'vulkan> HdrScanner<'vulkan> {
             let create_info =
                 vk::PipelineLayoutCreateInfo::default().set_layouts(&descriptor_layouts);
 
-            let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
-                .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
+            let layout = unsafe {
+                vulkan
+                    .device()
+                    .create_pipeline_layout(&create_info, VK_GLOBAL_ALLOCATOR.as_deref())
+            }
+            .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
 
             unsafe { try_name(vulkan, layout, "HdrScanner Pipeline Layout") };
 
@@ -48,8 +54,13 @@ impl<'vulkan> HdrScanner<'vulkan> {
                 .set_layouts(&descriptor_layouts);
 
             let device: &ext::shader_object::Device = unsafe { vulkan.context() };
-            let shaders = unsafe { device.create_shaders(slice::from_ref(&create_info), None) }
-                .map_err(|(_, e)| VkError::new(e, "vkCreateShadersEXT"))?;
+            let shaders = unsafe {
+                device.create_shaders(
+                    slice::from_ref(&create_info),
+                    VK_GLOBAL_ALLOCATOR.as_deref(),
+                )
+            }
+            .map_err(|(_, e)| VkError::new(e, "vkCreateShadersEXT"))?;
 
             let shader = shaders[0];
             unsafe { try_name(vulkan, shader, "HdrScanner Compute Shader") };
@@ -100,8 +111,12 @@ impl<'vulkan> HdrScanner<'vulkan> {
                 let pool_create_info = vk::CommandPoolCreateInfo::default()
                     .queue_family_index(vulkan.queue_family_index());
 
-                unsafe { vulkan.device().create_command_pool(&pool_create_info, None) }
-                    .map_err(|e| VkError::new(e, "vkCreateCommandPool"))?
+                unsafe {
+                    vulkan
+                        .device()
+                        .create_command_pool(&pool_create_info, VK_GLOBAL_ALLOCATOR.as_deref())
+                }
+                .map_err(|e| VkError::new(e, "vkCreateCommandPool"))?
             };
 
             let buffer = {
@@ -124,8 +139,12 @@ impl<'vulkan> HdrScanner<'vulkan> {
                     .semaphore_type(vk::SemaphoreType::TIMELINE);
                 let create_info = vk::SemaphoreCreateInfo::default().push_next(&mut type_info);
 
-                unsafe { vulkan.device().create_semaphore(&create_info, None) }
-                    .map_err(|e| VkError::new(e, "vkCreateSemaphore"))?
+                unsafe {
+                    vulkan
+                        .device()
+                        .create_semaphore(&create_info, VK_GLOBAL_ALLOCATOR.as_deref())
+                }
+                .map_err(|e| VkError::new(e, "vkCreateSemaphore"))?
             };
 
             // Debug: Name the objects.

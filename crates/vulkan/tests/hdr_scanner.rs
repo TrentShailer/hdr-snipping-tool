@@ -9,7 +9,8 @@ use alloc::sync::Arc;
 
 use ash::{util::Align, vk};
 use ash_helper::{
-    VulkanContext, allocate_buffer, allocate_image, cmd_transition_image, onetime_command,
+    VK_GLOBAL_ALLOCATOR, VulkanContext, allocate_buffer, allocate_image, cmd_transition_image,
+    onetime_command,
 };
 use half::f16;
 use rand::Rng;
@@ -180,8 +181,12 @@ fn hdr_scanner_random_data() {
         )
         .unwrap();
 
-        vulkan.device().destroy_buffer(staging_buffer, None);
-        vulkan.device().free_memory(staging_memory, None);
+        vulkan
+            .device()
+            .destroy_buffer(staging_buffer, VK_GLOBAL_ALLOCATOR.as_deref());
+        vulkan
+            .device()
+            .free_memory(staging_memory, VK_GLOBAL_ALLOCATOR.as_deref());
     }
     // Shadow destroyed objects
     #[expect(unused)]
@@ -204,7 +209,7 @@ fn hdr_scanner_random_data() {
             );
         vulkan
             .device()
-            .create_image_view(&create_info, None)
+            .create_image_view(&create_info, VK_GLOBAL_ALLOCATOR.as_deref())
             .unwrap()
     };
 

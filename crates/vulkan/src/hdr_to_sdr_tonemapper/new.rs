@@ -1,7 +1,7 @@
 use core::slice;
 
 use ash::{ext, vk};
-use ash_helper::{Context, VkError, VulkanContext, try_name, try_name_all};
+use ash_helper::{Context, VK_GLOBAL_ALLOCATOR, VkError, VulkanContext, try_name, try_name_all};
 
 use crate::{Vulkan, shaders::tonemap_hdr_to_sdr};
 
@@ -33,8 +33,12 @@ impl<'vulkan> HdrToSdrTonemapper<'vulkan> {
                 .set_layouts(&descriptor_layouts)
                 .push_constant_ranges(slice::from_ref(&push_range));
 
-            let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
-                .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
+            let layout = unsafe {
+                vulkan
+                    .device()
+                    .create_pipeline_layout(&create_info, VK_GLOBAL_ALLOCATOR.as_deref())
+            }
+            .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
 
             unsafe { try_name(vulkan, layout, "Tonemapper Pipeline Layout") };
 
@@ -54,8 +58,13 @@ impl<'vulkan> HdrToSdrTonemapper<'vulkan> {
                 .push_constant_ranges(slice::from_ref(&push_range));
 
             let device: &ext::shader_object::Device = unsafe { vulkan.context() };
-            let shaders = unsafe { device.create_shaders(slice::from_ref(&create_info), None) }
-                .map_err(|(_, e)| VkError::new(e, "vkCreateShadersEXT"))?;
+            let shaders = unsafe {
+                device.create_shaders(
+                    slice::from_ref(&create_info),
+                    VK_GLOBAL_ALLOCATOR.as_deref(),
+                )
+            }
+            .map_err(|(_, e)| VkError::new(e, "vkCreateShadersEXT"))?;
 
             let shader = shaders[0];
             unsafe { try_name(vulkan, shader, "Tonemapper Compute Shader") };

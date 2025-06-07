@@ -5,7 +5,9 @@ use core::slice;
 use windows_capture_provider::{CaptureItemCache, DirectX, Monitor, WindowsCapture};
 
 use ash::vk;
-use ash_helper::{VulkanContext, allocate_buffer, cmd_transition_image, onetime_command};
+use ash_helper::{
+    VK_GLOBAL_ALLOCATOR, VulkanContext, allocate_buffer, cmd_transition_image, onetime_command,
+};
 use image::ColorType;
 use testing::setup_logger;
 use tracing::info_span;
@@ -159,8 +161,12 @@ fn main() {
     }
 
     unsafe {
-        vulkan.device().destroy_buffer(staging_buffer, None);
-        vulkan.device().free_memory(staging_memory, None);
+        vulkan
+            .device()
+            .destroy_buffer(staging_buffer, VK_GLOBAL_ALLOCATOR.as_deref());
+        vulkan
+            .device()
+            .free_memory(staging_memory, VK_GLOBAL_ALLOCATOR.as_deref());
         hdr_image.destroy(&vulkan);
         sdr_image.destroy(&vulkan);
     }

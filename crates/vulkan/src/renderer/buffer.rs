@@ -2,7 +2,8 @@ use core::slice;
 
 use ash::{util::Align, vk};
 use ash_helper::{
-    BufferAlignment, BufferUsageFlags, VkError, VulkanContext, allocate_buffer, onetime_command,
+    BufferAlignment, BufferUsageFlags, VK_GLOBAL_ALLOCATOR, VkError, VulkanContext,
+    allocate_buffer, onetime_command,
 };
 
 use crate::{
@@ -222,8 +223,12 @@ impl RenderBuffer {
 
         // Cleanup
         unsafe {
-            vulkan.device().destroy_buffer(staging_buffer, None);
-            vulkan.device().free_memory(staging_memory, None);
+            vulkan
+                .device()
+                .destroy_buffer(staging_buffer, VK_GLOBAL_ALLOCATOR.as_deref());
+            vulkan
+                .device()
+                .free_memory(staging_memory, VK_GLOBAL_ALLOCATOR.as_deref());
         }
 
         Ok(Self {

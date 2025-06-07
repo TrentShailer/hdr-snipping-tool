@@ -3,7 +3,8 @@ use core::slice;
 
 use ash::{ext, khr, vk};
 use ash_helper::{
-    Context, LabelledVkResult, VkError, VulkanContext, link_shader_objects, try_name, try_name_all,
+    Context, LabelledVkResult, VK_GLOBAL_ALLOCATOR, VkError, VulkanContext, link_shader_objects,
+    try_name, try_name_all,
 };
 use bytemuck::bytes_of;
 
@@ -51,8 +52,12 @@ impl CapturePipeline {
         let sampler = {
             let create_info = vk::SamplerCreateInfo::default();
 
-            let sampler = unsafe { vulkan.device().create_sampler(&create_info, None) }
-                .map_err(|e| VkError::new(e, "vkCreateSampler"))?;
+            let sampler = unsafe {
+                vulkan
+                    .device()
+                    .create_sampler(&create_info, VK_GLOBAL_ALLOCATOR.as_deref())
+            }
+            .map_err(|e| VkError::new(e, "vkCreateSampler"))?;
 
             unsafe { try_name(vulkan.as_ref(), sampler, "Capture Sampler") };
 
@@ -86,8 +91,12 @@ impl CapturePipeline {
                 .set_layouts(&descriptor_layouts)
                 .push_constant_ranges(slice::from_ref(&push_range));
 
-            let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
-                .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
+            let layout = unsafe {
+                vulkan
+                    .device()
+                    .create_pipeline_layout(&create_info, VK_GLOBAL_ALLOCATOR.as_deref())
+            }
+            .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
 
             unsafe { try_name(vulkan.as_ref(), layout, "CapturePipeline Pipeline Layout") };
 
@@ -247,21 +256,23 @@ impl Drop for CapturePipeline {
         unsafe {
             let shader_device: &ext::shader_object::Device = self.vulkan.context();
 
-            self.shaders
-                .iter()
-                .for_each(|shader| shader_device.destroy_shader(*shader, None));
+            self.shaders.iter().for_each(|shader| {
+                shader_device.destroy_shader(*shader, VK_GLOBAL_ALLOCATOR.as_deref())
+            });
 
             self.vulkan
                 .device()
-                .destroy_pipeline_layout(self.pipeline_layout, None);
+                .destroy_pipeline_layout(self.pipeline_layout, VK_GLOBAL_ALLOCATOR.as_deref());
 
             self.descriptor_layouts.iter().for_each(|layout| {
                 self.vulkan
                     .device()
-                    .destroy_descriptor_set_layout(*layout, None);
+                    .destroy_descriptor_set_layout(*layout, VK_GLOBAL_ALLOCATOR.as_deref());
             });
 
-            self.vulkan.device().destroy_sampler(self.sampler, None);
+            self.vulkan
+                .device()
+                .destroy_sampler(self.sampler, VK_GLOBAL_ALLOCATOR.as_deref());
         }
     }
 }

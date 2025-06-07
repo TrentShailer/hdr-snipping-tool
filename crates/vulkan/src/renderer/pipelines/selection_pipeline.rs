@@ -3,7 +3,8 @@ use core::slice;
 
 use ash::{ext, vk};
 use ash_helper::{
-    Context, LabelledVkResult, Swapchain, VkError, VulkanContext, link_shader_objects, try_name,
+    Context, LabelledVkResult, Swapchain, VK_GLOBAL_ALLOCATOR, VkError, VulkanContext,
+    link_shader_objects, try_name,
 };
 use bytemuck::bytes_of;
 
@@ -106,8 +107,12 @@ impl SelectionPipeline {
             let create_info = vk::PipelineLayoutCreateInfo::default()
                 .push_constant_ranges(slice::from_ref(&push_range));
 
-            let layout = unsafe { vulkan.device().create_pipeline_layout(&create_info, None) }
-                .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?;
+            let layout = unsafe {
+                vulkan
+                    .device()
+                    .create_pipeline_layout(&create_info, VK_GLOBAL_ALLOCATOR.as_deref())
+                    .map_err(|e| VkError::new(e, "vkCreatePiplineLayout"))?
+            };
 
             unsafe { try_name(vulkan.as_ref(), layout, "SelectionPipeline Pipeline Layout") };
 
@@ -225,13 +230,13 @@ impl Drop for SelectionPipeline {
         unsafe {
             let shader_device: &ext::shader_object::Device = self.vulkan.context();
 
-            self.shaders
-                .iter()
-                .for_each(|shader| shader_device.destroy_shader(*shader, None));
+            self.shaders.iter().for_each(|shader| {
+                shader_device.destroy_shader(*shader, VK_GLOBAL_ALLOCATOR.as_deref())
+            });
 
             self.vulkan
                 .device()
-                .destroy_pipeline_layout(self.pipeline_layout, None);
+                .destroy_pipeline_layout(self.pipeline_layout, VK_GLOBAL_ALLOCATOR.as_deref());
         }
     }
 }

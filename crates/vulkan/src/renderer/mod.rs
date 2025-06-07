@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 use ash_helper::{
-    AllocationError, Swapchain, SwapchainPreferences, SwapchainRetirement, VkError, VulkanContext,
+    AllocationError, Swapchain, SwapchainPreferences, SwapchainRetirement, VK_GLOBAL_ALLOCATOR,
+    VkError, VulkanContext,
 };
 use buffer::RenderBuffer;
 use context::Surface;
@@ -89,10 +90,10 @@ impl Drop for Renderer {
 
             self.vulkan
                 .device()
-                .destroy_buffer(self.render_buffer.buffer, None);
+                .destroy_buffer(self.render_buffer.buffer, VK_GLOBAL_ALLOCATOR.as_deref());
             self.vulkan
                 .device()
-                .free_memory(self.render_buffer.memory, None);
+                .free_memory(self.render_buffer.memory, VK_GLOBAL_ALLOCATOR.as_deref());
 
             self.swapchain.destroy(self.vulkan.as_ref(), &self.surface);
         }
